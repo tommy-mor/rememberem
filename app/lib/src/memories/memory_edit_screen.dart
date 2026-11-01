@@ -1,0 +1,115 @@
+import 'package:flutter/material.dart';
+import 'package:rememberem_core/rememberem_core.dart';
+
+import '../speech/dictated_text_field.dart';
+import '../speech/dictation.dart';
+import 'memory_editor.dart';
+
+/// The photo of a person with spoken-or-typed notes, saved as you go.
+class MemoryEditScreen extends StatefulWidget {
+  const MemoryEditScreen({
+    super.key,
+    required this.memory,
+    required this.repository,
+    required this.dictation,
+  });
+
+  final Memory memory;
+  final MemoryRepository repository;
+  final Dictation dictation;
+
+  @override
+  State<MemoryEditScreen> createState() => _MemoryEditScreenState();
+}
+
+class _MemoryEditScreenState extends State<MemoryEditScreen> {
+  late final MemoryEditor _editor =
+      MemoryEditor(widget.repository, widget.memory);
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // Saves straight away if the app is sent to the background.
+    _lifecycle = AppLifecycleListener(onInactive: _editor.flush);
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    _editor.flush();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Finish saving before leaving, so the list behind shows the latest.
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        await _editor.flush();
+        navigator.pop();
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
+    final memory = widget.memory;
+    return Scaffold(
+      appBar: AppBar(title: const Text('New person')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                widget.repository.photoFile(memory),
+                height: 280,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) =>
+                    const SizedBox(height: 280, child: Icon(Icons.person)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _captionFor(memory),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          for (final field in MemoryField.values) ...[
+            const SizedBox(height: 16),
+            DictatedTextField(
+              label: field.label,
+              initialValue: memory.field(field),
+              dictation: widget.dictation,
+              multiline: field == MemoryField.details,
+              onChanged: (value) => _editor.update(field.key, value),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Text(
+            'Saved automatically.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _captionFor(Memory memory) {
+    final when = MaterialLocalizations.of(context).formatMediumDate(
+      memory.capturedAt,
+    );
+    final where = memory.location;
+    return where == null
+        ? when
+        : '$when · ${where.latitude.toStringAsFixed(5)}, '
+            '${where.longitude.toStringAsFixed(5)}';
+  }
+}
