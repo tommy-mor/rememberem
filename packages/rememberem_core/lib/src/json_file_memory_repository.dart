@@ -54,8 +54,15 @@ class JsonFileMemoryRepository implements MemoryRepository {
           (onDisk) => memory
               .withTrashedAt(onDisk.trashedAt)
               .withScore(onDisk.points, onDisk.lastCorrectDate)
-              .withDetailScores(onDisk.details),
+              .withDetailScores(onDisk.details)
+              // The link changes only through setContactKey.
+              .withContactKey(onDisk.contactKey),
         ),
+      );
+
+  @override
+  Future<void> setContactKey(String id, String? key) => _serial(
+        () => _update(id, (onDisk) => onDisk.withContactKey(key)),
       );
 
   @override

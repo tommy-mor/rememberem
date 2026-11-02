@@ -60,6 +60,13 @@ These summarise the shipped stories. Where they conflict with older entries belo
   - **Timeline.** Only happenings reach it; anyone without one appears once as "recorded".
   - **Card.** The card shows four add buttons. Each kind is added and changed on its own screen, and a blank description is never saved.
   - **Rollback risk.** A build older than this one would drop the new keys on its next save of a record, so never install an older build over newer data.
+- **Story 17: contact link.**
+  - **What is stored.** A person may hold one top-level `contactKey` (Android's contact lookup key) and nothing else about the contact. It is written only when set. Save, trash, restore and merge keep it; merge keeps the survivor's own link, else adopts the other's. Purge removes it with the record. It changes only through `setContactKey`, so a stale editor save cannot undo it. A malformed value reads as no link.
+  - **The icon.** The card's app-bar icon is shown only when `AppServices.contacts` is set (Android). Unlinked, a tap asks for READ_CONTACTS once. If granted, a dialog lists every contact's lookup key and name only, opened at the best name match (`ContactMatcher`), and the list lives only as long as the dialog. If refused, the system contact picker is used instead, which needs no permission. Linked, a tap opens the contact; a long press offers Re-assign or Remove link. A deleted contact shows "not found" and the link is never removed automatically.
+  - **The channel.** `ContactsChannel.kt` has no network code and never writes contacts; it handles one pending call per operation, and the button ignores taps while busy.
+  - **Verified on the emulator, debug and release.** Linking, opening, and not-found after deleting the contact.
+  - **Not verified.** iOS (no icon there), and the S22.
+  - **Release.** Play needs a declaration for READ_CONTACTS before a public release.
 
 ## Invariants
 
@@ -74,7 +81,7 @@ These summarise the shipped stories. Where they conflict with older entries belo
 9. Photos and records are written only under the app-private documents directory, never to the gallery or external storage. Evidence: main.dart:16-21; json_file_memory_repository.dart:26-34. Tested: no.
 10. The upright scratch copy in the cache directory is deleted in a `finally` after the face step. Evidence: portrait_capture.dart:40-57. Tested: unconfirmed (Grace says yes, Sally says no).
 11. The raw camera file is deleted right after its bytes are read, before processing, and not at all if readAsBytes throws. This is the root of risk 1. Evidence: capture_screen.dart:70-72. Tested: no.
-12. The app's own code has no share, export or network client. Only plugins send data: the speech recognizer, ML Kit, and (since story 15, with Street maps on) flutter_map fetching OSM tiles, which reveal only the area viewed and never person data. A widget test checks that no `TileLayer` is built when Street maps is off. Face detection is on-device. Speech is not forced on-device. Evidence: no matches in app/lib; AndroidManifest.xml:11-32; device_dictation.dart:26-34. Tested: no.
+12. The app's own code has no share, export or network client (the Kotlin photo and contacts channels included). Only plugins send data: the speech recognizer, ML Kit, and (since story 15, with Street maps on) flutter_map fetching OSM tiles, which reveal only the area viewed and never person data. A widget test checks that no `TileLayer` is built when Street maps is off. Face detection is on-device. Speech is not forced on-device. Evidence: no matches in app/lib; AndroidManifest.xml:11-32; device_dictation.dart:26-34. Tested: no.
 13. Capture flow: back camera, no audio, shutter disabled until the camera is ready or while saving, camera failure shows "Camera unavailable: <error>" with no retry, and backing out before the shutter saves nothing. Evidence: capture_screen.dart:39-92,132. Tested: no.
 14. The notes screen shows the photo, the date and any coordinates, then Name, Place, Meeting and Details in that order, with the footer "Saved automatically." and no Save or delete button. Evidence: memory_edit_screen.dart:61-114; memory_field.dart:6-9. Tested: no.
 15. The list shows people newest first (name or "Unnamed", then place and meeting) and reloads on didPopNext. Evidence: memory_list_screen.dart:43-47,70-98. Tested: no.

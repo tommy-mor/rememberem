@@ -55,9 +55,21 @@ class FakeMemoryRepository implements MemoryRepository {
           onDisk?.points ?? memory.points,
           onDisk == null ? memory.lastCorrectDate : onDisk.lastCorrectDate,
         )
-        .withDetailScores(onDisk?.details ?? const []);
+        .withDetailScores(onDisk?.details ?? const [])
+        .withContactKey(onDisk == null ? memory.contactKey : onDisk.contactKey);
     stored[memory.id] = saved;
     saves.add(saved);
+  }
+
+  /// Every link set, in order.
+  final List<(String, String?)> contactLinks = [];
+
+  @override
+  Future<void> setContactKey(String id, String? key) async {
+    final onDisk = stored[id];
+    if (onDisk == null) throw StateError('Memory $id no longer exists');
+    contactLinks.add((id, key));
+    stored[id] = onDisk.withContactKey(key);
   }
 
   @override

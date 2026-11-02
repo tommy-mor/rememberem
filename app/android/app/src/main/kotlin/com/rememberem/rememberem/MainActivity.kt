@@ -7,20 +7,24 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var photoPicker: OriginalPhotoPicker? = null
+    private var contacts: ContactsChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
         val picker = OriginalPhotoPicker(this)
         photoPicker = picker
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OriginalPhotoPicker.CHANNEL)
-            .setMethodCallHandler(picker)
+        MethodChannel(messenger, OriginalPhotoPicker.CHANNEL).setMethodCallHandler(picker)
+        val contactsChannel = ContactsChannel(this)
+        contacts = contactsChannel
+        MethodChannel(messenger, ContactsChannel.CHANNEL).setMethodCallHandler(contactsChannel)
     }
 
-    @Deprecated("Needed for the document picker's result")
+    @Deprecated("Needed for the pickers' results")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (photoPicker?.onActivityResult(requestCode, resultCode, data) != true) {
-            super.onActivityResult(requestCode, resultCode, data)
-        }
+        val handled = photoPicker?.onActivityResult(requestCode, resultCode, data) == true ||
+            contacts?.onActivityResult(requestCode, resultCode, data) == true
+        if (!handled) super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onRequestPermissionsResult(
@@ -28,8 +32,8 @@ class MainActivity : FlutterActivity() {
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
-        if (photoPicker?.onRequestPermissionsResult(requestCode) != true) {
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        }
+        val handled = photoPicker?.onRequestPermissionsResult(requestCode) == true ||
+            contacts?.onRequestPermissionsResult(requestCode) == true
+        if (!handled) super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 }

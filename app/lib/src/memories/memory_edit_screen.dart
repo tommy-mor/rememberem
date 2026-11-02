@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../contacts/contact_link_button.dart';
 import '../speech/dictated_text_field.dart';
 import 'detail_edit_screen.dart';
 import 'detail_list_editor.dart';
@@ -182,7 +183,19 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   Widget _buildScaffold(BuildContext context) {
     final memory = _editor.memory;
     return Scaffold(
-      appBar: AppBar(title: const Text('New person')),
+      appBar: AppBar(
+        title: const Text('New person'),
+        actions: [
+          if (widget.services.contacts case final contacts?)
+            ContactLinkButton(
+              memoryId: memory.id,
+              initialKey: memory.contactKey,
+              personName: () => _editor.memory.displayName,
+              contacts: contacts,
+              repository: widget.repository,
+            ),
+        ],
+      ),
       // Not a lazy ListView: fields scrolled out of view must keep their
       // text and any dictation in progress.
       body: SingleChildScrollView(

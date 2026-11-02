@@ -1,6 +1,7 @@
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../capture/photo_picker.dart';
+import '../contacts/contacts_service.dart';
 import '../location/device_location.dart';
 import '../practice/game_feedback.dart';
 import '../reminders/reminder_coordinator.dart';
@@ -18,6 +19,7 @@ class AppServices {
     AppSettingsController? settings,
     this.photoPicker,
     this.feedback,
+    this.contacts,
   }) : settings = settings ?? AppSettingsController();
 
   final MemoryRepository repository;
@@ -37,4 +39,7 @@ class AppServices {
 
   /// Game sounds and haptics; null is silent (tests).
   final GameFeedback? feedback;
+
+  /// Linking people to phone contacts; null hides it (iOS, tests).
+  final ContactsService? contacts;
 }

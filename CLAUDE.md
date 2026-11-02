@@ -139,6 +139,9 @@ has already been tried and fallen short.
   within the window set in Settings.
 - `settings.json` (`AppSettings`) holds Fred's settings; `reminders.json`
   holds the reminder. Damage in either never stops the app.
+- `contactKey` (top level, optional) links a person to a phone contact by
+  Android lookup key only; no contact data is copied. It changes only through
+  `setContactKey`, so autosave never undoes it.
 - `trashedAt` marks a person as in the trash. `all()` returns only active
   people; purge deletes every `<id>.*` file and refuses anyone not in the
   trash.
@@ -158,6 +161,9 @@ Check these before any public release. `sally` and `lena` own them.
   names, photos or notes. Settings can turn this off.
 - **Imported photos:** reading a photo's GPS needs `ACCESS_MEDIA_LOCATION`,
   which Android presents as photos and videos access.
+- **Contacts:** linking asks for READ_CONTACTS and reads only names and
+  lookup keys for the picker dialog; refusing falls back to the system picker.
+  Play requires a sensitive-permission declaration before public release.
 - **Faces:** face detection runs on-device through ML Kit. Laws on biometric
   data, such as BIPA, may still apply to storing faces of people who are not
   users.

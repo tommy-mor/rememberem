@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/capture/photo_picker.dart';
+import 'package:rememberem/src/contacts/contacts_service.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/practice/game_feedback.dart';
 import 'package:rememberem/src/settings/app_settings_controller.dart';
@@ -35,6 +36,7 @@ AppServices testServices(
   PhotoPicker? photoPicker,
   GameFeedback? feedback,
   PortraitCapture? capture,
+  ContactsService? contacts,
 }) => AppServices(
   repository: repository,
   capture:
@@ -49,4 +51,5 @@ AppServices testServices(
   settings: AppSettingsController(settings),
   photoPicker: photoPicker,
   feedback: feedback,
+  contacts: contacts,
 );

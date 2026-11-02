@@ -21,6 +21,10 @@ abstract interface class MemoryRepository {
   /// practice score (see [recordAnswer]).
   Future<void> save(Memory memory);
 
+  /// Links memory [id] to phone contact [key], or unlinks it if null.
+  /// Works on a trashed memory too. Throws [StateError] if [id] is gone.
+  Future<void> setContactKey(String id, String? key);
+
   /// Records a face-practice answer for active memory [id]: first try
   /// right adds a point and stamps [at]; otherwise points go to 0. Throws
   /// [StateError] if [id] is trashed or gone.

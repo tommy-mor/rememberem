@@ -16,6 +16,7 @@ class Memory {
     this.trashedAt,
     this.points = 0,
     DateTime? lastCorrectDate,
+    this.contactKey,
   })  : assert(encounters.isNotEmpty),
         lastCorrectDate = lastCorrectDate?.toUtc(),
         encounters = List.unmodifiable(
@@ -104,12 +105,18 @@ class Memory {
       lastCorrectDate: json['lastCorrectDate'] == null
           ? null
           : DateTime.parse(json['lastCorrectDate'] as String),
+      // Anything but a real key reads as no link, losing nothing else.
+      contactKey: switch (json[_contactKeyKey]) {
+        final String key when key.trim().isNotEmpty => key,
+        _ => null,
+      },
     );
   }
 
   static const _encountersKey = 'encounters';
   static const _detailsKey = 'detailItems';
   static const _legacyDetailsKey = 'details';
+  static const _contactKeyKey = 'contactKey';
 
   final String id;
 
@@ -131,6 +138,10 @@ class Memory {
 
   /// When Fred last named this face first try (UTC), or null.
   final DateTime? lastCorrectDate;
+
+  /// The phone contact this person is linked to: an opaque key (Android's
+  /// lookup key), never a copy of the contact's details. Null if unlinked.
+  final String? contactKey;
 
   /// The newest encounter: its photo represents the person everywhere.
   Encounter get latest => encounters.first;
@@ -211,6 +222,18 @@ class Memory {
     return changed ? withDetails(kept) : this;
   }
 
+  /// This person linked to phone contact [key], or unlinked if null.
+  Memory withContactKey(String? key) => Memory(
+        id: id,
+        encounters: encounters,
+        fields: fields,
+        details: details,
+        trashedAt: trashedAt,
+        points: points,
+        lastCorrectDate: lastCorrectDate,
+        contactKey: key,
+      );
+
   Memory withEncounters(List<Encounter> encounters) =>
       _copy(encounters: encounters);
 
@@ -222,6 +245,7 @@ class Memory {
         trashedAt: at,
         points: points,
         lastCorrectDate: lastCorrectDate,
+        contactKey: contactKey,
       );
 
   /// This person with face-practice score [points] and [lastCorrectDate].
@@ -233,6 +257,7 @@ class Memory {
         trashedAt: trashedAt,
         points: points,
         lastCorrectDate: lastCorrectDate,
+        contactKey: contactKey,
       );
 
   /// This person with [other] folded in: [other]'s name if it has one, and
@@ -262,6 +287,8 @@ class Memory {
       trashedAt: trashedAt,
       points: points,
       lastCorrectDate: lastCorrectDate,
+      // This person's own link wins; else the other's is adopted.
+      contactKey: contactKey ?? other.contactKey,
     );
   }
 
@@ -278,6 +305,7 @@ class Memory {
         trashedAt: trashedAt,
         points: points,
         lastCorrectDate: lastCorrectDate,
+        contactKey: contactKey,
       );
 
   Map<String, dynamic> toJson() => {
@@ -290,5 +318,6 @@ class Memory {
         if (points != 0) 'points': points,
         if (lastCorrectDate != null)
           'lastCorrectDate': lastCorrectDate!.toIso8601String(),
+        if (contactKey != null) _contactKeyKey: contactKey,
       };
 }
