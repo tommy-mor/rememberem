@@ -23,6 +23,7 @@ class FakeMemoryRepository implements MemoryRepository {
     required DateTime capturedAt,
     GeoPoint? location,
     String place = '',
+    String meeting = '',
   }) async {
     final id = 'm${stored.length}';
     final memory = Memory.captured(
@@ -31,6 +32,7 @@ class FakeMemoryRepository implements MemoryRepository {
       capturedAt: capturedAt,
       location: location,
       place: place,
+      meeting: meeting,
     );
     stored[id] = memory;
     return memory;

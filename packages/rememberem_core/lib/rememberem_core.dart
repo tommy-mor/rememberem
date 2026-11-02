@@ -7,6 +7,7 @@ export 'src/encounter.dart';
 export 'src/face_locator.dart';
 export 'src/geo_point.dart';
 export 'src/json_file_memory_repository.dart';
+export 'src/meeting_finder.dart';
 export 'src/memory.dart';
 export 'src/memory_field.dart';
 export 'src/memory_repository.dart';

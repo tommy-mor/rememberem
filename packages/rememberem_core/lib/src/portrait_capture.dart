@@ -3,6 +3,7 @@ import 'dart:io';
 import 'face_locator.dart';
 import 'geo_point.dart';
 import 'memory.dart';
+import 'meeting_finder.dart';
 import 'memory_repository.dart';
 import 'place_finder.dart';
 import 'portrait_cropper.dart';
@@ -16,6 +17,7 @@ class PortraitCapture {
     required this.workFolder,
     this.framer = const PortraitFramer(),
     this.placeFinder = const PlaceFinder(),
+    this.meetingFinder = const MeetingFinder(),
   });
 
   final MemoryRepository repository;
@@ -25,10 +27,12 @@ class PortraitCapture {
   final Directory workFolder;
   final PortraitFramer framer;
   final PlaceFinder placeFinder;
+  final MeetingFinder meetingFinder;
 
   /// Crops [rawJpeg] to the largest face found. If there is no face the
   /// whole photo is kept, so the moment is never lost. The place is filled
-  /// from the nearest known place, best effort.
+  /// from the nearest known place, and the meeting from the one held there
+  /// closest in time; both best effort.
   Future<Memory> capture(
     List<int> rawJpeg, {
     required DateTime capturedAt,
@@ -57,11 +61,15 @@ class PortraitCapture {
       final place = location == null || people == null
           ? ''
           : placeFinder.nearest(location, people)?.place ?? '';
+      final meeting = people == null || place.isEmpty
+          ? ''
+          : meetingFinder.suggest(place, capturedAt, people);
       return await repository.add(
         photoJpeg: portrait,
         capturedAt: capturedAt,
         location: location,
         place: place,
+        meeting: meeting,
       );
     } finally {
       await uprightFile.delete();

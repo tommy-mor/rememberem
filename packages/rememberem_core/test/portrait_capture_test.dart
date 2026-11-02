@@ -128,6 +128,57 @@ void main() {
       expect(saved.latest.place, 'Cafe');
     });
 
+    test('a meeting at that place within two hours is filled in too', () async {
+      final memory = await repository.add(
+        photoJpeg: jpeg(10, 10),
+        capturedAt:
+            DateTime.utc(2026, 11, 1).subtract(const Duration(minutes: 20)),
+        location: cafe,
+        place: 'Cafe',
+        meeting: 'Standup',
+      );
+      expect(memory.latest.meeting, 'Standup');
+
+      final captured = await captureAt(nearby);
+
+      expect(captured.latest.place, 'Cafe');
+      expect(captured.latest.meeting, 'Standup');
+    });
+
+    test('a trashed person's meeting is not used', () async {
+      await repository.add(
+        photoJpeg: jpeg(10, 10),
+        capturedAt: DateTime.utc(2026, 10, 1),
+        location: cafe,
+        place: 'Cafe',
+      );
+      final gone = await repository.add(
+        photoJpeg: jpeg(10, 10),
+        capturedAt: DateTime.utc(2026, 11, 1).subtract(const Duration(minutes: 5)),
+        location: cafe,
+        place: 'Cafe',
+        meeting: 'Secret',
+      );
+      await repository.trash(gone.id, DateTime.utc(2026, 11, 1));
+
+      final captured = await captureAt(nearby);
+
+      expect(captured.latest.place, 'Cafe');
+      expect(captured.latest.meeting, '');
+    });
+
+    test('a nearby meeting is not used when no place was found', () async {
+      await repository.add(
+        photoJpeg: jpeg(10, 10),
+        capturedAt: DateTime.utc(2026, 11, 1),
+        location: cafe,
+        place: 'Cafe',
+        meeting: 'Standup',
+      );
+
+      expect((await captureAt(null)).latest.meeting, '');
+    });
+
     test('no location, or only a trashed neighbour, gives a blank place',
         () async {
       final known = await knownCafe();
