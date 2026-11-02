@@ -24,8 +24,15 @@ class FakeMemoryRepository implements MemoryRepository {
     return memory;
   }
 
+  /// When true, the next save throws (and clears this flag).
+  bool failNextSave = false;
+
   @override
   Future<void> save(Memory memory) async {
+    if (failNextSave) {
+      failNextSave = false;
+      throw const FileSystemException('disk full');
+    }
     stored[memory.id] = memory;
     saves.add(memory);
   }

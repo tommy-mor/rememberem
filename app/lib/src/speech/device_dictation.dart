@@ -42,7 +42,8 @@ class DeviceDictation implements Dictation {
   }
 
   Future<bool> _initialise() async {
-    _ready = _ready ||
+    _ready =
+        _ready ||
         await _speech.initialize(
           onStatus: (status) {
             if (status == SpeechToText.doneStatus ||

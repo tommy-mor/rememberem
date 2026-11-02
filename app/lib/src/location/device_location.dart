@@ -18,9 +18,11 @@ class DeviceLocation {
           permission == LocationPermission.deniedForever) {
         return null;
       }
-      return _point(await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(timeLimit: fixTimeLimit),
-      ));
+      return _point(
+        await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(timeLimit: fixTimeLimit),
+        ),
+      );
     } on TimeoutException {
       return _point(await Geolocator.getLastKnownPosition());
     } on Exception {
@@ -28,7 +30,6 @@ class DeviceLocation {
     }
   }
 
-  GeoPoint? _point(Position? position) => position == null
-      ? null
-      : GeoPoint(position.latitude, position.longitude);
+  GeoPoint? _point(Position? position) =>
+      position == null ? null : GeoPoint(position.latitude, position.longitude);
 }

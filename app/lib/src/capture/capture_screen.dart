@@ -76,13 +76,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
         location: await _location,
       );
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
-        builder: (_) => MemoryEditScreen(
-          memory: memory,
-          repository: widget.services.repository,
-          dictation: widget.services.dictation,
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => MemoryEditScreen(
+            memory: memory,
+            repository: widget.services.repository,
+            dictation: widget.services.dictation,
+          ),
         ),
-      ));
+      );
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -112,16 +114,20 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   ? const CircularProgressIndicator()
                   : Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(_problem!,
-                          style: const TextStyle(color: Colors.white)),
+                      child: Text(
+                        _problem!,
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ),
             ),
           if (_saving)
             const ColoredBox(
               color: Colors.black54,
               child: Center(
-                child: Text('Framing the photo…',
-                    style: TextStyle(color: Colors.white, fontSize: 18)),
+                child: Text(
+                  'Framing the photo…',
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
               ),
             ),
         ],

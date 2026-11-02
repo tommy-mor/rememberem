@@ -47,13 +47,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   }
 
   void _open(Memory memory) {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => MemoryEditScreen(
-        memory: memory,
-        repository: widget.services.repository,
-        dictation: widget.services.dictation,
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MemoryEditScreen(
+          memory: memory,
+          repository: widget.services.repository,
+          dictation: widget.services.dictation,
+        ),
       ),
-    ));
+    );
   }
 
   @override
@@ -87,14 +89,17 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
               final name = memory.field(MemoryField.name);
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundImage:
-                      FileImage(widget.services.repository.photoFile(memory)),
+                  backgroundImage: FileImage(
+                    widget.services.repository.photoFile(memory),
+                  ),
                 ),
                 title: Text(name.isEmpty ? 'Unnamed' : name),
-                subtitle: Text([
-                  memory.field(MemoryField.place),
-                  memory.field(MemoryField.meeting),
-                ].where((s) => s.isNotEmpty).join(' · ')),
+                subtitle: Text(
+                  [
+                    memory.field(MemoryField.place),
+                    memory.field(MemoryField.meeting),
+                  ].where((s) => s.isNotEmpty).join(' · '),
+                ),
                 onTap: () => _open(memory),
               );
             },

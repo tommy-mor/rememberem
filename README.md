@@ -60,5 +60,6 @@ flutter build ipa                             # iOS (macOS + Xcode only)
 
 Each person is stored as `<id>.json` next to `<id>.jpg` in the app's private
 documents folder (`memories/`). Photos never go to the gallery. A record's
-`fields` map is open-ended: the screen shows `name`, `place`, `meeting` and
-`details`, and other keys (age, interests, ...) can be added without a migration.
+`fields` map is open-ended: the screen shows `name`, `place` and `meeting`, and
+other keys (age, interests, ...) can be added without a migration. Details are a
+separate list (`detailItems`), each with its text and the time it was recorded.

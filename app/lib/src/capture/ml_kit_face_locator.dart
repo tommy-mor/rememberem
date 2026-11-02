@@ -11,8 +11,9 @@ class MlKitFaceLocator implements FaceLocator {
 
   @override
   Future<List<PixelRect>> findFaces(File photo) async {
-    final faces =
-        await _detector.processImage(InputImage.fromFilePath(photo.path));
+    final faces = await _detector.processImage(
+      InputImage.fromFilePath(photo.path),
+    );
     return [
       for (final face in faces)
         PixelRect(

@@ -24,8 +24,9 @@ class DictatedTextField extends StatefulWidget {
 }
 
 class _DictatedTextFieldState extends State<DictatedTextField> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.initialValue);
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialValue,
+  );
   bool _listening = false;
 
   @override
@@ -57,10 +58,14 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
       },
     );
     if (!available && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Speech recognition is not available. '
-            'Check microphone permission in Settings.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Speech recognition is not available. '
+            'Check microphone permission in Settings.',
+          ),
+        ),
+      );
     }
   }
 

@@ -1,0 +1,70 @@
+# Rememberem baseline record
+
+Checked at commit 89d8d2c on 2026-11-01
+
+All entries were confirmed by Vera by reading the code. Nothing was run: no analyze, tests, build or device check.
+
+## Map
+
+Rememberem is a local, single-user Flutter app for remembering people you meet. Each person is a Memory: `<id>.jpg` plus `<id>.json` in the app-private `documents/memories` directory (app/lib/main.dart:17-21). The record holds open text fields (name, place, meeting, details), capture time and GPS. The repository has add, save, all and photoFile, and no delete.
+
+Journey:
+- Entry: the "Meet someone" app shortcut or the list FAB (meet_shortcut.dart, rememberem_app.dart:28-43).
+- Capture: CaptureScreen opens the back camera and requests GPS in the background. The shutter (`_takePhoto`, capture_screen.dart:64-92) reads the bytes, deletes the raw file, awaits location, then calls PortraitCapture.capture. That bakes EXIF orientation in an isolate, runs the ML Kit face finder, frames a 4:5 crop on the largest face (the whole photo if no face), and saves through JsonFileMemoryRepository (temp file plus rename).
+- Notes: MemoryEditScreen shows four fields (Name, Place, Meeting, Details), each with a mic button (DictatedTextField over DeviceDictation, speech_to_text). MemoryEditor autosaves after 400 ms with serialized saves, and flushes on back, on app inactive and on dispose.
+- List: MemoryListScreen shows people newest first and reloads when a screen above it closes.
+
+Platform: the Android manifest requests camera, mic, internet and fine location, with no allowBackup setting. iOS minimum is 15.5. Release builds are signed with the debug key.
+
+Absent from the code: delete, search, share, export, reminders, state restoration, logging and analytics.
+
+Tests: core covers the framer, capture and repository happy paths. The app has widget tests with fakes that never fail. Real-face cropping exists only in app/integration_test and needs a device.
+
+## Invariants
+
+1. Each shutter press that reaches storage creates exactly one Memory, and a photo with no face is kept whole. Evidence: portrait_capture.dart:43-44,50; json_file_memory_repository.dart:27-36. Tested: yes.
+2. Intended rule: capture never loses the moment. The code upholds it only for the zero-face case. Exceptions from the face locator or crop propagate after the raw file is already deleted (see risk 1). Evidence: portrait_capture.dart:26-27,43-44; capture_screen.dart:72. Tested: no.
+3. The crop stays inside the image at 4:5. The final min() may cut the ratio by 1px. Evidence: portrait_framer.dart:26-39. Tested: yes (3 framer tests).
+4. EXIF rotation is baked in before detection and cropping, so face and crop coordinates share one pixel space. Evidence: portrait_cropper.dart:22; portrait_capture.dart:33,47-48. Tested: yes (one rotation case only).
+5. Writes are atomic (temp file, then rename), a saved record loads back unchanged, and all() lists only `.json` files so stray `.tmp` files are never loaded. Evidence: json_file_memory_repository.dart:40-41,45-48,70-74; memory.dart:14-23,47-53. Tested: yes (leftover `.tmp` files). Round-trip of location and capturedAt is not asserted.
+6. Edits are saved within 400 ms, flushed on back, inactive and dispose, and saved serially in order with the last value winning. Holds only while the repository never throws (risk 3). Edits in the last 400 ms before a hard kill are unprotected. Evidence: memory_editor.dart:23-40; memory_edit_screen.dart:34,40,47-54. Tested: no.
+7. A spoken phrase lands in exactly one field, appended after typed text. Dictation is single-session: a new listen ends the previous one and fires its onDone. Stopping or leaving the screen stops dictation. If speech is unavailable, a snackbar points to microphone permission. Evidence: dictated_text_field.dart:31-65; device_dictation.dart:20-24,58-62. Tested: yes for the first and third points, no for the others.
+8. A second "Meet someone" trigger while capture is open is ignored, and the shortcut pops to the root before pushing capture. Evidence: rememberem_app.dart:32-37. Tested: no.
+9. Photos and records are written only under the app-private documents directory, never to the gallery or external storage. Evidence: main.dart:16-21; json_file_memory_repository.dart:26-34. Tested: no.
+10. The upright scratch copy in the cache directory is deleted in a `finally` after the face step. Evidence: portrait_capture.dart:40-57. Tested: unconfirmed (Grace says yes, Sally says no).
+11. The raw camera file is deleted right after its bytes are read, before processing, and not at all if readAsBytes throws. This is the root of risk 1. Evidence: capture_screen.dart:70-72. Tested: no.
+12. The app's own code has no share, export or network client. Only plugins send data (speech recognizer, ML Kit). Face detection is on-device. Speech is not forced on-device. Evidence: no matches in app/lib; AndroidManifest.xml:11-32; device_dictation.dart:26-34. Tested: no.
+13. Capture flow: back camera, no audio, shutter disabled until the camera is ready or while saving, camera failure shows "Camera unavailable: <error>" with no retry, and backing out before the shutter saves nothing. Evidence: capture_screen.dart:39-92,132. Tested: no.
+14. The notes screen shows the photo, the date and any coordinates, then Name, Place, Meeting and Details in that order, with the footer "Saved automatically." and no Save or delete button. Evidence: memory_edit_screen.dart:61-114; memory_field.dart:6-9. Tested: no.
+15. The list shows people newest first (name or "Unnamed", then place and meeting) and reloads on didPopNext. Evidence: memory_list_screen.dart:43-47,70-98. Tested: no.
+16. Plugin calls match the installed versions: SpeechListenOptions (speech_to_text 7.5.0), LocationSettings(timeLimit), ShortcutItem(icon). Evidence: device_dictation.dart:21-27; device_location.dart:19; meet_shortcut.dart:16-20. Tested: no. Vera re-checked only the speech call.
+17. iOS minimum is 15.5 in the Podfile. Evidence: app/ios/Podfile:2. Tested: no. The ML Kit requirement itself was not re-verified.
+
+## Open risks
+
+No Blocker survived verification. Vera downgraded both Blocker claims.
+
+1. **Should fix: a failure during capture loses the photo.** The raw file is deleted at capture_screen.dart:72 before capture() and add() succeed. A face-locator exception (portrait_capture.dart:41, no fallback), a non-JPEG (portrait_cropper.dart:39), disk full or isolate OOM leaves only a snackbar (capture_screen.dart:86-91). Nothing is saved until `await _location` resolves (:76). Location normally resolves before the shutter, so that window is small. A delete failure also skips the save. Untested. Raised by tess, hal, rex, sally. Vera: Should fix, not Blocker.
+2. **Should fix: one corrupt .json hides every memory.** all() has no per-file try/catch (json_file_memory_repository.dart:47-52; memory.dart:21-22), and the FutureBuilder ignores hasError so it spins forever (memory_list_screen.dart:63-69). Likelihood is low given atomic writes. Untested. Raised by tess, hal, rex, fred.
+3. **Should fix: autosave stalls permanently after one failed save.** `_lastSave.then(save)` (memory_editor.dart:37) stays errored, so later saves are skipped while the UI says "Saved automatically." (memory_edit_screen.dart:96). Pop awaits flush, so `navigator.pop()` never runs (:52-53) and the user is stuck. The dispose flush (:41) is unawaited and leaves an unhandled error. The fake repository never fails. Raised by tess, rex.
+4. **Should fix: an empty camera list gives a spinner forever.** `cameras.first` throws StateError, an Error that `on Exception` misses (capture_screen.dart:42-45,57). `_problem` is never set and the location request never starts. Raised by hal, rex.
+5. **Should fix: cropping edge cases are unverified.** Not covered: a zero-width face (NaN top), negative or off-image boxes, a possible ArgumentError from clamp on a float ulp, 4:5 to the pixel after round() and min(), EXIF orientations 2 to 8, huge images. Evidence: portrait_framer.dart:20-40. Real-face cropping needs a device. Raised by tess.
+6. **Should fix: backup is on by default for photos, notes and GPS.** No allowBackup, fullBackupContent or dataExtractionRules (AndroidManifest.xml:7-10), and the documents directory is in iCloud backup. Not device-verified. The README says data stays private. Raised by sally, hal, grace.
+7. **Should fix: dictated audio may go to a cloud recognizer.** No `onDevice` in device_dictation.dart:26-34, and INTERNET is declared in the main manifest (AndroidManifest.xml:4). Which recognizer runs is device-dependent. Raised by sally, hal.
+8. **Should fix: no way to delete a person.** MemoryRepository has no delete (memory_repository.dart:7-22), and no delete UI exists in app/lib. Only uninstalling or clearing data removes a photo, record or GPS. Raised by grace.
+9. **Should fix: no consent moment at capture.** The shutter goes straight to save (capture_screen.dart:64-85), and photoFileName is required (memory.dart:8,28), so there is no notes-only path. Product judgement. Vera: possibly Consider. Raised by grace.
+10. **Should fix: exact GPS is stored and shown for every person.** Requested on every capture (capture_screen.dart:61,76), stored, and shown to 5 decimals (memory_edit_screen.dart:112-113). Severity is debatable for a personal local app. Raised by grace.
+11. **Consider: dictation can overwrite typing and write to a disposed controller.** `before` is captured once (dictated_text_field.dart:48-51), so text typed during dictation is overwritten by the next result. The disposed-controller throw (:35-37,51-52) is a debug assert only. In release, a late result just calls onChanged and is saved. Vera: Consider-level. Raised by tess, rex.
+12. **Consider: DeviceLocation can throw from its TimeoutException handler.** getLastKnownPosition is unguarded (device_location.dart:24-26), so a throw there loses the photo via the capture catch. Low likelihood. Raised by hal.
+13. **Consider: orphans and a mid-capture exit.** A crash between the photo write and the record write leaves an unlisted .jpg (json_file_memory_repository.dart:34-35). `.tmp` files are never swept, and a failed readAsBytes leaves the raw shot (capture_screen.dart:70-72). The upright copy can survive a crash in the cache directory. Leaving CaptureScreen mid-save leaves an unnamed record, because there is no mounted check. Raised by rex, sally, grace.
+14. **Consider: raw exception text is shown to the user.** capture_screen.dart:58,90 interpolate `$e`, which can include file paths. Raised by fred, sally.
+15. **Consider: location denial is silent.** device_location.dart:17-19 returns null, and the caption shows only the date (memory_edit_screen.dart:109-111). Raised by fred.
+16. **Consider: no screen-privacy hardening.** No FLAG_SECURE and no auth gate, so faces and notes show in the app switcher and on an unlocked phone (memory_list_screen.dart:91). Capture must stay instant. Raised by sally.
+17. **Consider: the release build is signed with the debug key.** app/android/app/build.gradle.kts:34-36, a known TODO. Fix before any store submission. Git history was not scanned for secrets. Raised by sally.
+18. **Consider: the Details field has no guidance.** The multiline field (memory_edit_screen.dart:90) invites sensitive or judgemental notes. An opportunity, not a defect. Raised by grace.
+19. **Consider: config gaps.** The manifest omits the Bluetooth permissions that speech_to_text lists, so headset mics may not work for dictation. The iOS shortcut icon `ic_shortcut_camera` exists only as an Android drawable (meet_shortcut.dart:20). The Podfile lacks the ML Kit post_install settings (probably unneeded). Vera did not verify the Bluetooth and Podfile claims. Raised by hal.
+20. **Consider: lifecycle edges.** A shortcut tap on the edit screen uses popUntil, which bypasses PopScope (rememberem_app.dart:36). The unawaited dispose flush means the list refresh (memory_list_screen.dart:43-46) can read stale data. Camera preview pause on background and predictive back were not checked. Raised by rex.
+
+## Unverified
+
+- **Shortcut tap dropped on cold start (Should fix if real).** Raised by fred and rex. The code returns silently when `navigator.currentState` is null (rememberem_app.dart:33), and the quick-action install is async (meet_shortcut.dart:13-15). Whether the launch action beats the first frame is platform timing. Vera: Can't tell. Cheapest check: on a device or emulator, force-stop the app, launch it from the home-screen shortcut several times, and see whether the camera opens each time.

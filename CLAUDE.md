@@ -73,7 +73,9 @@ names a crew, run its agents as parallel subagents with distinct questions and
 finish with `vera`.
 
 The **Baseline** crew (the guardians) and the **Plan check** crew (the builders)
-share no members and are deliberately adversarial. Every plan goes through Plan
+share no members and are deliberately adversarial. To save tokens, plan each
+story with a slimmed lineup (about three guardians and two or three builders,
+chosen by lane; see "Slim by default" in REVIEW_AGENTS.md). Every plan goes through Plan
 check, then gets objections from Baseline, with one round of rebuttals each way.
 `vera` settles the factual disputes. Any stalemate left over goes to the
 **TieBreaker** crew: `paige` (product manager, chair), `walt` and `hazel`
@@ -105,9 +107,13 @@ has already been tried and fallen short.
 - One `<id>.json` and one `<id>.jpg` per person, in
   `getApplicationDocumentsDirectory()/memories/`. Writes go to a temp file and
   are then renamed into place.
-- `fields` is an open map. The UI shows `name`, `place`, `meeting` and
-  `details`. **Adding keys needs no migration; renaming or removing keys does,**
-  and the change must still load records written by older versions.
+- `fields` is an open map. The UI shows `name`, `place` and `meeting`.
+  **Adding keys needs no migration; renaming or removing keys does,** and the
+  change must still load records written by older versions.
+- `detailItems` is an ordered list of details, each `{id, text, at}` with `at`
+  in UTC: the time the detail was first recorded. Records written before it
+  existed kept one `fields['details']` string. That string loads as a single
+  detail timed at `capturedAt`, and the key is dropped on the next save.
 - Photos are made upright, cropped to a 4:5 head-and-shoulders portrait around
   the largest face, and never written to the gallery.
 

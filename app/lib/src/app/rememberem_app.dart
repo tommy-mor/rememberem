@@ -34,9 +34,11 @@ class _RememberemAppState extends State<RememberemApp> {
     _capturing = true;
     try {
       navigator.popUntil((route) => route.isFirst);
-      await navigator.push(MaterialPageRoute<void>(
-        builder: (_) => CaptureScreen(services: widget.services),
-      ));
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => CaptureScreen(services: widget.services),
+        ),
+      );
     } finally {
       _capturing = false;
     }

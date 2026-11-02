@@ -592,6 +592,8 @@ A recommendation to ship is not permission to deploy. Eric deploys.
 
 The two crews share no members and are meant to push against each other.
 
+**Slim by default.** To save tokens, planning a single story uses a slimmed lineup: about three guardians and two or three builders, chosen by which lanes the story touches (always including `tess` among the guardians and `archie` among the builders). Run the full crews only for the first Baseline, a Full audit, or a story Eric marks as high-stakes. `fred` joins planning only when the story changes a device journey he must later walk.
+
 - **Baseline, the guardians** (`tess`, `hal`, `rex`, `sally`, `grace`, `fred`), own the truth about the app as it is: what works, what must stay true, what is already risky. Their instinct is "prove this won't break what we have."
 - **Plan check, the builders** (`archie`, `marlin`, `pamala`, `owen`, `gill`), own the case for change: is the plan accurate, buildable, simple, fast, shippable, and worth it? Their instinct is "prove this objection is real, or let us build."
 
