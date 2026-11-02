@@ -5,7 +5,10 @@ import 'memory.dart';
 /// Finds the known place nearest to where a photo was taken, from the
 /// places already recorded on people's encounters.
 class PlaceFinder {
-  const PlaceFinder({this.radiusMeters = 91.44});
+  const PlaceFinder({this.radiusMeters = defaultRadiusMeters});
+
+  /// 300 feet.
+  static const defaultRadiusMeters = 91.44;
 
   /// How close a known place must be to count (300 feet by default).
   final double radiusMeters;
