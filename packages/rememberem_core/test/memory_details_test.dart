@@ -48,6 +48,19 @@ void main() {
     expect((json['detailItems'] as List).single['text'], 'Likes hiking');
   });
 
+  test('copyWith changes only what it is given, and keeps UTC', () {
+    final detail = Detail(id: 'a', text: 'Tall', at: DateTime.utc(2026, 1, 1));
+
+    final retexted = detail.copyWith(text: 'Very tall');
+    final redated = detail.copyWith(at: DateTime(2020, 5, 6, 7, 8));
+
+    expect(retexted.at, detail.at);
+    expect(redated.text, 'Tall');
+    expect(redated.id, 'a');
+    expect(redated.at.isUtc, isTrue);
+    expect(redated.at.isAtSameMomentAs(DateTime(2020, 5, 6, 7, 8)), isTrue);
+  });
+
   test('details round-trip through the repository in order, in UTC',
       () async {
     final temp = await Directory.systemTemp.createTemp('rememberem_details_');

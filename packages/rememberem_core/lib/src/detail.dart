@@ -13,11 +13,11 @@ class Detail {
   final String id;
   final String text;
 
-  /// When the detail was first recorded, in UTC.
+  /// When the detail was recorded (Fred may re-date it), in UTC.
   final DateTime at;
 
-  Detail copyWith({String? text}) =>
-      Detail(id: id, text: text ?? this.text, at: at);
+  Detail copyWith({String? text, DateTime? at}) =>
+      Detail(id: id, text: text ?? this.text, at: at ?? this.at);
 
   Map<String, dynamic> toJson() => {
         'id': id,

@@ -29,6 +29,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     widget.memory,
   );
   late final AppLifecycleListener _lifecycle;
+  // Cached so pending snackbars (detail Undo) can be cleared on leaving.
+  ScaffoldMessengerState? _messenger;
 
   @override
   void initState() {
@@ -38,7 +40,21 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.maybeOf(context);
+  }
+
+  @override
   void dispose() {
+    // Clearing during dispose upsets the messenger, so do it after the
+    // frame. (Leaving via a shortcut skips the PopScope handler.)
+    final messenger = _messenger;
+    if (messenger != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (messenger.mounted) messenger.clearSnackBars();
+      });
+    }
     _lifecycle.dispose();
     _editor.flush();
     super.dispose();
@@ -52,6 +68,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final navigator = Navigator.of(context);
+        _messenger?.clearSnackBars();
         await _editor.flush();
         navigator.pop();
       },
@@ -99,9 +116,15 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             ],
             const SizedBox(height: 16),
             DetailListEditor(
-              details: memory.details,
+              details: _editor.memory.details,
               dictation: widget.dictation,
-              onChanged: _editor.updateDetail,
+              onChanged: (id, text) =>
+                  _edit(() => _editor.updateDetail(id, text)),
+              onTimeChanged: (id, at) =>
+                  _edit(() => _editor.setDetailTime(id, at)),
+              onDelete: (id) => _edit(() => _editor.deleteDetail(id)),
+              onRestore: (detail, index) =>
+                  _edit(() => _editor.restoreDetail(detail, index)),
             ),
             const SizedBox(height: 16),
             Text(
@@ -114,6 +137,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       ),
     );
   }
+
+  /// Applies a detail change and rebuilds so time captions stay current.
+  void _edit(VoidCallback change) => setState(change);
 
   String _captionFor(Memory memory) {
     final when = MaterialLocalizations.of(context)

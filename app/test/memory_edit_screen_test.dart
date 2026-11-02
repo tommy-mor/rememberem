@@ -204,4 +204,183 @@ void main() {
 
     expect(repository.saves, isEmpty);
   });
+
+  group('person card details', () {
+    Future<void> showWithDetails(WidgetTester tester) async {
+      memory = memory.withDetails([
+        Detail(id: 'a', text: 'From Seattle', at: DateTime(2026, 11, 1, 10)),
+        Detail(id: 'b', text: 'Sings', at: DateTime(2026, 11, 1, 11, 30)),
+      ]);
+      await showScreen(tester);
+    }
+
+    testWidgets('each saved detail shows its local recorded time', (
+      tester,
+    ) async {
+      await showWithDetails(tester);
+
+      expect(find.text('Sunday, November 1, 2026, 10:00 AM'), findsOneWidget);
+      expect(find.text('Sunday, November 1, 2026, 11:30 AM'), findsOneWidget);
+      expect(find.byTooltip('Delete Detail 3'), findsOneWidget);
+      expect(find.textContaining('2026, '), findsNWidgets(2));
+    });
+
+    testWidgets('long-press the time to pick a new date and time', (
+      tester,
+    ) async {
+      await showWithDetails(tester);
+
+      await tester.longPress(find.text('Sunday, November 1, 2026, 10:00 AM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('15'));
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sunday, November 15, 2026, 10:00 AM'), findsOneWidget);
+      final saved = repository.saves.last.details.first;
+      expect(saved.at.isAtSameMomentAs(DateTime(2026, 11, 15, 10)), isTrue);
+      expect(saved.text, 'From Seattle');
+    });
+
+    testWidgets('cancelling the date picker changes nothing', (tester) async {
+      await showWithDetails(tester);
+
+      await tester.longPress(find.text('Sunday, November 1, 2026, 10:00 AM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sunday, November 1, 2026, 10:00 AM'), findsOneWidget);
+      expect(repository.saves, isEmpty);
+    });
+
+    testWidgets('delete removes a detail at once; Undo puts it back', (
+      tester,
+    ) async {
+      await showWithDetails(tester);
+
+      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1)); // snackbar slides in
+      expect(find.text('From Seattle'), findsNothing);
+      expect(repository.saves.last.details.map((d) => d.text), ['Sings']);
+
+      await tester.tap(find.text('Undo'));
+      await tester.pump();
+      expect(find.text('From Seattle'), findsOneWidget);
+      expect(repository.saves.last.details.map((d) => d.text), [
+        'From Seattle',
+        'Sings',
+      ]);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'From Seattle'),
+        'From Tacoma',
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(repository.saves.last.details.first.text, 'From Tacoma');
+    });
+
+    testWidgets('deleting the only detail leaves one blank box', (
+      tester,
+    ) async {
+      memory = memory.withDetails([
+        Detail(id: 'a', text: 'Tall', at: DateTime(2026, 11, 1)),
+      ]);
+      await showScreen(tester);
+
+      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.pump();
+
+      expect(find.widgetWithText(TextField, 'Detail'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Detail 2'), findsNothing);
+      expect(repository.saves.last.details, isEmpty);
+    });
+
+    testWidgets('a late dictation result cannot revive a deleted detail', (
+      tester,
+    ) async {
+      await showWithDetails(tester);
+
+      await tester.tap(find.byTooltip('Speak Detail'));
+      await tester.pump();
+      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.pump();
+      dictation.sayLate('late words');
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(repository.saves.last.details.map((d) => d.text), ['Sings']);
+    });
+  });
+
+  group('leaving the card after a delete', () {
+    testWidgets('back clears the Undo snackbar and the delete sticks', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      memory = memory.withDetails([
+        Detail(id: 'a', text: 'Tall', at: DateTime(2026, 11, 1)),
+        Detail(id: 'b', text: 'Kind', at: DateTime(2026, 11, 1)),
+      ]);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const Text('list')),
+      );
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (_) => MemoryEditScreen(
+            memory: memory,
+            repository: repository,
+            dictation: dictation,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.text('list'), findsOneWidget);
+      expect(find.text('Undo'), findsNothing);
+      expect(repository.stored[memory.id]!.details.map((d) => d.id), ['b']);
+    });
+
+    testWidgets('leaving without the back handler also clears it', (
+      tester,
+    ) async {
+      memory = memory.withDetails([
+        Detail(id: 'a', text: 'Tall', at: DateTime(2026, 11, 1)),
+      ]);
+      await showScreen(tester);
+      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      await tester.pumpWidget(const MaterialApp(home: Text('elsewhere')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Undo'), findsNothing);
+      expect(repository.stored[memory.id]!.details, isEmpty);
+    });
+
+    testWidgets('deleting a blank row saves nothing', (tester) async {
+      await showScreen(tester);
+      await tester.tap(find.text('Add detail'));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Delete Detail 2'));
+      await tester.pump();
+
+      expect(find.widgetWithText(TextField, 'Detail 2'), findsNothing);
+      expect(repository.saves, isEmpty);
+    });
+  });
 }

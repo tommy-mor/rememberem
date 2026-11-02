@@ -49,6 +49,8 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
     final before = _controller.text.trim();
     final available = await widget.dictation.listen(
       onWords: (words) {
+        // dispose() stops dictation without waiting; ignore a late result.
+        if (!mounted) return;
         _controller.text = before.isEmpty ? words : '$before $words';
         widget.onChanged(_controller.text);
       },

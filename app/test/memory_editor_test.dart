@@ -149,6 +149,121 @@ void main() {
     });
   });
 
+  group('detail time, delete and restore', () {
+    final at1 = DateTime.utc(2026, 11, 1, 10);
+    final at2 = DateTime.utc(2026, 11, 1, 11);
+    final withTwo = memory.withDetails([
+      Detail(id: 'a', text: 'From Seattle', at: at1),
+      Detail(id: 'b', text: 'Sings', at: at2),
+    ]);
+
+    test('setDetailTime saves at once and survives a later text edit', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final editor = MemoryEditor(repository, withTwo);
+        final newAt = DateTime.utc(2020, 1, 2, 3, 4);
+
+        editor.setDetailTime('a', newAt);
+        async.flushMicrotasks();
+        expect(repository.saves.last.details.first.at, newAt);
+
+        editor.updateDetail('a', 'From Seattle, WA');
+        async.elapse(const Duration(seconds: 1));
+        final saved = repository.saves.last.details;
+        expect(saved.map((d) => d.id), ['a', 'b']);
+        expect(saved.first.at, newAt);
+        expect(saved.first.text, 'From Seattle, WA');
+      });
+    });
+
+    test('deleteDetail saves at once; a late edit cannot bring it back', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final editor = MemoryEditor(repository, withTwo);
+
+        editor.updateDetail('a', 'typing...');
+        editor.deleteDetail('a');
+        async.flushMicrotasks();
+        expect(repository.saves.last.details.map((d) => d.id), ['b']);
+
+        editor.updateDetail('a', 'late dictation');
+        async.elapse(const Duration(seconds: 1));
+        expect(repository.saves.last.details.map((d) => d.id), ['b']);
+      });
+    });
+
+    test('restoreDetail puts it back in place and it is editable again', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final editor = MemoryEditor(repository, withTwo);
+        final deleted = withTwo.details.first;
+
+        editor.deleteDetail('a');
+        editor.restoreDetail(deleted, 0);
+        editor.updateDetail('a', 'new');
+        async.elapse(const Duration(seconds: 1));
+
+        final saved = repository.saves.last.details;
+        expect(saved.map((d) => d.id), ['a', 'b']);
+        expect(saved.first.text, 'new');
+        expect(saved.first.at, at1);
+      });
+    });
+
+    test('a delete whose save failed is retried by the next flush', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository()..failNextSave = true;
+        final editor = MemoryEditor(repository, withTwo);
+
+        editor.deleteDetail('a');
+        async.flushMicrotasks();
+        expect(repository.saves, isEmpty);
+
+        editor.flush();
+        async.flushMicrotasks();
+        expect(repository.saves.last.details.map((d) => d.id), ['b']);
+      });
+    });
+
+    test('a failed save on delete raises no unhandled error', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository()..failNextSave = true;
+        final editor = MemoryEditor(repository, withTwo);
+
+        editor.deleteDetail('a');
+        async.flushMicrotasks();
+        editor.setDetailTime('b', at1);
+        async.flushMicrotasks();
+
+        expect(repository.saves.last.details.single.at, at1);
+      });
+    });
+
+    test('a legacy detail can be re-dated and deleted for good', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final legacy = Memory.fromJson({
+          'id': 'old',
+          'photo': 'old.jpg',
+          'capturedAt': '2026-10-01T09:00:00.000Z',
+          'fields': {'details': 'Likes hiking'},
+        });
+        final editor = MemoryEditor(repository, legacy);
+
+        editor.setDetailTime('old-legacy', at2);
+        async.flushMicrotasks();
+        expect(repository.saves.last.details.single.at, at2);
+
+        editor.deleteDetail('old-legacy');
+        async.flushMicrotasks();
+        final reloaded = Memory.fromJson(
+          jsonDecode(jsonEncode(repository.saves.last)) as Map<String, dynamic>,
+        );
+        expect(reloaded.details, isEmpty);
+      });
+    });
+  });
+
   test('one failed save does not block later saves', () {
     fakeAsync((async) {
       final repository = FakeMemoryRepository()..failNextSave = true;
