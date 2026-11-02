@@ -58,8 +58,12 @@ flutter build ipa                             # iOS (macOS + Xcode only)
 
 ## Storage
 
-Each person is stored as `<id>.json` next to `<id>.jpg` in the app's private
-documents folder (`memories/`). Photos never go to the gallery. A record's
-`fields` map is open-ended: the screen shows `name`, `place` and `meeting`, and
-other keys (age, interests, ...) can be added without a migration. Details are a
-separate list (`detailItems`), each with its text and the time it was recorded.
+Each person is stored as `<id>.json`, with one photo per encounter
+(`<id>.jpg`, plus `<id>.<source>.jpg` for photos merged in from someone else),
+in the app's private documents folder (`memories/`). Photos never go to the
+gallery. An encounter holds the photo, time, location, place and meeting, and
+the newest one's photo represents the person. A record's `fields` map holds the
+name and is open-ended, so other keys (age, interests, ...) can be added without
+a migration. Details are a separate list (`detailItems`), each with its text
+and the time it was recorded. People moved to the trash keep their files until
+they are deleted forever.

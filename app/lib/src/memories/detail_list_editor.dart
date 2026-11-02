@@ -65,6 +65,9 @@ class _DetailListEditorState extends State<DetailListEditor> {
       ..showSnackBar(
         SnackBar(
           content: const Text('Detail deleted'),
+          // Undo snackbars would otherwise stay until dismissed.
+          persist: false,
+          duration: const Duration(seconds: 6),
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () {

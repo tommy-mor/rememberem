@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'encounter.dart';
 import 'geo_point.dart';
 import 'memory.dart';
 
@@ -32,5 +33,18 @@ abstract interface class MemoryRepository {
   /// repeat. Throws [StateError] if [id] is not in the trash.
   Future<void> purge(String id);
 
+  /// Folds [discardedId] into [survivorId]: the survivor gains the other's
+  /// photos, encounters, details and (if given) name, then the other is
+  /// deleted. Both must be active and different, else [StateError]. If it
+  /// fails part-way, running it again finishes the job without duplicates.
+  Future<Memory> merge(String survivorId, String discardedId);
+
+  /// The photo that represents [memory]: its newest encounter's.
   File photoFile(Memory memory);
+
+  File encounterPhoto(Encounter encounter);
+
+  /// Deletes just this encounter's photo file (after its encounter has been
+  /// removed from the record).
+  Future<void> deleteEncounterPhoto(Encounter encounter);
 }

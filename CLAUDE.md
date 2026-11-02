@@ -104,16 +104,27 @@ has already been tried and fallen short.
 
 ## Data the app keeps
 
-- One `<id>.json` and one `<id>.jpg` per person, in
-  `getApplicationDocumentsDirectory()/memories/`. Writes go to a temp file and
-  are then renamed into place.
-- `fields` is an open map. The UI shows `name`, `place` and `meeting`.
-  **Adding keys needs no migration; renaming or removing keys does,** and the
-  change must still load records written by older versions.
+- One `<id>.json` per person in `getApplicationDocumentsDirectory()/memories/`,
+  plus one photo per encounter: `<id>.jpg` for the first, and
+  `<id>.<source>.jpg` for photos merged in from someone else. Writes go to a
+  temp file and are then renamed into place, and every mutation goes through
+  one serial chain in `JsonFileMemoryRepository`.
+- `encounters` lists every time Fred met the person, each
+  `{photo, capturedAt, location, place, meeting}`, kept newest first. The
+  newest encounter's photo represents the person everywhere. Records written
+  before encounters kept one top-level `photo`/`capturedAt`/`location`, with
+  place and meeting in `fields`. They load as one encounter.
+- `fields` is an open map holding the name. **Adding keys needs no migration;
+  renaming or removing keys does,** and the change must still load records
+  written by older versions.
 - `detailItems` is an ordered list of details, each `{id, text, at}` with `at`
-  in UTC: the time the detail was first recorded. Records written before it
-  existed kept one `fields['details']` string. That string loads as a single
-  detail timed at `capturedAt`, and the key is dropped on the next save.
+  in UTC: the time the detail was recorded (Fred can re-date it). Records
+  written before it existed kept one `fields['details']` string. That string
+  loads as a single detail timed at the first encounter, and the key is
+  dropped on the next save.
+- `trashedAt` marks a person as in the trash. `all()` returns only active
+  people; purge deletes every `<id>.*` file and refuses anyone not in the
+  trash.
 - Photos are made upright, cropped to a 4:5 head-and-shoulders portrait around
   the largest face, and never written to the gallery.
 

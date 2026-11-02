@@ -78,11 +78,9 @@ void main() {
 
     expect(find.text('Alex Davis'), findsOneWidget);
     final saved = repository.stored[memory.id]!;
-    expect(saved.fields, {
-      'name': 'Alex Davis',
-      'place': 'Stake Center',
-      'meeting': 'Sunday Meetings',
-    });
+    expect(saved.field(MemoryField.name), 'Alex Davis');
+    expect(saved.latest.place, 'Stake Center');
+    expect(saved.latest.meeting, 'Sunday Meetings');
     expect(saved.details.map((d) => d.text), [
       'Alex is from Seattle and wants to sing in the choir.',
     ]);

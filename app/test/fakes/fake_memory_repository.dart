@@ -8,6 +8,11 @@ class FakeMemoryRepository implements MemoryRepository {
   final Map<String, Memory> stored = {};
   final List<Memory> saves = [];
   final List<String> purges = [];
+  final List<(String, String)> merges = [];
+  final List<String> deletedPhotos = [];
+
+  /// When true, the next merge throws (and clears this flag).
+  bool failNextMerge = false;
 
   /// When true, the next save throws (and clears this flag).
   bool failNextSave = false;
@@ -19,7 +24,7 @@ class FakeMemoryRepository implements MemoryRepository {
     GeoPoint? location,
   }) async {
     final id = 'm${stored.length}';
-    final memory = Memory(
+    final memory = Memory.captured(
       id: id,
       photoFileName: '$id.jpg',
       capturedAt: capturedAt,
@@ -73,5 +78,41 @@ class FakeMemoryRepository implements MemoryRepository {
   }
 
   @override
-  File photoFile(Memory memory) => File('missing/${memory.photoFileName}');
+  Future<Memory> merge(String survivorId, String discardedId) async {
+    if (failNextMerge) {
+      failNextMerge = false;
+      throw const FileSystemException('disk full');
+    }
+    final survivor = stored[survivorId];
+    final discarded = stored[discardedId];
+    if (survivorId == discardedId ||
+        survivor == null ||
+        discarded == null ||
+        survivor.trashedAt != null ||
+        discarded.trashedAt != null) {
+      throw StateError('Cannot merge $discardedId into $survivorId');
+    }
+    merges.add((survivorId, discardedId));
+    final merged = survivor.merged(
+      discarded.withEncounters([
+        for (final e in discarded.encounters)
+          e.withPhotoFileName('$survivorId.${e.photoFileName}'),
+      ]),
+    );
+    stored[survivorId] = merged;
+    stored.remove(discardedId);
+    purges.add(discardedId);
+    return merged;
+  }
+
+  @override
+  Future<void> deleteEncounterPhoto(Encounter encounter) async =>
+      deletedPhotos.add(encounter.photoFileName);
+
+  @override
+  File photoFile(Memory memory) => encounterPhoto(memory.latest);
+
+  @override
+  File encounterPhoto(Encounter encounter) =>
+      File('missing/${encounter.photoFileName}');
 }

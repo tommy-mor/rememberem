@@ -26,7 +26,10 @@ class MemoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: CircleAvatar(backgroundImage: FileImage(photo)),
+      leading: CircleAvatar(
+        backgroundImage: FileImage(photo),
+        onBackgroundImageError: (_, _) {},
+      ),
       title: Text(nameOf(memory)),
       subtitle: Text(
         [

@@ -50,7 +50,10 @@ void main() {
 
     await repository.restore(alex.id);
 
-    expect((await repository.all()).single.toJson(), original);
+    expect(
+      jsonEncode((await repository.all()).single),
+      jsonEncode(original),
+    );
     expect(await repository.trashed(), isEmpty);
   });
 
@@ -98,12 +101,12 @@ void main() {
 
   test('purge leaves people whose id merely starts with the same text',
       () async {
-    final a = Memory(
+    final a = Memory.captured(
         trashedAt: DateTime.utc(2026),
         id: 'abc',
         photoFileName: 'abc.jpg',
         capturedAt: DateTime.utc(2026));
-    final b = Memory(
+    final b = Memory.captured(
         id: 'abc-2',
         photoFileName: 'abc-2.jpg',
         capturedAt: DateTime.utc(2026));

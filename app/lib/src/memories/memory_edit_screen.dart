@@ -4,7 +4,11 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
 import 'detail_list_editor.dart';
+import 'encounter_edit_screen.dart';
 import 'memory_editor.dart';
+import 'memory_tile.dart';
+import 'merge_picker_screen.dart';
+import 'pictures_section.dart';
 
 /// The photo of a person with spoken-or-typed notes, saved as you go.
 class MemoryEditScreen extends StatefulWidget {
@@ -32,6 +36,13 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   // Cached so pending snackbars (detail Undo) can be cleared on leaving.
   ScaffoldMessengerState? _messenger;
 
+  /// Bumped when a picture screen may have changed the newest encounter,
+  /// so the Place and Meeting fields reload their text.
+  int _fieldsGen = 0;
+
+  /// Set when leaving via a merge, whose own snackbar must survive.
+  bool _keepSnackBars = false;
+
   @override
   void initState() {
     super.initState();
@@ -50,7 +61,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     // Clearing during dispose upsets the messenger, so do it after the
     // frame. (Leaving via a shortcut skips the PopScope handler.)
     final messenger = _messenger;
-    if (messenger != null) {
+    if (messenger != null && !_keepSnackBars) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (messenger.mounted) messenger.clearSnackBars();
       });
@@ -77,7 +88,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   }
 
   Widget _buildScaffold(BuildContext context) {
-    final memory = widget.memory;
+    final memory = _editor.memory;
     return Scaffold(
       appBar: AppBar(title: const Text('New person')),
       // Not a lazy ListView: fields scrolled out of view must keep their
@@ -108,6 +119,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             for (final field in MemoryField.values) ...[
               const SizedBox(height: 16),
               DictatedTextField(
+                key: ValueKey('${field.key}-$_fieldsGen'),
                 label: field.label,
                 initialValue: memory.field(field),
                 dictation: widget.dictation,
@@ -127,12 +139,111 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                   _edit(() => _editor.restoreDetail(detail, index)),
             ),
             const SizedBox(height: 16),
+            PicturesSection(
+              encounters: memory.encounters,
+              repository: widget.repository,
+              onOpen: _openPicture,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _merge,
+              icon: const Icon(Icons.merge),
+              label: const Text('Merge with existing person'),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Saved automatically.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPicture(Encounter encounter) async {
+    final removed = await Navigator.of(context).push<Encounter>(
+      MaterialPageRoute(
+        builder: (_) => EncounterEditScreen(
+          editor: _editor,
+          repository: widget.repository,
+          dictation: widget.dictation,
+          photoFileName: encounter.photoFileName,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _fieldsGen++);
+    if (removed == null) return;
+    // Replace, never queue: a queued snackbar dropped on leaving would never
+    // close, and its photo would never be deleted.
+    final closed = (ScaffoldMessenger.of(context)..hideCurrentSnackBar())
+        .showSnackBar(
+          SnackBar(
+            content: const Text('Picture deleted'),
+            // Undo snackbars would otherwise stay until dismissed.
+            persist: false,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () {
+                if (!mounted) return;
+                setState(() {
+                  _editor.restoreEncounter(removed);
+                  _fieldsGen++;
+                });
+              },
+            ),
+          ),
+        )
+        .closed;
+    // The photo file goes only once Undo is no longer possible.
+    if (await closed == SnackBarClosedReason.action) return;
+    try {
+      await _editor.flush(); // the record must no longer use the photo
+    } on Object {
+      return; // keep the file while a saved record may still refer to it
+    }
+    await widget.repository.deleteEncounterPhoto(removed);
+  }
+
+  /// Folds this person into one Fred picks, then returns to the list.
+  Future<void> _merge() async {
+    final target = await Navigator.of(context).push<Memory>(
+      MaterialPageRoute(
+        builder: (_) => MergePickerScreen(
+          repository: widget.repository,
+          excludeId: _editor.memory.id,
+        ),
+      ),
+    );
+    if (target == null || !mounted) return;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final Memory merged;
+    try {
+      await _editor.flush();
+      _editor.close();
+      merged = await widget.repository.merge(target.id, _editor.memory.id);
+    } on Object {
+      _editor.reopen();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not finish merging. Try again.')),
+      );
+      return;
+    }
+    final oldName = MemoryTile.nameOf(target);
+    final newName = MemoryTile.nameOf(merged);
+    messenger.clearSnackBars();
+    _keepSnackBars = true;
+    navigator.popUntil((route) => route.isFirst);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          oldName == newName
+              ? 'Merged into $oldName'
+              : 'Merged into $oldName; name now $newName',
         ),
       ),
     );

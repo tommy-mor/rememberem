@@ -8,7 +8,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 import 'fakes/fake_memory_repository.dart';
 
 void main() {
-  final memory = Memory(
+  final memory = Memory.captured(
     id: 'a',
     photoFileName: 'a.jpg',
     capturedAt: DateTime.utc(2026, 11, 1),
@@ -41,7 +41,7 @@ void main() {
       editor.flush();
       async.flushMicrotasks();
 
-      expect(repository.saves.single.fields, {'place': 'Stake Center'});
+      expect(repository.saves.single.latest.place, 'Stake Center');
     });
   });
 

@@ -25,12 +25,15 @@ class MemoryEditor {
   /// Details deleted in this session; late edits to them are ignored.
   final Set<String> _deleted = {};
 
+  /// While closed (during a merge) every change and save is ignored.
+  bool _closed = false;
+
   /// The memory as edited, including details cleared to blank (which
   /// [flush] leaves out of what is saved).
   Memory get memory => _memory;
 
   void update(String key, String value) {
-    if (_memory.fields[key] == value) return;
+    if (_closed || _memory.field(_fieldFor(key)) == value) return;
     _memory = _memory.withField(key, value);
     _scheduleSave();
   }
@@ -39,7 +42,7 @@ class MemoryEditor {
   /// its text first becomes non-blank and saved straight away; later edits
   /// keep that time.
   void updateDetail(String id, String text) {
-    if (_deleted.contains(id)) return;
+    if (_closed || _deleted.contains(id)) return;
     final details = _memory.details;
     final index = details.indexWhere((d) => d.id == id);
     if (index == -1) {
@@ -60,6 +63,7 @@ class MemoryEditor {
 
   /// Changes when detail [id] was recorded, keeping its text and place.
   void setDetailTime(String id, DateTime at) {
+    if (_closed) return;
     final details = _memory.details;
     final index = details.indexWhere((d) => d.id == id);
     if (index == -1) return;
@@ -72,6 +76,7 @@ class MemoryEditor {
   /// Removes detail [id] (saved or not) and saves at once. Later edits to
   /// it, such as a late dictation result, are ignored until it is restored.
   void deleteDetail(String id) {
+    if (_closed) return;
     _deleted.add(id);
     final details = _memory.details;
     if (!details.any((d) => d.id == id)) return;
@@ -84,12 +89,64 @@ class MemoryEditor {
 
   /// Puts back a deleted [detail] at [index] (for Undo).
   void restoreDetail(Detail detail, int index) {
+    if (_closed) return;
     _deleted.remove(detail.id);
     final details = [..._memory.details];
     details.insert(index.clamp(0, details.length), detail);
     _memory = _memory.withDetails(details);
     _flushNow();
   }
+
+  /// Changes the encounter whose photo is [photoFileName]. Date changes
+  /// should pass [now] so they save at once; text waits like other edits.
+  void updateEncounter(
+    String photoFileName,
+    Encounter Function(Encounter) change, {
+    bool now = false,
+  }) {
+    if (_closed) return;
+    final encounters = _memory.encounters;
+    final index = encounters.indexWhere(
+      (e) => e.photoFileName == photoFileName,
+    );
+    if (index == -1) return;
+    _memory = _memory.withEncounters(
+      [...encounters]..[index] = change(encounters[index]),
+    );
+    now ? _flushNow() : _scheduleSave();
+  }
+
+  /// Removes one encounter and saves at once. Returns it (for Undo), or
+  /// null if it is the person's last one, which is never removed.
+  Encounter? removeEncounter(String photoFileName) {
+    if (_closed || _memory.encounters.length < 2) return null;
+    final encounters = _memory.encounters;
+    final index = encounters.indexWhere(
+      (e) => e.photoFileName == photoFileName,
+    );
+    if (index == -1) return null;
+    _memory = _memory.withEncounters([...encounters]..removeAt(index));
+    _flushNow();
+    return encounters[index];
+  }
+
+  void restoreEncounter(Encounter encounter) {
+    if (_closed) return;
+    _memory = _memory.withEncounters([..._memory.encounters, encounter]);
+    _flushNow();
+  }
+
+  /// Stops all changes and saves, e.g. while this person is merged away.
+  void close() {
+    _timer?.cancel();
+    _closed = true;
+  }
+
+  /// Undoes [close], e.g. when the merge failed.
+  void reopen() => _closed = false;
+
+  MemoryField _fieldFor(String key) =>
+      MemoryField.values.firstWhere((f) => f.key == key);
 
   /// Saves now without waiting. A failure must not surface as an unhandled
   /// error; [flush] marks the state unsaved so the next flush retries it.
@@ -107,7 +164,7 @@ class MemoryEditor {
   /// Saves any unsaved change now. Saves run one at a time, in order.
   Future<void> flush() {
     _timer?.cancel();
-    if (_dirty) {
+    if (_dirty && !_closed) {
       _dirty = false;
       final snapshot = _memory.withDetails([
         for (final detail in _memory.details)

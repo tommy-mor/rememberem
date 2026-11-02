@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'encounter.dart';
 import 'geo_point.dart';
 import 'memory.dart';
 import 'memory_repository.dart';
@@ -30,7 +31,7 @@ class JsonFileMemoryRepository implements MemoryRepository {
       _serial(() async {
         await folder.create(recursive: true);
         final id = _newId(capturedAt);
-        final memory = Memory(
+        final memory = Memory.captured(
           id: id,
           photoFileName: '$id.jpg',
           capturedAt: capturedAt,
@@ -63,21 +64,77 @@ class JsonFileMemoryRepository implements MemoryRepository {
         if (await record.exists() && _isActive(await record.readAsString())) {
           throw StateError('Memory $id is not in the trash');
         }
-        // Photos and temp files first, the record last, so a half-finished
-        // purge still shows up in the trash and can be repeated. Matching
-        // by name (not by parsing the record) means a corrupt record
-        // cannot block it.
-        final files = await folder.list().toList();
-        for (final entity in files) {
-          final name = entity.uri.pathSegments.last;
-          if (entity is File &&
-              name.startsWith('$id.') &&
-              entity.path != record.path) {
-            await entity.delete();
-          }
-        }
-        if (await record.exists()) await record.delete();
+        await _deleteFiles(id);
       });
+
+  /// Deletes every file of [id]: photos and temp files first, the record
+  /// last. Run only inside [_serial].
+  Future<void> _deleteFiles(String id) async {
+    final record = _recordFile(id);
+    // Photos and temp files first, the record last, so a half-finished
+    // purge still shows up in the trash and can be repeated. Matching
+    // by name (not by parsing the record) means a corrupt record
+    // cannot block it.
+    final files = await folder.list().toList();
+    for (final entity in files) {
+      final name = entity.uri.pathSegments.last;
+      if (entity is File &&
+          name.startsWith('$id.') &&
+          entity.path != record.path) {
+        await entity.delete();
+      }
+    }
+    if (await record.exists()) await record.delete();
+  }
+
+  @override
+  Future<Memory> merge(String survivorId, String discardedId) =>
+      _serial(() async {
+        if (survivorId == discardedId) {
+          throw StateError('Cannot merge $survivorId into itself');
+        }
+        final survivor = await _readActive(survivorId);
+        final discarded = await _readActive(discardedId);
+        // Copy the other's photos under the survivor's id first, so they
+        // survive the purge below and a repeated merge finds them in place.
+        final moved = <Encounter>[];
+        for (final encounter in discarded.encounters) {
+          final base = encounter.photoFileName
+              .replaceAll(RegExp(r"\.jpg$"), '')
+              .replaceAll('.', '_');
+          final renamed = encounter.withPhotoFileName('$survivorId.$base.jpg');
+          final source = encounterPhoto(encounter);
+          final target = encounterPhoto(renamed);
+          if (!await target.exists() && await source.exists()) {
+            await _writeAtomically(target, await source.readAsBytes());
+          }
+          moved.add(renamed);
+        }
+        final merged = survivor.merged(discarded.withEncounters(moved));
+        await _write(merged);
+        // Only now is it safe to delete the other person.
+        await _deleteFiles(discardedId);
+        return merged;
+      });
+
+  @override
+  Future<void> deleteEncounterPhoto(Encounter encounter) => _serial(() async {
+        final photo = encounterPhoto(encounter);
+        if (await photo.exists()) await photo.delete();
+      });
+
+  Future<Memory> _readActive(String id) async {
+    final record = _recordFile(id);
+    if (!await record.exists()) {
+      throw StateError('Memory $id no longer exists');
+    }
+    final memory = Memory.fromJson(
+        jsonDecode(await record.readAsString()) as Map<String, dynamic>);
+    if (memory.trashedAt != null) {
+      throw StateError('Memory $id is in the trash');
+    }
+    return memory;
+  }
 
   /// True if [json] is a readable record that is not in the trash. A
   /// corrupt record counts as not active, so it can still be purged.
@@ -95,7 +152,7 @@ class JsonFileMemoryRepository implements MemoryRepository {
   @override
   Future<List<Memory>> all() async {
     final active = (await _loadAll()).where((m) => m.trashedAt == null).toList()
-      ..sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+      ..sort((a, b) => Encounter.newestFirst(a.latest, b.latest));
     return active;
   }
 
@@ -109,8 +166,11 @@ class JsonFileMemoryRepository implements MemoryRepository {
   }
 
   @override
-  File photoFile(Memory memory) =>
-      File('${folder.path}${Platform.pathSeparator}${memory.photoFileName}');
+  File photoFile(Memory memory) => encounterPhoto(memory.latest);
+
+  @override
+  File encounterPhoto(Encounter encounter) =>
+      File('${folder.path}${Platform.pathSeparator}${encounter.photoFileName}');
 
   Future<List<Memory>> _loadAll() async {
     if (!await folder.exists()) return [];

@@ -99,6 +99,9 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       ..showSnackBar(
         SnackBar(
           content: Text('Moved ${MemoryTile.nameOf(memory)} to trash'),
+          // Undo snackbars would otherwise stay until dismissed.
+          persist: false,
+          duration: const Duration(seconds: 6),
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () => _undoTrash(memory),
