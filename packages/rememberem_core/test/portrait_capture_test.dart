@@ -17,6 +17,14 @@ class _FakeFaceLocator implements FaceLocator {
   }
 }
 
+class _UnreadableRepository extends JsonFileMemoryRepository {
+  _UnreadableRepository(super.folder);
+
+  @override
+  Future<List<Memory>> all() async =>
+      throw const FormatException('corrupt record');
+}
+
 void main() {
   late Directory temp;
   late JsonFileMemoryRepository repository;
@@ -84,5 +92,71 @@ void main() {
         .capture(jpeg(60, 80), capturedAt: DateTime.utc(2026, 11, 1));
 
     expect(Directory('${temp.path}/work').listSync(), isEmpty);
+  });
+
+  group('place auto-fill', () {
+    const cafe = GeoPoint(47.6, -122.3);
+    // About 50 m north of the cafe.
+    const nearby = GeoPoint(47.60045, -122.3);
+
+    Future<Memory> knownCafe() async {
+      final memory = await repository.add(
+        photoJpeg: jpeg(10, 10),
+        capturedAt: DateTime.utc(2026, 10, 1),
+        location: cafe,
+      );
+      final named = memory.withField('place', 'Cafe');
+      await repository.save(named);
+      return named;
+    }
+
+    Future<Memory> captureAt(GeoPoint? location) =>
+        captureWith(_FakeFaceLocator([])).capture(
+          jpeg(60, 80),
+          capturedAt: DateTime.utc(2026, 11, 1),
+          location: location,
+        );
+
+    test('a capture near a known place starts with that place', () async {
+      await knownCafe();
+
+      final memory = await captureAt(nearby);
+
+      expect(memory.latest.place, 'Cafe');
+      final saved =
+          (await repository.all()).firstWhere((m) => m.id == memory.id);
+      expect(saved.latest.place, 'Cafe');
+    });
+
+    test('no location, or only a trashed neighbour, gives a blank place',
+        () async {
+      final known = await knownCafe();
+
+      expect((await captureAt(null)).latest.place, '');
+
+      await repository.trash(known.id, DateTime.utc(2026, 10, 2));
+      expect((await captureAt(nearby)).latest.place, '');
+    });
+
+    test('a record of the wrong shape (a TypeError) still saves the photo',
+        () async {
+      await knownCafe();
+      await File('${temp.path}/memories/odd.json').writeAsString('[]');
+
+      final memory = await captureAt(nearby);
+
+      expect(memory.latest.place, '');
+      expect(await repository.photoFile(memory).exists(), isTrue);
+    });
+
+    test('a failed lookup still saves the photo, with a blank place', () async {
+      repository = _UnreadableRepository(Directory('${temp.path}/memories'));
+
+      final memory = await captureAt(nearby);
+
+      expect(memory.encounters, hasLength(1));
+      expect(memory.latest.place, '');
+      expect(await repository.photoFile(memory).exists(), isTrue);
+    });
   });
 }

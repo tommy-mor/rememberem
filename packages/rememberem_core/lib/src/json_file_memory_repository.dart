@@ -27,6 +27,7 @@ class JsonFileMemoryRepository implements MemoryRepository {
     required List<int> photoJpeg,
     required DateTime capturedAt,
     GeoPoint? location,
+    String place = '',
   }) =>
       _serial(() async {
         await folder.create(recursive: true);
@@ -36,6 +37,7 @@ class JsonFileMemoryRepository implements MemoryRepository {
           photoFileName: '$id.jpg',
           capturedAt: capturedAt,
           location: location,
+          place: place,
         );
         await _writeAtomically(photoFile(memory), photoJpeg);
         await _write(memory);

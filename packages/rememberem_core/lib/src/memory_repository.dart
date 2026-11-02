@@ -6,11 +6,12 @@ import 'memory.dart';
 
 /// Private storage for memories and their photos.
 abstract interface class MemoryRepository {
-  /// Stores [photoJpeg] and creates a memory with empty fields.
+  /// Stores [photoJpeg] and creates a memory met once, at [place].
   Future<Memory> add({
     required List<int> photoJpeg,
     required DateTime capturedAt,
     GeoPoint? location,
+    String place = '',
   });
 
   /// Saves changes to an existing memory. Throws [StateError] if it has

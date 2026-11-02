@@ -85,7 +85,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ),
         ),
       );
-    } on Exception catch (e) {
+    } catch (e) {
+      // Any failure, Error included, must give the shutter back.
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)

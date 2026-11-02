@@ -22,6 +22,7 @@ class FakeMemoryRepository implements MemoryRepository {
     required List<int> photoJpeg,
     required DateTime capturedAt,
     GeoPoint? location,
+    String place = '',
   }) async {
     final id = 'm${stored.length}';
     final memory = Memory.captured(
@@ -29,6 +30,7 @@ class FakeMemoryRepository implements MemoryRepository {
       photoFileName: '$id.jpg',
       capturedAt: capturedAt,
       location: location,
+      place: place,
     );
     stored[id] = memory;
     return memory;

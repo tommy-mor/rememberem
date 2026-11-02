@@ -11,6 +11,7 @@ export 'src/memory.dart';
 export 'src/memory_field.dart';
 export 'src/memory_repository.dart';
 export 'src/pixel_rect.dart';
+export 'src/place_finder.dart';
 export 'src/portrait_capture.dart';
 export 'src/portrait_cropper.dart';
 export 'src/portrait_framer.dart';

@@ -381,4 +381,28 @@ void main() {
       expect(repository.saves, isEmpty);
     });
   });
+
+  testWidgets('opening an existing person never fills in their place', (
+    tester,
+  ) async {
+    final cafe = await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 10, 1),
+      location: const GeoPoint(47.61, -122.33),
+      place: 'Cafe',
+    );
+    expect(cafe.latest.place, 'Cafe');
+    await showScreen(tester); // `memory`: same location, blank place
+
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(
+      tester
+          .widget<TextField>(find.widgetWithText(TextField, 'Place'))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(repository.saves, isEmpty);
+  });
 }
