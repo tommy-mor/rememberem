@@ -1,10 +1,10 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
+import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem/src/trash/trash_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
@@ -18,19 +18,6 @@ class _NoFaces implements FaceLocator {
 }
 
 /// Lets a test hold the next all() call open and finish it later.
-class _SlowListRepository extends FakeMemoryRepository {
-  Completer<void>? gate;
-
-  @override
-  Future<List<Memory>> all() async {
-    final result = await super.all();
-    final wait = gate;
-    gate = null;
-    if (wait != null) await wait.future;
-    return result;
-  }
-}
-
 void main() {
   late FakeMemoryRepository repository;
 
@@ -79,45 +66,38 @@ void main() {
 
   setUp(() => repository = FakeMemoryRepository());
 
-  testWidgets('trash removes the row at once; Undo brings it back', (
-    tester,
-  ) async {
+  Future<void> trashFromPage(WidgetTester tester, String name) async {
+    await tester.tap(find.text(name));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Move to trash'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('trash on the person page saves, goes back without them, and '
+      'Undo brings them back on their page', (tester) async {
     await person('Alex');
     await person('Sam');
     await showList(tester);
+    expect(find.byTooltip('Move to trash'), findsNothing); // not on the list
 
-    await tester.tap(find.byTooltip('Move to trash').first);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Sam'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Meeting'), 'Choir');
+    await tester.tap(find.byTooltip('Move to trash'));
+    await tester.pumpAndSettle();
 
+    expect(find.byType(MemoryListScreen), findsOneWidget);
+    expect(find.byType(MemoryEditScreen), findsNothing);
     expect(find.text('Sam'), findsNothing);
     expect(find.text('Moved Sam to trash'), findsOneWidget);
-    expect((await repository.trashed()).single.field(MemoryField.name), 'Sam');
+    final trashed = (await repository.trashed()).single;
+    expect(trashed.field(MemoryField.meeting), 'Choir');
 
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
-    expect(find.text('Sam'), findsOneWidget);
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
     expect(await repository.trashed(), isEmpty);
-  });
-
-  testWidgets('an old reload finishing late cannot hide an undone trash', (
-    tester,
-  ) async {
-    repository = _SlowListRepository();
-    await person('Sam');
-    await showList(tester);
-    final slow = repository as _SlowListRepository;
-
-    final held = Completer<void>();
-    slow.gate = held;
-    await tester.tap(find.byTooltip('Move to trash'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.text('Undo'));
-    await tester.pumpAndSettle();
-    expect(find.text('Sam'), findsOneWidget);
-
-    held.complete(); // the stale reload (taken while trashed) lands last
+    await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Sam'), findsOneWidget);
   });
@@ -125,9 +105,7 @@ void main() {
   testWidgets('opening the Trash hides a pending Undo', (tester) async {
     await person('Sam');
     await showList(tester);
-    await tester.tap(find.byTooltip('Move to trash'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await trashFromPage(tester, 'Sam');
     expect(find.text('Undo'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Trash'));

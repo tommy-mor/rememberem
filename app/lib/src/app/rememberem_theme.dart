@@ -11,6 +11,13 @@ class RememberemTheme {
   static const gold = Color(0xFFE4BC52);
   static const paleGold = Color(0xFFFFF3D6);
 
+  /// Text fields' inner padding: 70 % of Material 3's outlined default
+  /// (12, 20, 12, 12), for a tighter page.
+  static const fieldPadding = EdgeInsets.fromLTRB(8.4, 14, 8.4, 8.4);
+
+  /// The same for dense fields (Material's 12, 16, 12, 8), used in lists.
+  static const denseFieldPadding = EdgeInsets.fromLTRB(8.4, 11.2, 8.4, 5.6);
+
   static ThemeData light(AppSettings settings) {
     final primary = Color(settings.themeColor);
     final background = Color(settings.backgroundColor);
@@ -48,6 +55,9 @@ class RememberemTheme {
       ThemeData(
         colorScheme: scheme,
         scaffoldBackgroundColor: background,
+        inputDecorationTheme: const InputDecorationTheme(
+          contentPadding: fieldPadding,
+        ),
         appBarTheme: AppBarTheme(
           backgroundColor: bar,
           foregroundColor: gold,

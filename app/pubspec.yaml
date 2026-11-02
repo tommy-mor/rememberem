@@ -26,6 +26,8 @@ dependencies:
   latlong2: 0.10.1
   image_picker: 1.2.4
   audioplayers: 6.8.1
+  # Opens the About page links in the browser.
+  url_launcher: 6.3.3
 
 dev_dependencies:
   flutter_test:

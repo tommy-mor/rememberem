@@ -110,7 +110,7 @@ void main() {
     expect(find.text('Stake Center - Sunday'), findsOneWidget);
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('Sam'), findsOneWidget);
-    expect(find.text('recorded'), findsOneWidget);
+    expect(find.text('recorded'), findsNothing);
     expect(find.text('Gone'), findsNothing);
     expect(repository.saves, isEmpty);
     expect(repository.purges, isEmpty);

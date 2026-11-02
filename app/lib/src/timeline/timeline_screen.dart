@@ -134,24 +134,32 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
               ),
             ),
           ),
-          for (final group in day.groups) ...[
-            Text(_groupLabel(group), style: theme.textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          // Everything under a date is indented beneath it.
+          Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final memory in group.people)
-                  TimelineMiniature(
-                    memory: memory,
-                    photo: widget.services.repository.photoFile(memory),
-                    recorded: group.recordedIds.contains(memory.id),
-                    onOpen: () => _openPerson(memory),
+                for (final group in day.groups) ...[
+                  Text(_groupLabel(group), style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final memory in group.people)
+                        TimelineMiniature(
+                          memory: memory,
+                          photo: widget.services.repository.photoFile(memory),
+                          onOpen: () => _openPerson(memory),
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
+                ],
               ],
             ),
-            const SizedBox(height: 12),
-          ],
+          ),
           const Divider(),
         ],
       ),

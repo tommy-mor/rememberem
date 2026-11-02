@@ -49,7 +49,9 @@ void main() {
     addTearDown(tester.view.reset);
     final controller = AppSettingsController(const AppSettings(gameTurns: 19));
     await tester.pumpWidget(
-      MaterialApp(home: SettingsScreen(settings: controller)),
+      MaterialApp(
+        home: SettingsScreen(settings: controller, links: FakeLinkOpener()),
+      ),
     );
 
     final turns = find.ancestor(

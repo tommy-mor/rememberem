@@ -71,8 +71,73 @@ void main() {
 
     expect(stored(memory).location!.latitude, closeTo(here.latitude, 1e-6));
     expect(stored(memory).location!.longitude, closeTo(here.longitude, 1e-6));
-    expect(find.text('47.60000, -122.30000'), findsOneWidget);
+    // Two decimals; the Cafe is over a kilometre away, so no place name.
+    expect(find.text('47.60, -122.30'), findsOneWidget);
+    expect(stored(memory).place, isEmpty);
     expect(repository.stored[cafe.id]!.encounters.first.place, 'Cafe');
+  });
+
+  testWidgets('a spot near a known place takes its name, over a typed one', (
+    tester,
+  ) async {
+    await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 10, 1),
+      location: const GeoPoint(47.6001, -122.3001),
+      place: 'Cafe',
+    );
+    final memory = await showCard(
+      tester,
+      place: 'Typed by hand',
+      deviceAt: here,
+    );
+
+    await tester.tap(find.byTooltip('Change location'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this spot'));
+    await tester.pumpAndSettle();
+
+    expect(stored(memory).place, 'Cafe');
+    expect(find.widgetWithText(TextField, 'Cafe'), findsOneWidget);
+  });
+
+  testWidgets('tapping a known place pin chooses that place', (tester) async {
+    await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 10, 1),
+      location: here,
+      place: 'Cafe',
+    );
+    final memory = await showCard(tester, deviceAt: here);
+
+    await tester.tap(find.byTooltip('Change location'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PlaceMarkerView),
+        matching: find.text('Cafe'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(stored(memory).location, here);
+    expect(stored(memory).place, 'Cafe');
+  });
+
+  testWidgets('with no match the Place field is blank and hints unknown', (
+    tester,
+  ) async {
+    final memory = await showCard(tester, place: 'Typed', deviceAt: here);
+    await tester.tap(find.byTooltip('Change location'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this spot'));
+    await tester.pumpAndSettle();
+
+    expect(stored(memory).place, isEmpty);
+    final place = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'Place'),
+    );
+    expect(place.decoration!.hintText, 'unknown');
   });
 
   testWidgets('Remote clears the location and sets the place, on the card '

@@ -126,7 +126,7 @@ void main() {
   ) async {
     await boot(tester);
     await open(tester, find.text('Ann'));
-    await open(tester, find.byIcon(Icons.chevron_right));
+    await open(tester, find.byTooltip('Open this picture'));
     expect(find.byType(EncounterEditScreen), findsOneWidget);
 
     await back(tester);
@@ -255,7 +255,7 @@ void main() {
   ) async {
     await boot(tester);
     await open(tester, find.text('Ann'));
-    await open(tester, find.byIcon(Icons.chevron_right));
+    await open(tester, find.byTooltip('Open this picture'));
 
     shortcut.trigger!();
     await settleCamera(tester);

@@ -46,6 +46,13 @@ void main() {
     (w) => w is TextField && (w.decoration?.labelText ?? '').startsWith(kind),
   );
 
+  /// Opens the detail row labelled [label] with its expander.
+  Future<void> openRow(WidgetTester tester, String label) async {
+    await tester.ensureVisible(find.byTooltip('Open $label'));
+    await tester.tap(find.byTooltip('Open $label'));
+    await tester.pumpAndSettle();
+  }
+
   Future<Memory> named(String name) async {
     final m = await repository.add(
       photoJpeg: [],
@@ -90,7 +97,7 @@ void main() {
       expect(find.text('+ $kind'), findsOneWidget);
     }
     expect(find.textContaining('Fact'), findsNothing);
-    expect(find.textContaining('47.61000, -122.33000'), findsOneWidget);
+    expect(find.textContaining('47.61, -122.33'), findsOneWidget);
   });
 
   testWidgets('Fred speaks into each field and it all saves by itself', (
@@ -211,7 +218,7 @@ void main() {
       [happening.kind, happening.place, happening.text],
       [DetailKind.happening, 'Park', 'Picnic'],
     );
-    expect(find.widgetWithText(TextField, 'Park'), findsOneWidget);
+    expect(find.text('Park'), findsOneWidget);
     expect(find.textContaining('· Park'), findsOneWidget);
   });
 
@@ -337,7 +344,7 @@ void main() {
 
     const label = 'Relationship · Boss · someone removed';
     expect(find.text(label), findsOneWidget);
-    await tester.tap(find.byTooltip('Change $label'));
+    await tester.tap(find.byTooltip('Open $label'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -404,16 +411,34 @@ void main() {
     expect(find.text('New person'), findsNothing);
   });
 
-  testWidgets('Crop and Merge sit to the right of the photo', (tester) async {
-    await showScreen(tester);
+  testWidgets(
+    'crop sits on the lower right of the photo; Merge, then the time, '
+    'then the coordinates sit to its right',
+    (tester) async {
+      await showScreen(tester);
 
-    final photo = tester.getRect(find.byType(Image).first);
-    for (final label in ['Crop', 'Merge with existing person']) {
-      final button = tester.getRect(find.text(label));
-      expect(button.left, greaterThan(photo.right), reason: label);
-      expect(button.top, lessThan(photo.bottom), reason: label);
-    }
-  });
+      final photo = tester.getRect(find.byType(Image).first);
+      final crop = tester.getRect(find.byTooltip('Crop'));
+      expect(photo.contains(crop.center), isTrue);
+      expect(crop.center.dx, greaterThan(photo.center.dx));
+      expect(crop.center.dy, greaterThan(photo.center.dy));
+      expect(find.text('Crop'), findsNothing); // an icon only
+
+      final merge = tester.getRect(find.text('Merge with existing person'));
+      final clock = tester.getRect(find.byTooltip('Change date and time'));
+      final pin = tester.getRect(find.byTooltip('Change location'));
+      for (final r in [merge, clock, pin]) {
+        expect(r.left, greaterThan(photo.right));
+        expect(r.top, lessThan(photo.bottom));
+      }
+      expect(merge.top, lessThan(clock.top));
+      expect(clock.top, lessThan(pin.top));
+      expect(
+        tester.widget<Text>(find.text('Merge with existing person')).style,
+        isNull, // sized by the button's own text style (60 %)
+      );
+    },
+  );
 
   testWidgets('detail text follows the size in Settings', (tester) async {
     memory = memory.withDetails([
@@ -585,7 +610,7 @@ void main() {
     testWidgets('changing the type in place keeps the score', (tester) async {
       await showWithDetails(tester);
 
-      await tester.tap(find.byTooltip('Change $relLabel'));
+      await tester.tap(find.byTooltip('Open $relLabel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('friend'));
       await tester.pumpAndSettle();
@@ -600,6 +625,7 @@ void main() {
     ) async {
       await showWithDetails(tester);
 
+      await openRow(tester, 'Fact');
       await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1)); // snackbar slides in
@@ -624,6 +650,7 @@ void main() {
     ) async {
       await showWithDetails(tester);
 
+      await openRow(tester, 'Fact');
       await tester.tap(find.byTooltip('Speak Fact'));
       await tester.pump();
       await tester.tap(find.byTooltip('Delete Fact'));
@@ -660,6 +687,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byTooltip('Open Fact').first);
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Delete Fact').first);
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
@@ -679,6 +708,7 @@ void main() {
         Detail(id: 'a', text: 'Tall', at: DateTime(2026, 11, 1)),
       ]);
       await showScreen(tester);
+      await openRow(tester, 'Fact');
       await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));

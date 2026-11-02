@@ -7,11 +7,13 @@ import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
 import 'detail_extras_editor.dart';
 
-/// The Details section: one compact row per detail, its kind and data as
-/// the field's label on one line ("Happening · 3 Mar 2026 · Park") and its
-/// description as the text. A row's date, place, type or person are edited
-/// in place under it (the tune button); a new row opens that way. Below,
-/// a button to add each kind. Details can be deleted, with Undo.
+/// The Details section: one line per detail, its kind and data as the
+/// label on the field's border ("Happening · 3 Mar 2026 · Park") and its
+/// description as the text, with an expander. Opening a row (the expander,
+/// or tapping into it) draws a box round it holding the mic, the kind's
+/// extras and a delete button; tapping outside the box, or focus leaving
+/// it, closes it again. A new row opens. Below, a button to add each kind.
+/// Details can be deleted, with Undo.
 class DetailListEditor extends StatefulWidget {
   const DetailListEditor({
     super.key,
@@ -20,6 +22,7 @@ class DetailListEditor extends StatefulWidget {
     required this.ownerId,
     required this.people,
     required this.photoOf,
+    required this.choosePlace,
     required this.nameOf,
     required this.onChanged,
     required this.onReplace,
@@ -35,6 +38,9 @@ class DetailListEditor extends StatefulWidget {
   /// Everyone active and in the trash, for relationship choices and types.
   final List<Memory> people;
   final File Function(Memory person) photoOf;
+
+  /// Picks a happening's place on a map; see [DetailExtrasEditor].
+  final Future<String?> Function(String current) choosePlace;
 
   /// The shown name of an active person, or null.
   final String? Function(String id) nameOf;
@@ -91,6 +97,22 @@ class _DetailListEditorState extends State<DetailListEditor> {
   /// A row coming back through Undo, which is not new.
   String? _restoring;
 
+  /// Rows whose dictation is listening; they stay open until it ends.
+  final Set<String> _listening = {};
+
+  void _expand(String id) {
+    if (!_open.contains(id)) setState(() => _open.add(id));
+  }
+
+  /// Closes row [id], unless it is listening or something (a picker, a
+  /// menu, the map) is open over the page: those take focus and taps
+  /// without leaving the row.
+  void _collapse(String id) {
+    if (!_open.contains(id) || _listening.contains(id)) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    setState(() => _open.remove(id));
+  }
+
   @override
   void didUpdateWidget(DetailListEditor old) {
     super.didUpdateWidget(old);
@@ -98,7 +120,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
     for (final d in widget.details) {
       if (before.contains(d.id) || d.id == _restoring) continue;
       // Added just now (its place may already be filled in).
-      if (d.kind != DetailKind.fact) _open.add(d.id);
+      _open.add(d.id);
       // A relationship starts with "Who", so the keyboard waits.
       _added = d.kind == DetailKind.relationship ? null : d.id;
     }
@@ -109,6 +131,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
     final index = widget.details.indexWhere((d) => d.id == detail.id);
     widget.onDelete(detail.id);
     _open.remove(detail.id);
+    _listening.remove(detail.id);
     // An empty row has nothing worth bringing back.
     if (detail.isEmpty) return;
     ScaffoldMessenger.of(context)
@@ -164,58 +187,84 @@ class _DetailListEditorState extends State<DetailListEditor> {
   }
 
   Widget _row(BuildContext context, Detail detail) {
+    final id = detail.id;
     final label = DetailListEditor.rowLabel(detail, widget.nameOf);
-    final open = _open.contains(detail.id);
-    final hasExtras = detail.kind != DetailKind.fact;
-    return Column(
-      key: ValueKey('detail-${detail.id}'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: DictatedTextField(
-                key: ValueKey(detail.id),
-                label: label,
-                initialValue: detail.text,
-                dictation: widget.dictation,
-                multiline: true,
-                dense: true,
-                autofocus: _added == detail.id,
-                onChanged: (text) => widget.onChanged(detail.id, text),
-              ),
+    final open = _open.contains(id);
+    final scheme = Theme.of(context).colorScheme;
+    // The same widgets open or closed, so the description field (and any
+    // dictation in it) is never rebuilt from scratch.
+    // In the text fields' group, so the paste toolbar and selection
+    // handles (overlays) count as inside; tapping another field still
+    // closes the row, through focus leaving it.
+    return TapRegion(
+      key: ValueKey('detail-$id'),
+      groupId: EditableText,
+      onTapOutside: (_) => _collapse(id),
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (focused) => focused ? _expand(id) : _collapse(id),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: open ? scheme.primary : Colors.transparent,
+              width: 1.5,
             ),
-            if (hasExtras)
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: open ? 'Hide $label' : 'Change $label',
-                icon: Icon(open ? Icons.expand_less : Icons.tune),
-                onPressed: () => setState(
-                  () => open ? _open.remove(detail.id) : _open.add(detail.id),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(open ? 6 : 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DictatedTextField(
+                  key: ValueKey(id),
+                  label: label,
+                  initialValue: detail.text,
+                  dictation: widget.dictation,
+                  multiline: true,
+                  dense: true,
+                  alwaysFloatLabel: true,
+                  autofocus: _added == id,
+                  showMic: open,
+                  trailing: IconButton(
+                    tooltip: 'Open $label',
+                    icon: const Icon(Icons.expand_more),
+                    onPressed: () => _expand(id),
+                  ),
+                  onListeningChanged: (listening) =>
+                      listening ? _listening.add(id) : _listening.remove(id),
+                  onChanged: (text) => widget.onChanged(id, text),
                 ),
-              ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: 'Delete $label',
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => _delete(detail),
-            ),
-          ],
-        ),
-        if (open)
-          Padding(
-            padding: const EdgeInsets.only(left: 8, right: 8, bottom: 4),
-            child: DetailExtrasEditor(
-              key: ValueKey('extras-${detail.id}'),
-              detail: detail,
-              ownerId: widget.ownerId,
-              people: widget.people,
-              photoOf: widget.photoOf,
-              onChanged: widget.onReplace,
+                if (open) ...[
+                  if (detail.kind != DetailKind.fact)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: DetailExtrasEditor(
+                        key: ValueKey('extras-$id'),
+                        detail: detail,
+                        ownerId: widget.ownerId,
+                        people: widget.people,
+                        photoOf: widget.photoOf,
+                        choosePlace: widget.choosePlace,
+                        onChanged: widget.onReplace,
+                      ),
+                    ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Delete $label',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _delete(detail),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }

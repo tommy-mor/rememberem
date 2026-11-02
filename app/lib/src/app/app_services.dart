@@ -1,5 +1,7 @@
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../about/browser_link_opener.dart';
+import '../about/link_opener.dart';
 import '../capture/photo_picker.dart';
 import '../contacts/contacts_service.dart';
 import '../location/device_location.dart';
@@ -20,7 +22,9 @@ class AppServices {
     this.photoPicker,
     this.feedback,
     this.contacts,
-  }) : settings = settings ?? AppSettingsController();
+    LinkOpener? links,
+  }) : settings = settings ?? AppSettingsController(),
+       links = links ?? BrowserLinkOpener();
 
   final MemoryRepository repository;
   final PortraitCapture capture;
@@ -42,4 +46,7 @@ class AppServices {
 
   /// Linking people to phone contacts; null hides it (iOS, tests).
   final ContactsService? contacts;
+
+  /// Opens the About page's links in the browser.
+  final LinkOpener links;
 }

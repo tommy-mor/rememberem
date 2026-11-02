@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../about/about_screen.dart';
+import '../about/link_opener.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../reminders/reminders_section.dart';
 import 'app_settings_controller.dart';
@@ -11,9 +13,15 @@ import 'settings_heading.dart';
 /// Fred's choices: reminders, how matching and practice behave, and
 /// whether maps fetch streets. Every change applies at once.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.settings, this.reminders});
+  const SettingsScreen({
+    super.key,
+    required this.settings,
+    required this.links,
+    this.reminders,
+  });
 
   final AppSettingsController settings;
+  final LinkOpener links;
   final ReminderCoordinator? reminders;
 
   @override
@@ -116,6 +124,16 @@ class SettingsScreen extends StatelessWidget {
               ),
               value: s.streetMaps,
               onChanged: (v) => settings.update(s.copyWith(streetMaps: v)),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('About Rememberem'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AboutScreen(links: links),
+                ),
+              ),
             ),
           ],
         ),

@@ -16,6 +16,8 @@ class BrandLogo extends StatelessWidget {
         child: Image.asset(
           asset,
           height: 40,
+          // A fixed size, so it can be tapped before the image has loaded.
+          width: 140,
           fit: BoxFit.contain,
           // A missing asset (as in some tests) falls back to the name.
           errorBuilder: (_, _, _) => const Text('Rememberem'),

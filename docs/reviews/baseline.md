@@ -76,6 +76,15 @@ These summarise the shipped stories. Where they conflict with older entries belo
   - **Photos.** The gallery button opens the phone's gallery picker (`ACTION_PICK`); a photo whose location was held back says so, with a Settings link.
   - **Verified on the emulator (debug).** Inline relationship saved without a description; thumbnails; both-way list; dark mode; crop rewrote only that photo; Google Photos pick kept GPS with limited and with no access; game sounds played; vibrations logged as MEDIA.
   - **Not verified.** The Galaxy S22 (sounds, buzz, Samsung Gallery GPS), dictation dings (no recogniser on the emulator), pinch in the crop screen (maths unit-tested), iOS.
+- **Story 19: layout batch.**
+  - **Detail rows.** Closed: one line, label always on the border, only an expander. Open (expander or tapping in): a box with mic, indented extras and delete. Tapping outside or focus leaving closes it, except while its dictation listens or another route (picker, menu, map) is on top. The field is never remounted between the two.
+  - **Happening place.** Chosen on the location picker: a known pin, or a spot Fred names (`PlaceNameDialog`, pre-filled with the known place there). Only the name is stored.
+  - **Location.** A new location sets the encounter's place to the known place there (the picker finds it), else blank with the hint "unknown"; Remote is unchanged.
+  - **Person page.** The photo opens its picture page and carries the crop button; Merge (60 % text), time and two-decimal coordinates sit beside it; other pictures are listed under it. Trash is beside the name: it saves, trashes, goes back and offers Undo, which reopens the person.
+  - **List.** Compact `MemoryTile`, a points badge (face plus detail points) when above zero, no trash button, and no Remembered line until something is remembered.
+  - **About.** From the logo or Settings; links open in the browser through `LinkOpener` (`url_launcher` 6.3.3; `launchUrl` needs no `<queries>` entry).
+  - **Verified on the emulator (debug).** List badges and spacing, the page's top group, the detail box opening and closing, About and its link opening Chrome, the timeline indent.
+  - **Not verified.** The phone; the happening map on a device (widget-tested); iOS link opening.
 
 ## Invariants
 

@@ -154,7 +154,9 @@ void main() {
       return repository.merge(alex.id, again.id);
     }
 
-    testWidgets('are listed newest first', (tester) async {
+    testWidgets('the newest is the photo; the others are listed under it', (
+      tester,
+    ) async {
       final alex = await twoPictures();
       await openCard(tester, alex);
 
@@ -162,7 +164,11 @@ void main() {
           .widgetList<ListTile>(find.byType(ListTile))
           .map((t) => (t.title! as Text).data)
           .toList();
-      expect(dates, ['Sunday, November 1, 2026', 'Thursday, October 1, 2026']);
+      expect(dates, ['Thursday, October 1, 2026']);
+      expect(
+        tester.getTopLeft(find.text('Thursday, October 1, 2026')).dy,
+        lessThan(tester.getTopLeft(find.widgetWithText(TextField, 'Name')).dy),
+      );
     });
 
     testWidgets('delete with Undo restores it and keeps the file', (
@@ -171,7 +177,7 @@ void main() {
       final alex = await twoPictures();
       await openCard(tester, alex);
 
-      await tester.tap(find.text('Sunday, November 1, 2026'));
+      await tester.tap(find.byTooltip('Open this picture'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete picture'));
       await tester.pumpAndSettle();
@@ -188,7 +194,7 @@ void main() {
       await openCard(tester, alex);
       final newest = alex.latest.photoFileName;
 
-      await tester.tap(find.text('Sunday, November 1, 2026'));
+      await tester.tap(find.byTooltip('Open this picture'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete picture'));
       await tester.pumpAndSettle();
@@ -196,14 +202,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.deletedPhotos, [newest]);
-      expect(find.text('Thursday, October 1, 2026'), findsOneWidget);
+      // The older picture now represents them.
+      expect(find.textContaining('Oct 1,'), findsOneWidget);
     });
 
     testWidgets('the last picture cannot be deleted', (tester) async {
       final alex = await person('Alex', DateTime(2026, 10, 1));
       await openCard(tester, alex);
 
-      await tester.tap(find.text('Thursday, October 1, 2026'));
+      await tester.tap(find.byTooltip('Open this picture'));
       await tester.pumpAndSettle();
 
       final button = tester.widget<OutlinedButton>(
@@ -226,11 +233,9 @@ void main() {
     final alex = await repository.merge(a.id, c.id);
     await openCard(tester, alex);
 
-    for (final date in [
-      'Sunday, November 1, 2026',
-      'Thursday, October 1, 2026',
-    ]) {
-      await tester.tap(find.text(date));
+    // The newest picture is the photo; after its delete the next one is.
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byTooltip('Open this picture'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete picture'));
       await tester.pumpAndSettle();

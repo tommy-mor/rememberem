@@ -4,22 +4,33 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../app/app_services.dart';
 import 'location_choice.dart';
 import 'place_marker.dart';
+import 'place_name_dialog.dart';
 import 'street_map.dart';
 
-/// Pick where a picture was taken by moving the map under the crosshair.
-/// Known places are marked to make the map easy to read. Pops with a
-/// [LocationChoice], or nothing if Fred goes back.
+/// Pick a spot by moving the map under the crosshair, or tap a known place's
+/// pin to choose that place. Pops with a [LocationChoice] naming the known
+/// place at the spot (if any), or nothing if Fred goes back.
 class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({
     super.key,
     required this.services,
     required this.initial,
+    this.initialPlace,
+    this.askName = false,
   });
 
   final AppServices services;
 
-  /// The picture's current location, if it has one.
+  /// The current location, if there is one.
   final GeoPoint? initial;
+
+  /// The current place's name: with no [initial] location, the map starts
+  /// at that known place.
+  final String? initialPlace;
+
+  /// Ask Fred to name a spot that is not a known place (a happening's
+  /// place), instead of leaving it blank.
+  final bool askName;
 
   @override
   State<LocationPickerScreen> createState() => _LocationPickerScreenState();
@@ -27,6 +38,9 @@ class LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   List<PlaceGroup> _places = const [];
+
+  /// Everyone, for finding the known place at a spot.
+  List<Memory> _people = const [];
   GeoPoint? _start;
   bool _loading = true;
 
@@ -43,16 +57,23 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   /// else here, else the newest known place, else the whole world.
   Future<void> _load() async {
     var places = const <PlaceGroup>[];
+    var people = const <Memory>[];
     try {
-      final groups = PlaceBook.from(await widget.services.repository.all());
+      people = await widget.services.repository.all();
       places = [
-        for (final g in groups.groups)
+        for (final g in PlaceBook.from(people).groups)
           if (g.name != null && g.marker != null) g,
       ];
     } catch (_) {
       // Marks are only a help.
     }
-    var start = widget.initial;
+    final named = DetailTypeCatalog.normalizeKey(widget.initialPlace ?? '');
+    var start =
+        widget.initial ??
+        places
+            .where((g) => DetailTypeCatalog.normalizeKey(g.label) == named)
+            .firstOrNull
+            ?.marker;
     if (start == null) {
       try {
         start = await widget.services.location.current();
@@ -64,6 +85,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (!mounted) return;
     setState(() {
       _places = places;
+      _people = people;
       _start = start;
       _centre = start;
       _loading = false;
@@ -88,7 +110,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         centre: _start,
                         markers: [
                           for (final g in _places)
-                            PlaceMarker(at: g.marker!, label: g.label),
+                            PlaceMarker(
+                              at: g.marker!,
+                              label: g.label,
+                              onTap: () => Navigator.of(context).pop(
+                                LocationChoice.at(g.marker!, place: g.label),
+                              ),
+                            ),
                         ],
                         onCentreChanged: (c) => _centre = c,
                       ),
@@ -106,6 +134,24 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               ],
             ),
     );
+  }
+
+  /// The crosshair's spot, named after the known place there, if any.
+  Future<void> _useCentre() async {
+    final centre = _centre;
+    if (centre == null) return;
+    final settings = widget.services.settings.value;
+    var place = settings.placeFinder.nearest(centre, _people)?.place ?? '';
+    if (widget.askName) {
+      final named = await showDialog<String>(
+        context: context,
+        builder: (_) => PlaceNameDialog(initial: place),
+      );
+      if (named == null || !mounted) return;
+      place = named;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop(LocationChoice.at(centre, place: place));
   }
 
   Widget _buttons(BuildContext context) {
@@ -137,12 +183,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   minimumSize: const Size.fromHeight(56),
                 ),
                 // With nowhere to start, wait for Fred to move the map.
-                onPressed: () {
-                  final centre = _centre;
-                  if (centre != null) {
-                    Navigator.of(context).pop(LocationChoice.at(centre));
-                  }
-                },
+                onPressed: _useCentre,
                 icon: const Icon(Icons.check),
                 label: const Text('Use this spot'),
               ),

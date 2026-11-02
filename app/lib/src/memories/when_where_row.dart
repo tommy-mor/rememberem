@@ -7,6 +7,7 @@ import '../maps/location_picker_screen.dart';
 
 /// When and where a picture was taken, each with a button to change it:
 /// a clock for the date and time, a map pin for the location (or Remote).
+/// [stacked] puts them on two tight lines, beside the person's photo.
 class WhenWhereRow extends StatelessWidget {
   const WhenWhereRow({
     super.key,
@@ -14,7 +15,10 @@ class WhenWhereRow extends StatelessWidget {
     required this.services,
     required this.onTimeChanged,
     required this.onLocationChosen,
+    this.stacked = false,
   });
+
+  final bool stacked;
 
   final Encounter encounter;
   final AppServices services;
@@ -55,8 +59,8 @@ class WhenWhereRow extends StatelessWidget {
   String get _where {
     final at = encounter.location;
     if (at != null) {
-      return '${at.latitude.toStringAsFixed(5)}, '
-          '${at.longitude.toStringAsFixed(5)}';
+      return '${at.latitude.toStringAsFixed(2)}, '
+          '${at.longitude.toStringAsFixed(2)}';
     }
     return encounter.place == Encounter.remotePlace
         ? Encounter.remotePlace
@@ -68,27 +72,49 @@ class WhenWhereRow extends StatelessWidget {
     final localizations = MaterialLocalizations.of(context);
     final local = encounter.capturedAt.toLocal();
     final small = Theme.of(context).textTheme.bodySmall;
+    final when = Text(
+      '${localizations.formatMediumDate(local)}, '
+      '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local))}',
+      style: small,
+    );
+    final density = stacked ? VisualDensity.compact : null;
+    final clock = IconButton(
+      visualDensity: density,
+      tooltip: 'Change date and time',
+      icon: const Icon(Icons.schedule),
+      onPressed: () => _pickTime(context),
+    );
+    final where = Text(_where, style: small);
+    final pin = IconButton(
+      visualDensity: density,
+      tooltip: 'Change location',
+      icon: const Icon(Icons.location_on_outlined),
+      onPressed: () => _pickLocation(context),
+    );
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Flexible(child: when),
+              clock,
+            ],
+          ),
+          Row(
+            children: [
+              Flexible(child: where),
+              pin,
+            ],
+          ),
+        ],
+      );
+    }
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(
-          '${localizations.formatMediumDate(local)}, '
-          '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local))}',
-          style: small,
-        ),
-        IconButton(
-          tooltip: 'Change date and time',
-          icon: const Icon(Icons.schedule),
-          onPressed: () => _pickTime(context),
-        ),
-        Text(_where, style: small),
-        IconButton(
-          tooltip: 'Change location',
-          icon: const Icon(Icons.location_on_outlined),
-          onPressed: () => _pickLocation(context),
-        ),
-      ],
+      children: [when, clock, where, pin],
     );
   }
 }

@@ -11,15 +11,12 @@ class TimelineMiniature extends StatelessWidget {
     super.key,
     required this.memory,
     required this.photo,
-    required this.recorded,
     required this.onOpen,
   });
 
   final Memory memory;
   final File photo;
 
-  /// Shown only because they were recorded that day (no details yet).
-  final bool recorded;
   final VoidCallback onOpen;
 
   @override
@@ -53,11 +50,6 @@ class TimelineMiniature extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: small,
             ),
-            if (recorded)
-              Text(
-                'recorded',
-                style: small?.copyWith(fontStyle: FontStyle.italic),
-              ),
           ],
         ),
       ),

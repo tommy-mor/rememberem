@@ -124,31 +124,30 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Faces'), findsOneWidget);
   });
 
-  testWidgets('trash drops the count at once; Undo brings it back', (
+  testWidgets('each person shows a points badge once they have points', (
     tester,
   ) async {
     await person('Ann', points: 5);
-    await person('Bo', points: 6);
+    await person('Bo');
     await showList(tester);
-    expect(find.text('Remembered: 2 faces · 0 details'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Move to trash').first);
-    await tester.pump();
-    expect(find.text('Remembered: 1 face · 0 details'), findsOneWidget);
-
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.text('Undo'));
-    await tester.pumpAndSettle();
-    expect(find.text('Remembered: 2 faces · 0 details'), findsOneWidget);
+    Finder badgeIn(String name) => find.descendant(
+      of: find.widgetWithText(ListTile, name),
+      matching: find.byType(Badge),
+    );
+    expect(badgeIn('Ann'), findsOneWidget);
+    expect(
+      find.descendant(of: badgeIn('Ann'), matching: find.text('5')),
+      findsOneWidget,
+    );
+    expect(badgeIn('Bo'), findsNothing);
   });
 
   testWidgets('coming back from a game shows new points', (tester) async {
     final ann = await person('Ann', points: 4);
     await showList(tester);
-    expect(
-      find.text('Remembered: nothing yet, practice to start'),
-      findsOneWidget,
-    );
+    // Nothing remembered yet: the line is left out.
+    expect(find.byType(RememberedLabel), findsNothing);
 
     navigator.currentState!.push(
       MaterialPageRoute<void>(builder: (_) => const Scaffold()),

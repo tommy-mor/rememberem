@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
-/// Every picture of a person, newest first, each with when and where it was
-/// taken. Tapping one opens it.
+/// The [encounters] given (the person's other pictures, newest first),
+/// each with when and where it was taken. Tapping one opens it.
 class PicturesSection extends StatelessWidget {
   const PicturesSection({
     super.key,
@@ -21,9 +21,9 @@ class PicturesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Pictures', style: Theme.of(context).textTheme.titleSmall),
         for (final encounter in encounters)
           ListTile(
+            dense: true,
             contentPadding: EdgeInsets.zero,
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(6),

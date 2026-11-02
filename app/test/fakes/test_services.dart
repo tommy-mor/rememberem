@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:rememberem/src/about/link_opener.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/capture/photo_picker.dart';
 import 'package:rememberem/src/contacts/contacts_service.dart';
@@ -37,6 +38,7 @@ AppServices testServices(
   GameFeedback? feedback,
   PortraitCapture? capture,
   ContactsService? contacts,
+  LinkOpener? links,
 }) => AppServices(
   repository: repository,
   capture:
@@ -52,4 +54,16 @@ AppServices testServices(
   photoPicker: photoPicker,
   feedback: feedback,
   contacts: contacts,
+  links: links ?? FakeLinkOpener(),
 );
+
+/// Records the links opened; opens nothing.
+class FakeLinkOpener implements LinkOpener {
+  final opened = <Uri>[];
+
+  @override
+  Future<bool> open(Uri url) async {
+    opened.add(url);
+    return true;
+  }
+}

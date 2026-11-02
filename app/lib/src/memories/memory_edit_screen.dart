@@ -6,6 +6,8 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../contacts/contact_link_button.dart';
+import '../maps/location_choice.dart';
+import '../maps/location_picker_screen.dart';
 import '../speech/dictated_text_field.dart';
 import 'crop_screen.dart';
 import 'detail_list_editor.dart';
@@ -284,7 +286,19 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     final memory = _editor.memory;
     return Scaffold(
       appBar: AppBar(
-        title: Text(memory.displayName),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(memory.displayName, overflow: TextOverflow.ellipsis),
+            ),
+            IconButton(
+              tooltip: 'Move to trash',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _trash,
+            ),
+          ],
+        ),
         actions: [
           if (widget.services.contacts case final contacts?)
             ContactLinkButton(
@@ -306,51 +320,17 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    widget.repository.photoFile(memory),
-                    key: ValueKey('photo-$_photoGen'),
-                    width: 192,
-                    height: 240,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox(
-                      width: 192,
-                      height: 240,
-                      child: Icon(Icons.person),
-                    ),
-                  ),
-                ),
+                _photo(memory),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _cropping ? null : _crop,
-                        icon: const Icon(Icons.crop),
-                        label: const Text('Crop'),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: _merge,
-                        icon: const Icon(Icons.merge),
-                        label: const Text(
-                          'Merge with existing person',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Expanded(child: _photoGroup(context, memory)),
               ],
             ),
-            WhenWhereRow(
-              encounter: memory.encounters.first,
-              services: widget.services,
-              onTimeChanged: (at) => _changeNewest((e) => e.withCapturedAt(at)),
-              onLocationChosen: (choice) => _changeNewest(choice.applyTo),
-            ),
+            if (memory.encounters.length > 1)
+              PicturesSection(
+                encounters: memory.encounters.skip(1).toList(),
+                repository: widget.repository,
+                onOpen: _openPicture,
+              ),
             for (final field in MemoryField.values) ...[
               const SizedBox(height: 16),
               DictatedTextField(
@@ -358,7 +338,11 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 label: field.label,
                 initialValue: memory.field(field),
                 dictation: widget.services.dictation,
-                hint: field == MemoryField.name ? MemoryTile.unknownName : null,
+                hint: switch (field) {
+                  MemoryField.name => MemoryTile.unknownName,
+                  MemoryField.place => 'unknown',
+                  _ => null,
+                },
                 onChanged: (value) {
                   _editor.update(field.key, value);
                   // The title shows the name as it is typed.
@@ -375,6 +359,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 ownerId: memory.id,
                 people: _people,
                 photoOf: widget.repository.photoFile,
+                choosePlace: _choosePlace,
                 nameOf: (id) => _activeNames[id],
                 onChanged: _describe,
                 onReplace: (detail) =>
@@ -384,12 +369,6 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 onRestore: (detail, index) =>
                     _edit(() => _editor.restoreDetail(detail, index)),
               ),
-            ),
-            const SizedBox(height: 16),
-            PicturesSection(
-              encounters: memory.encounters,
-              repository: widget.repository,
-              onOpen: _openPicture,
             ),
             const SizedBox(height: 16),
             RelationshipsSection(
@@ -405,6 +384,147 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// The photo that represents this person; tap it to open its picture
+  /// page. The crop button sits on its lower right corner.
+  Widget _photo(Memory memory) {
+    return SizedBox(
+      width: 192,
+      height: 240,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => _openPicture(memory.encounters.first),
+              child: Tooltip(
+                message: 'Open this picture',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    widget.repository.photoFile(memory),
+                    key: ValueKey('photo-$_photoGen'),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(Icons.person),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: IconButton.filledTonal(
+              tooltip: 'Crop',
+              icon: const Icon(Icons.crop),
+              onPressed: _cropping ? null : _crop,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Beside the photo: Merge, then when and where it was taken.
+  Widget _photoGroup(BuildContext context, Memory memory) {
+    final label = Theme.of(context).textTheme.labelLarge;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            textStyle: label?.copyWith(fontSize: (label.fontSize ?? 14) * 0.6),
+            visualDensity: VisualDensity.compact,
+          ),
+          onPressed: _merge,
+          icon: const Icon(Icons.merge, size: 16),
+          label: const Text(
+            'Merge with existing person',
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 4),
+        WhenWhereRow(
+          stacked: true,
+          encounter: memory.encounters.first,
+          services: widget.services,
+          onTimeChanged: (at) => _changeNewest((e) => e.withCapturedAt(at)),
+          onLocationChosen: (choice) => _changeNewest(choice.applyTo),
+        ),
+      ],
+    );
+  }
+
+  /// A happening's place, from the map: a known place's pin, or a spot
+  /// Fred names. Null if he went back.
+  Future<String?> _choosePlace(String current) async {
+    final choice = await Navigator.of(context).push<LocationChoice>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          services: widget.services,
+          initial: null,
+          initialPlace: current,
+          askName: true,
+        ),
+      ),
+    );
+    return choice?.place;
+  }
+
+  /// Saves, moves this person to the trash and goes back, offering Undo,
+  /// which brings them back and opens them again.
+  Future<void> _trash() async {
+    // Once only, and not while Back is already leaving.
+    if (_leaving) return;
+    _leaving = true;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final memory = _editor.memory;
+    try {
+      await _editor.flush();
+      _editor.close();
+      await widget.repository.trash(memory.id, _editor.clock());
+    } on Object {
+      _editor.reopen();
+      _leaving = false;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not move to trash. Try again.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    messenger.clearSnackBars();
+    _keepSnackBars = true;
+    navigator.pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Moved ${memory.displayName} to trash'),
+        // Undo snackbars would otherwise stay until dismissed.
+        persist: false,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            try {
+              await widget.repository.restore(memory.id);
+              final back = (await widget.repository.all())
+                  .where((m) => m.id == memory.id)
+                  .firstOrNull;
+              if (back == null) return;
+              await navigator.push(
+                PersonCardRoute(services: widget.services, memory: back),
+              );
+            } on StateError {
+              // Already deleted for good from the Trash screen.
+            } on Object {
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Could not undo. Try the Trash.')),
+              );
+            }
+          },
         ),
       ),
     );

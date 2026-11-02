@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../about/about_screen.dart';
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
 import '../app/brand_logo.dart';
@@ -133,59 +134,24 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     );
   }
 
-  Future<void> _trash(Memory memory) async {
-    final messenger = ScaffoldMessenger.of(context);
-    setState(
-      () => _memories = [
-        for (final m in _memories ?? <Memory>[])
-          if (m.id != memory.id) m,
-      ],
-    );
-    try {
-      await _repository.trash(memory.id, widget.clock());
-    } on Object {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Could not move ${MemoryTile.nameOf(memory)} to trash'),
-        ),
-      );
-      await _reload();
-      return;
-    }
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Moved ${MemoryTile.nameOf(memory)} to trash'),
-          // Undo snackbars would otherwise stay until dismissed.
-          persist: false,
-          duration: const Duration(seconds: 6),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () => _undoTrash(memory),
-          ),
-        ),
-      );
-    await _reload();
-  }
-
-  Future<void> _undoTrash(Memory memory) async {
-    try {
-      await _repository.restore(memory.id);
-    } on StateError {
-      // Already deleted forever from the Trash screen; nothing to undo.
-    }
-    await _reload();
-  }
-
   void _openSettings() {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SettingsScreen(
           settings: widget.services.settings,
+          links: widget.services.links,
           reminders: widget.services.reminders,
         ),
+      ),
+    );
+  }
+
+  void _openAbout() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AboutScreen(links: widget.services.links),
       ),
     );
   }
@@ -204,7 +170,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const BrandLogo(),
+        title: Tooltip(
+          message: 'About',
+          child: InkWell(onTap: _openAbout, child: const BrandLogo()),
+        ),
         actions: [
           IconButton(
             tooltip: 'Timeline',
@@ -250,6 +219,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     final canPlayFaces = _facePlanner.canPlay(memories);
     final canPlayDetails = _detailPlanner.canPlay(memories);
     final small = Theme.of(context).textTheme.bodySmall;
+    final remembered = RememberedCount.of(
+      memories,
+      threshold: widget.services.settings.value.rememberedThreshold,
+    );
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -258,13 +231,12 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // From the list as shown, so a trash or undo updates it at once.
-            RememberedLabel(
-              RememberedCount.of(
-                memories,
-                threshold: widget.services.settings.value.rememberedThreshold,
-              ),
-            ),
-            const SizedBox(height: 4),
+            if (remembered.isNothing)
+              const SizedBox.shrink()
+            else ...[
+              RememberedLabel(remembered),
+              const SizedBox(height: 4),
+            ],
             if (!canPlayFaces)
               Text(
                 'Name at least 4 different people to practice faces.',
@@ -341,15 +313,22 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       itemCount: memories.length,
       itemBuilder: (context, index) {
         final memory = memories[index];
+        final points = MemoryTile.pointsOf(memory);
         return MemoryTile(
           memory: memory,
           photo: _repository.photoFile(memory),
           onTap: () => _open(memory),
-          trailing: IconButton(
-            tooltip: 'Move to trash',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _trash(memory),
-          ),
+          trailing: points == 0
+              ? null
+              : Tooltip(
+                  message: '$points practice points',
+                  child: Badge(
+                    label: Text('$points'),
+                    largeSize: 20,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    textColor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
         );
       },
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../app/rememberem_theme.dart';
+
 import 'dictation.dart';
 
 /// A text field with a microphone button that fills it by speech.
@@ -14,6 +16,10 @@ class DictatedTextField extends StatefulWidget {
     this.hint,
     this.dense = false,
     this.autofocus = false,
+    this.showMic = true,
+    this.trailing,
+    this.alwaysFloatLabel = false,
+    this.onListeningChanged,
   });
 
   final String label;
@@ -28,6 +34,16 @@ class DictatedTextField extends StatefulWidget {
   /// Tighter padding, for rows in a list.
   final bool dense;
   final bool autofocus;
+
+  /// Without the mic, [trailing] (if any) takes its place.
+  final bool showMic;
+  final Widget? trailing;
+
+  /// Keeps the label on the border even while the field is empty.
+  final bool alwaysFloatLabel;
+
+  /// Told when listening starts and stops.
+  final ValueChanged<bool>? onListeningChanged;
 
   @override
   State<DictatedTextField> createState() => _DictatedTextFieldState();
@@ -61,6 +77,7 @@ class _DictatedTextFieldState extends State<DictatedTextField>
 
   void _setListening(bool listening) {
     setState(() => _listening = listening);
+    widget.onListeningChanged?.call(listening);
     if (listening) {
       _pulse.repeat(reverse: true);
     } else {
@@ -117,25 +134,30 @@ class _DictatedTextFieldState extends State<DictatedTextField>
         labelText: widget.label,
         hintText: widget.hint,
         isDense: widget.dense,
+        contentPadding: widget.dense ? RememberemTheme.denseFieldPadding : null,
         // Keep the label up so the hint shows while the field is empty.
-        floatingLabelBehavior: widget.hint == null
-            ? null
-            : FloatingLabelBehavior.always,
+        floatingLabelBehavior: widget.hint != null || widget.alwaysFloatLabel
+            ? FloatingLabelBehavior.always
+            : null,
         border: const OutlineInputBorder(),
-        suffixIcon: IconButton(
-          tooltip: _listening ? 'Stop listening' : 'Speak ${widget.label}',
-          icon: _listening
-              ? FadeTransition(
-                  opacity: _pulse,
-                  child: ScaleTransition(
-                    scale: _pulse.drive(Tween(begin: 0.85, end: 1.15)),
-                    child: const Icon(Icons.stop_circle),
-                  ),
-                )
-              : const Icon(Icons.mic),
-          color: _listening ? Theme.of(context).colorScheme.error : null,
-          onPressed: _toggleListening,
-        ),
+        suffixIcon: !widget.showMic && !_listening
+            ? widget.trailing
+            : IconButton(
+                tooltip: _listening
+                    ? 'Stop listening'
+                    : 'Speak ${widget.label}',
+                icon: _listening
+                    ? FadeTransition(
+                        opacity: _pulse,
+                        child: ScaleTransition(
+                          scale: _pulse.drive(Tween(begin: 0.85, end: 1.15)),
+                          child: const Icon(Icons.stop_circle),
+                        ),
+                      )
+                    : const Icon(Icons.mic),
+                color: _listening ? Theme.of(context).colorScheme.error : null,
+                onPressed: _toggleListening,
+              ),
       ),
     );
   }

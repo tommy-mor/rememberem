@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/rememberem_theme.dart';
+
 /// A detail's extra data, edited in place under its description: a
-/// happening's date and place; a relationship's person (first) and type;
+/// happening's date and place (from a map); a relationship's person
+/// (first) and type;
 /// an anniversary's type and first date. Every change is passed on at
 /// once as a copy of [detail] (so its score is kept).
 class DetailExtrasEditor extends StatefulWidget {
@@ -14,6 +17,7 @@ class DetailExtrasEditor extends StatefulWidget {
     required this.ownerId,
     required this.people,
     required this.photoOf,
+    required this.choosePlace,
     required this.onChanged,
   });
 
@@ -28,6 +32,10 @@ class DetailExtrasEditor extends StatefulWidget {
 
   /// A person's photo, for the thumbnails beside names.
   final File Function(Memory person) photoOf;
+
+  /// Opens the map at [current] (a place name); the chosen place's name,
+  /// or null if Fred went back.
+  final Future<String?> Function(String current) choosePlace;
   final ValueChanged<Detail> onChanged;
 
   @override
@@ -35,8 +43,6 @@ class DetailExtrasEditor extends StatefulWidget {
 }
 
 class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
-  late final _place = TextEditingController(text: widget.detail.place ?? '');
-  final _placeFocus = FocusNode();
   late final List<String> _labels = DetailTypeCatalog.labels(
     widget.detail.kind,
     widget.people,
@@ -54,17 +60,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
   }
 
   @override
-  void didUpdateWidget(DetailExtrasEditor old) {
-    super.didUpdateWidget(old);
-    // A place filled in from where the phone is, while Fred is elsewhere.
-    final place = _detail.place ?? '';
-    if (!_placeFocus.hasFocus && _place.text != place) _place.text = place;
-  }
-
-  @override
   void dispose() {
-    _place.dispose();
-    _placeFocus.dispose();
     _custom.dispose();
     super.dispose();
   }
@@ -93,6 +89,13 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
         at: DateTime(date.year, date.month, date.day, time.hour, time.minute),
       ),
     );
+  }
+
+  Future<void> _pickPlace() async {
+    final place = await widget.choosePlace(_detail.place?.trim() ?? '');
+    if (place != null && mounted) {
+      widget.onChanged(_detail.copyWith(place: place));
+    }
   }
 
   Future<void> _pickEventDate() async {
@@ -136,6 +139,8 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     return [
       ListTile(
         dense: true,
+        visualDensity: VisualDensity.compact,
+        minVerticalPadding: 0,
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.schedule),
         title: Text(
@@ -145,15 +150,19 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
         subtitle: const Text('When it happened'),
         onTap: _pickHappeningTime,
       ),
-      TextField(
-        controller: _place,
-        focusNode: _placeFocus,
-        decoration: const InputDecoration(
-          labelText: 'Place',
-          isDense: true,
-          border: OutlineInputBorder(),
+      ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        minVerticalPadding: 0,
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.place_outlined),
+        title: Text(
+          (_detail.place?.trim() ?? '').isEmpty
+              ? 'Choose place'
+              : _detail.place!.trim(),
         ),
-        onChanged: (v) => widget.onChanged(_detail.copyWith(place: v)),
+        subtitle: const Text('Where it happened'),
+        onTap: _pickPlace,
       ),
     ];
   }
@@ -167,6 +176,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
       decoration: const InputDecoration(
         labelText: 'Who',
         isDense: true,
+        contentPadding: RememberemTheme.denseFieldPadding,
         border: OutlineInputBorder(),
       ),
       items: [
@@ -226,6 +236,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
         decoration: InputDecoration(
           labelText: customLabel,
           isDense: true,
+          contentPadding: RememberemTheme.denseFieldPadding,
           border: const OutlineInputBorder(),
         ),
         onChanged: (v) {
@@ -244,6 +255,8 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     final when = _detail.eventDate;
     return ListTile(
       dense: true,
+      visualDensity: VisualDensity.compact,
+      minVerticalPadding: 0,
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.event),
       title: Text(

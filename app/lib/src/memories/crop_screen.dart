@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 /// Crops a photo to a 4:5 portrait: pinch and drag it in the frame, then
-/// Done pops with the framed part as JPEG bytes. Back or Cancel pops with
-/// nothing.
+/// Crop pops with the framed part as JPEG bytes. Back pops with nothing.
 class CropScreen extends StatefulWidget {
   const CropScreen({super.key, required this.jpeg});
 
@@ -97,45 +96,69 @@ class _CropScreenState extends State<CropScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('Crop'),
-        actions: [
-          TextButton(
-            onPressed: _cropping ? null : _done,
-            child: const Text('Done'),
+      appBar: AppBar(title: const Text('Crop')),
+      body: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Text(
+              'Use pinch to zoom in or out, then press Crop',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          ),
+          Expanded(child: _frameArea()),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _cropping ? null : _done,
+                  icon: const Icon(Icons.crop),
+                  label: const Text('Crop'),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: AspectRatio(
-            aspectRatio: CropScreen.aspect,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                _frame = constraints.biggest;
-                return DecoratedBox(
-                  position: DecorationPosition.foreground,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: ClipRect(
-                    child: InteractiveViewer(
-                      transformationController: _transform,
-                      minScale: 1,
-                      maxScale: 6,
-                      child: SizedBox.expand(
-                        child: Image.memory(
-                          widget.jpeg,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                        ),
+    );
+  }
+
+  Widget _frameArea() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: AspectRatio(
+          aspectRatio: CropScreen.aspect,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              _frame = constraints.biggest;
+              return DecoratedBox(
+                position: DecorationPosition.foreground,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: ClipRect(
+                  child: InteractiveViewer(
+                    transformationController: _transform,
+                    minScale: 1,
+                    maxScale: 6,
+                    child: SizedBox.expand(
+                      child: Image.memory(
+                        widget.jpeg,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image, color: Colors.white),
                       ),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
