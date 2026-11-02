@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:image/src/util/rational.dart';
 import 'package:rememberem/src/capture/capture_screen.dart';
 import 'package:rememberem/src/capture/photo_picker.dart';
+import 'package:rememberem/src/capture/picked_photo.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -15,12 +16,20 @@ import 'fakes/fake_memory_repository.dart';
 import 'fakes/test_services.dart';
 
 class _FakePicker implements PhotoPicker {
-  _FakePicker(this.photo);
+  _FakePicker(this.photo, {this.original = true});
 
   final List<int>? photo;
+  final bool original;
+  int settingsOpened = 0;
 
   @override
-  Future<List<int>?> pick() async => photo;
+  Future<PickedPhoto?> pick() async {
+    final bytes = photo;
+    return bytes == null ? null : PickedPhoto(bytes, original: original);
+  }
+
+  @override
+  Future<void> openSettings() async => settingsOpened++;
 }
 
 class _NoFaces implements FaceLocator {
@@ -84,14 +93,21 @@ void main() {
     capture = _RecordingCapture(repository);
   });
 
-  Future<void> showCamera(WidgetTester tester, List<int>? photo) async {
+  late _FakePicker picker;
+
+  Future<void> showCamera(
+    WidgetTester tester,
+    List<int>? photo, {
+    bool original = true,
+  }) async {
+    picker = _FakePicker(photo, original: original);
     await tester.pumpWidget(
       MaterialApp(
         home: CaptureScreen(
           services: testServices(
             repository,
             capture: capture,
-            photoPicker: _FakePicker(photo),
+            photoPicker: picker,
             // Where the phone is now must not be used for an old photo.
             location: FakeLocation(const GeoPoint(1, 1)),
           ),
@@ -139,5 +155,30 @@ void main() {
     expect(capture.calls, isEmpty);
     expect(find.byType(CaptureScreen), findsOneWidget);
     expect(find.byTooltip('Choose a photo from the phone'), findsOneWidget);
+  });
+
+  testWidgets('a photo the phone stripped of its location says so and '
+      'offers Settings; a location that did come through is used', (
+    tester,
+  ) async {
+    await showCamera(
+      tester,
+      img.encodeJpg(img.Image(width: 8, height: 8)),
+      original: false,
+    );
+    await tester.tap(find.byTooltip('Choose a photo from the phone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.textContaining('No location came'), findsOneWidget);
+    await tester.tap(find.text('Settings'));
+    expect(picker.settingsOpened, 1);
+
+    await tester.pumpWidget(const SizedBox());
+    await showCamera(tester, photoWithExif(), original: false);
+    await tester.tap(find.byTooltip('Choose a photo from the phone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(capture.calls.last.location, isNotNull);
   });
 }

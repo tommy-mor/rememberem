@@ -185,6 +185,24 @@ class FakeMemoryRepository implements MemoryRepository {
     return stored[survivorId]!;
   }
 
+  /// Crops written, as (memory id, photo file name, bytes).
+  final List<(String, String, List<int>)> replacedPhotos = [];
+
+  @override
+  Future<void> replaceEncounterPhoto(
+    String id,
+    String photoFileName,
+    List<int> jpeg,
+  ) async {
+    final memory = stored[id];
+    if (memory == null ||
+        memory.trashedAt != null ||
+        !memory.encounters.any((e) => e.photoFileName == photoFileName)) {
+      throw StateError('No photo $photoFileName for $id');
+    }
+    replacedPhotos.add((id, photoFileName, jpeg));
+  }
+
   @override
   Future<void> deleteEncounterPhoto(Encounter encounter) async =>
       deletedPhotos.add(encounter.photoFileName);

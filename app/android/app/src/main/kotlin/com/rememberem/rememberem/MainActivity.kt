@@ -18,6 +18,7 @@ class MainActivity : FlutterActivity() {
         val contactsChannel = ContactsChannel(this)
         contacts = contactsChannel
         MethodChannel(messenger, ContactsChannel.CHANNEL).setMethodCallHandler(contactsChannel)
+        MethodChannel(messenger, Haptics.CHANNEL).setMethodCallHandler(Haptics(this))
     }
 
     @Deprecated("Needed for the pickers' results")

@@ -16,7 +16,7 @@ Memory at(String place, GeoPoint? location,
     );
 
 void main() {
-  const finder = PlaceFinder();
+  const finder = PlaceFinder(radiusMeters: 91.44); // 300 ft
   const here = GeoPoint(0, 0);
 
   group('GeoPoint.distanceTo', () {

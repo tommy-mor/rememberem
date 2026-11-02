@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:rememberem_core/rememberem_core.dart';
 
-/// Navy and brushed gold, from the elephant logo.
+/// Brushed gold on Fred's theme colour (navy by default, from the elephant
+/// logo), over his chosen background.
 class RememberemTheme {
   const RememberemTheme._();
 
@@ -9,10 +11,12 @@ class RememberemTheme {
   static const gold = Color(0xFFE4BC52);
   static const paleGold = Color(0xFFFFF3D6);
 
-  static ThemeData get light {
+  static ThemeData light(AppSettings settings) {
+    final primary = Color(settings.themeColor);
+    final background = Color(settings.backgroundColor);
     final scheme = ColorScheme.fromSeed(
-      seedColor: navy,
-      primary: navy,
+      seedColor: primary,
+      primary: primary,
       onPrimary: Colors.white,
       secondary: gold,
       onSecondary: deepNavy,
@@ -20,20 +24,40 @@ class RememberemTheme {
       onTertiary: deepNavy,
       secondaryContainer: paleGold,
       onSecondaryContainer: deepNavy,
+      surface: background,
     );
-    return ThemeData(
-      colorScheme: scheme,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: navy,
-        foregroundColor: gold,
-        iconTheme: IconThemeData(color: gold),
-        actionsIconTheme: IconThemeData(color: gold),
-      ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: gold,
-        foregroundColor: deepNavy,
-      ),
-      listTileTheme: const ListTileThemeData(selectedColor: navy),
-    );
+    return _themed(scheme, primary, background);
   }
+
+  /// Dark pages from the theme colour; the background choice does not
+  /// apply.
+  static ThemeData dark(AppSettings settings) {
+    final primary = Color(settings.themeColor);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.dark,
+      secondary: gold,
+      onSecondary: deepNavy,
+      tertiary: gold,
+      onTertiary: deepNavy,
+    );
+    return _themed(scheme, scheme.surfaceContainerHighest, scheme.surface);
+  }
+
+  static ThemeData _themed(ColorScheme scheme, Color bar, Color background) =>
+      ThemeData(
+        colorScheme: scheme,
+        scaffoldBackgroundColor: background,
+        appBarTheme: AppBarTheme(
+          backgroundColor: bar,
+          foregroundColor: gold,
+          iconTheme: const IconThemeData(color: gold),
+          actionsIconTheme: const IconThemeData(color: gold),
+        ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: gold,
+          foregroundColor: deepNavy,
+        ),
+        listTileTheme: ListTileThemeData(selectedColor: scheme.primary),
+      );
 }

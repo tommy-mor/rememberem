@@ -307,13 +307,13 @@ void main() {
     }
 
     await showList();
-    final button = find.widgetWithText(OutlinedButton, 'Practice details');
+    final button = find.widgetWithText(OutlinedButton, 'Details');
     expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
 
     await repository.add(photoJpeg: [], capturedAt: DateTime(2026, 2, 1));
     await tester.pumpWidget(const SizedBox());
     await showList();
-    await tester.tap(find.text('Practice details'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Details'));
     await tester.pumpAndSettle();
     expect(find.byType(DetailGameScreen), findsOneWidget);
   });

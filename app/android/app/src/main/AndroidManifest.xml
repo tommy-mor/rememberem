@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"/>
     <!-- Find the contact to link a person to: lookup key and name only. -->
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <!-- A short buzz for a right answer in practice. Install-time, no prompt,
+         no data. -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Daily practice reminders: show them, and reschedule after a reboot.
          Deliberately no exact-alarm permission (inexact delivery is fine). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>

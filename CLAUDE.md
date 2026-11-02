@@ -123,7 +123,9 @@ has already been tried and fallen short.
   in UTC: the time the detail was recorded (Fred can re-date it). Records
   written before it existed kept one `fields['details']` string. That string
   loads as a single detail timed at the first encounter, and the key is
-  dropped on the next save.
+  dropped on the next save. A detail's `text` may be blank once it has other
+  data (a relationship's person or type, a place, a date); only a detail
+  with nothing entered (`Detail.isEmpty`) is left out of a save.
 - Each detail has a `type` (fact, happening, relationship or anniversary).
   Records written before typed details have no `type` and read as facts.
   Relationships keep the other person's id in `targetId`; merge and purge
@@ -160,7 +162,10 @@ Check these before any public release. `sally` and `lena` own them.
   sees the device IP, the user agent and the area being viewed. It never sees
   names, photos or notes. Settings can turn this off.
 - **Imported photos:** reading a photo's GPS needs `ACCESS_MEDIA_LOCATION`,
-  which Android presents as photos and videos access.
+  which Android presents as photos and videos access (with a "limited
+  access" choice). It is asked on each gallery tap until allowed or Android
+  stops asking. Photos come through the phone's gallery app, which may be a
+  cloud app (Google Photos) that sees the choice.
 - **Contacts:** linking asks for READ_CONTACTS and reads only names and
   lookup keys for the picker dialog; refusing falls back to the system picker.
   Play requires a sensitive-permission declaration before public release.
@@ -192,8 +197,15 @@ Check these before any public release. `sally` and `lena` own them.
   `dart run flutter_native_splash:create`. Game sounds come from
   `app/tool/make_sounds.py`.
 - **Photo GPS on Android:** the system photo picker strips location, so
-  photos from the phone come through `OriginalPhotoPicker.kt`, which uses
-  the document picker plus `MediaStore.setRequireOriginal`.
+  photos from the phone come through `OriginalPhotoPicker.kt`, which opens
+  the phone's gallery (`ACTION_PICK`) and asks `MediaStore.setRequireOriginal`
+  for the unredacted file. If it cannot, it says so (`original: false`) and
+  the app explains how to allow it. Google Photos returned GPS on the
+  emulator even without the permission; Samsung Gallery is unverified.
+- **Sounds and haptics:** sounds use the media volume (the ringtone stream
+  is silent on vibrate), and the right-answer buzz goes through `Haptics.kt`
+  as a media vibration: Flutter's haptics are touch vibrations, which follow
+  the "touch interactions" setting many phones ship turned off.
 - **Test portrait:** `app/integration_test/assets/portrait.jpg` is a
   public-domain NASA portrait for the on-device face test. It is bundled as an
   app asset, so it also ships in release builds.

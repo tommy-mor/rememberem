@@ -169,8 +169,8 @@ void main() {
     for (final (opener, page) in [
       (find.byTooltip('Places'), PlacesScreen),
       (find.byTooltip('Trash'), TrashScreen),
-      (find.text('Practice faces'), FaceGameScreen),
-      (find.text('Practice details'), DetailGameScreen),
+      (find.widgetWithText(OutlinedButton, 'Faces'), FaceGameScreen),
+      (find.widgetWithText(OutlinedButton, 'Details'), DetailGameScreen),
     ]) {
       await open(tester, opener);
       expect(find.byType(page), findsOneWidget);

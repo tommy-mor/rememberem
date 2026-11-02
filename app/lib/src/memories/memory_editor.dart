@@ -28,8 +28,8 @@ class MemoryEditor {
   /// While closed (during a merge) every change and save is ignored.
   bool _closed = false;
 
-  /// The memory as edited, including details cleared to blank (which
-  /// [flush] leaves out of what is saved).
+  /// The memory as edited, including empty details (just added, or
+  /// cleared), which [flush] leaves out of what is saved.
   Memory get memory => _memory;
 
   void update(String key, String value) {
@@ -38,10 +38,10 @@ class MemoryEditor {
     _scheduleSave();
   }
 
-  /// Adds a new [detail] and saves at once; one with a blank description
-  /// is ignored.
+  /// Adds [detail] at the end, usually empty for Fred to fill in where it
+  /// stands. It is saved once something is entered.
   void addDetail(Detail detail) {
-    if (_closed || detail.text.trim().isEmpty) return;
+    if (_closed) return;
     if (_memory.details.any((d) => d.id == detail.id)) return;
     _memory = _memory.withDetails([..._memory.details, detail]);
     _flushNow();
@@ -54,7 +54,7 @@ class MemoryEditor {
     if (_closed || _deleted.contains(detail.id)) return;
     final details = _memory.details;
     final index = details.indexWhere((d) => d.id == detail.id);
-    if (index == -1 || detail.text.trim().isEmpty) return;
+    if (index == -1) return;
     _memory = _memory.withDetails([...details]..[index] = detail);
     _flushNow();
   }
@@ -167,7 +167,7 @@ class MemoryEditor {
       _dirty = false;
       final snapshot = _memory.withDetails([
         for (final detail in _memory.details)
-          if (detail.text.trim().isNotEmpty) detail,
+          if (!detail.isEmpty) detail,
       ]);
       // A failed earlier save must not block this one; its error has
       // already gone to whoever awaited it.

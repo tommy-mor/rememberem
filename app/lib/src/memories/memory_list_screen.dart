@@ -284,7 +284,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
                   child: OutlinedButton.icon(
                     onPressed: canPlayFaces ? _practiceFaces : null,
                     icon: const Icon(Icons.face),
-                    label: const Text('Practice faces'),
+                    label: const Text('Faces'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -292,7 +292,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
                   child: OutlinedButton.icon(
                     onPressed: canPlayDetails ? _practiceDetails : null,
                     icon: const Icon(Icons.notes),
-                    label: const Text('Practice details'),
+                    label: const Text('Details'),
                   ),
                 ),
               ],

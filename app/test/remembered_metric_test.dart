@@ -121,7 +121,7 @@ void main() {
 
     expect(find.text('Remembered: 2 faces · 2 details'), findsOneWidget);
     expect(find.text('Meet someone'), findsOneWidget);
-    expect(find.text('Practice faces'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Faces'), findsOneWidget);
   });
 
   testWidgets('trash drops the count at once; Undo brings it back', (

@@ -12,6 +12,8 @@ class DictatedTextField extends StatefulWidget {
     required this.onChanged,
     this.multiline = false,
     this.hint,
+    this.dense = false,
+    this.autofocus = false,
   });
 
   final String label;
@@ -23,15 +25,28 @@ class DictatedTextField extends StatefulWidget {
   /// Shown greyed out while the field is empty.
   final String? hint;
 
+  /// Tighter padding, for rows in a list.
+  final bool dense;
+  final bool autofocus;
+
   @override
   State<DictatedTextField> createState() => _DictatedTextFieldState();
 }
 
-class _DictatedTextFieldState extends State<DictatedTextField> {
+class _DictatedTextFieldState extends State<DictatedTextField>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _controller = TextEditingController(
     text: widget.initialValue,
   );
   bool _listening = false;
+
+  /// Pulses the stop icon while listening; stopped otherwise, so tests and
+  /// the screen settle.
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+    lowerBound: 0.4,
+  );
 
   @override
   void dispose() {
@@ -39,8 +54,20 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
       _listening = false;
       widget.dictation.stop();
     }
+    _pulse.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _setListening(bool listening) {
+    setState(() => _listening = listening);
+    if (listening) {
+      _pulse.repeat(reverse: true);
+    } else {
+      _pulse
+        ..stop()
+        ..value = 1;
+    }
   }
 
   Future<void> _toggleListening() async {
@@ -48,7 +75,7 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
       await widget.dictation.stop();
       return;
     }
-    setState(() => _listening = true);
+    _setListening(true);
     // Speech is added after anything already typed.
     final before = _controller.text.trim();
     final available = await widget.dictation.listen(
@@ -60,7 +87,7 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
       },
       onDone: () {
         // Not listening any more means dispose() already stopped us.
-        if (mounted && _listening) setState(() => _listening = false);
+        if (mounted && _listening) _setListening(false);
       },
     );
     if (!available && mounted) {
@@ -79,6 +106,7 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
+      autofocus: widget.autofocus,
       onChanged: widget.onChanged,
       textCapitalization: widget.multiline
           ? TextCapitalization.sentences
@@ -88,6 +116,7 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hint,
+        isDense: widget.dense,
         // Keep the label up so the hint shows while the field is empty.
         floatingLabelBehavior: widget.hint == null
             ? null
@@ -95,7 +124,15 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
         border: const OutlineInputBorder(),
         suffixIcon: IconButton(
           tooltip: _listening ? 'Stop listening' : 'Speak ${widget.label}',
-          icon: Icon(_listening ? Icons.stop_circle : Icons.mic),
+          icon: _listening
+              ? FadeTransition(
+                  opacity: _pulse,
+                  child: ScaleTransition(
+                    scale: _pulse.drive(Tween(begin: 0.85, end: 1.15)),
+                    child: const Icon(Icons.stop_circle),
+                  ),
+                )
+              : const Icon(Icons.mic),
           color: _listening ? Theme.of(context).colorScheme.error : null,
           onPressed: _toggleListening,
         ),

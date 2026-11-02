@@ -7,10 +7,10 @@ import 'memory.dart';
 class PlaceFinder {
   const PlaceFinder({this.radiusMeters = defaultRadiusMeters});
 
-  /// 300 feet.
-  static const defaultRadiusMeters = 91.44;
+  /// 555 feet.
+  static const defaultRadiusMeters = 169.164;
 
-  /// How close a known place must be to count (300 feet by default).
+  /// How close a known place must be to count (555 feet by default).
   final double radiusMeters;
 
   /// The encounter with a named place closest to [at] and within

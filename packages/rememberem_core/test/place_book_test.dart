@@ -40,11 +40,12 @@ void main() {
   });
 
   test('unnamed spots join the nearby newest spot; a chain does not grow', () {
-    // a (newest) at 0 m, b at 80 m, c at 160 m: c is 160 m from a.
+    // a (newest) at 0 m, b at 150 m, c at 300 m: c is 300 m from a, beyond
+    // the 555 ft (169 m) radius, though only 150 m from b.
     final people = [
       Memory(id: 'a', encounters: [at('a', '', north(0), day: 3)]),
-      Memory(id: 'b', encounters: [at('b', '', north(80), day: 2)]),
-      Memory(id: 'c', encounters: [at('c', '', north(160), day: 1)]),
+      Memory(id: 'b', encounters: [at('b', '', north(150), day: 2)]),
+      Memory(id: 'c', encounters: [at('c', '', north(300), day: 1)]),
     ];
 
     final groups = PlaceBook.from(people).groups;

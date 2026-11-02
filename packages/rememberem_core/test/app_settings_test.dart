@@ -11,6 +11,32 @@ void main() {
     expect(s.reveal, const Duration(seconds: 3));
     expect(s.rememberedThreshold, RememberedCount.defaultThreshold);
     expect([s.sounds, s.vibration, s.streetMaps], [true, true, true]);
+    expect(s.placeRadiusFeet, 555);
+    expect(s.detailTextPercent, 80);
+    expect(s.themeColor, AppPalette.themeColors.first);
+    expect(s.backgroundColor, AppPalette.backgrounds.first);
+    expect(s.darkMode, isFalse);
+  });
+
+  test('a settings file from before display settings keeps light mode', () {
+    final s = AppSettings.fromJson({'sounds': false, 'placeRadiusFeet': 300});
+    expect(s.darkMode, isFalse);
+    expect(s.placeRadiusFeet, 300);
+    expect(s.detailTextPercent, 80);
+    expect(s.backgroundColor, AppPalette.backgrounds.first);
+  });
+
+  test('colours outside the palette fall back; text size is clamped', () {
+    final s = AppSettings.fromJson({
+      'themeColor': 0xFF123456,
+      'backgroundColor': 'blue',
+      'detailTextPercent': 500,
+      'darkMode': 'yes',
+    });
+    expect(s.themeColor, AppPalette.themeColors.first);
+    expect(s.backgroundColor, AppPalette.backgrounds.first);
+    expect(s.detailTextPercent, 150);
+    expect(s.darkMode, isFalse);
   });
 
   test('round-trips through json', () {
@@ -23,6 +49,10 @@ void main() {
       sounds: false,
       vibration: false,
       streetMaps: false,
+      detailTextPercent: 110,
+      themeColor: 0xFF00695C,
+      backgroundColor: 0xFFFFFFFF,
+      darkMode: true,
     );
     expect(AppSettings.fromJson(s.toJson()), s);
   });

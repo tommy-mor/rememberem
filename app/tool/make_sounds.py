@@ -3,6 +3,8 @@
 Run from app/:  python tool/make_sounds.py
 Outputs: assets/sounds/right.wav  a short rising two-note chime
          assets/sounds/wrong.wav  a soft, low "nope"
+         assets/sounds/listen_start.wav  a short high ding: dictation listens
+         assets/sounds/listen_stop.wav   a short lower ding: dictation ended
 """
 
 import math
@@ -57,3 +59,6 @@ if __name__ == "__main__":
         "wrong.wav",
         mix((0, tone(311.1, 0.16, 0.3, 14)), (int(RATE * 0.12), tone(233.1, 0.24, 0.3, 12))),
     )
+    # Dictation: one short ding up as listening starts, one down as it ends.
+    write("listen_start.wav", tone(1568.0, 0.18, 0.3, 18))
+    write("listen_stop.wav", tone(1046.5, 0.18, 0.3, 18))

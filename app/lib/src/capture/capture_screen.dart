@@ -79,15 +79,35 @@ class _CaptureScreenState extends State<CaptureScreen> {
   Future<void> _pickPhoto(PhotoPicker picker) async {
     if (_saving) return;
     await _save(() async {
-      final bytes = await picker.pick();
-      if (bytes == null) return null;
-      final meta = PhotoMetadata.read(bytes, now: DateTime.now());
+      final photo = await picker.pick();
+      if (photo == null) return null;
+      final meta = PhotoMetadata.read(photo.bytes, now: DateTime.now());
+      if (!photo.original && meta.location == null) _sayNoLocation(picker);
       return (
-        bytes: bytes,
+        bytes: photo.bytes,
         capturedAt: meta.takenAt ?? DateTime.now(),
         location: meta.location,
       );
     });
+  }
+
+  /// No location came, perhaps because the phone held it back; say how to
+  /// allow it, without claiming it did. Shown
+  /// on the app's messenger, so it stays up on the person's page.
+  void _sayNoLocation(PhotoPicker picker) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'No location came with this photo. If it should have one, '
+          'allowing Rememberem photo access in Settings may help.',
+        ),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: () => picker.openSettings().ignore(),
+        ),
+      ),
+    );
   }
 
   /// Saves the photo [source] gives (null: nothing chosen) and moves on to

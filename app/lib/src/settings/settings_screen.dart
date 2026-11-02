@@ -4,6 +4,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../reminders/reminders_section.dart';
 import 'app_settings_controller.dart';
+import 'colour_choice.dart';
 import 'setting_stepper.dart';
 import 'settings_heading.dart';
 
@@ -28,6 +29,34 @@ class SettingsScreen extends StatelessWidget {
               const SettingsHeading('Reminders'),
               RemindersSection(coordinator: reminders),
             ],
+            const SettingsHeading('Display'),
+            SwitchListTile(
+              title: const Text('Dark mode'),
+              value: s.darkMode,
+              onChanged: (v) => settings.update(s.copyWith(darkMode: v)),
+            ),
+            ColourChoice(
+              label: 'Theme colour',
+              colours: AppPalette.themeColors,
+              value: s.themeColor,
+              onChanged: (v) => settings.update(s.copyWith(themeColor: v)),
+            ),
+            ColourChoice(
+              label: 'Background',
+              colours: AppPalette.backgrounds,
+              value: s.backgroundColor,
+              enabled: !s.darkMode,
+              onChanged: (v) => settings.update(s.copyWith(backgroundColor: v)),
+            ),
+            SettingStepper(
+              label: 'Detail text size',
+              value: s.detailTextPercent,
+              range: AppSettings.detailTextPercentRange,
+              step: 10,
+              format: (v) => '$v %',
+              onChanged: (v) =>
+                  settings.update(s.copyWith(detailTextPercent: v)),
+            ),
             const SettingsHeading('Matching'),
             SettingStepper(
               label: 'Same place within',
@@ -69,6 +98,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             SwitchListTile(
               title: const Text('Sounds'),
+              subtitle: const Text('Game chimes and the dictation ding'),
               value: s.sounds,
               onChanged: (v) => settings.update(s.copyWith(sounds: v)),
             ),

@@ -55,7 +55,8 @@ class Detail {
 
   final String id;
 
-  /// The description; never blank for a saved detail.
+  /// The description. May be blank once the detail has other data, such
+  /// as a relationship's person.
   final String text;
 
   /// When the detail was recorded, in UTC. For a happening, when it
@@ -67,6 +68,15 @@ class Detail {
   final DetailKind? _type;
 
   DetailKind get kind => _type ?? DetailKind.fact;
+
+  /// True if nothing has been entered: no description, place, type,
+  /// person or date. An empty detail is never saved.
+  bool get isEmpty =>
+      text.trim().isEmpty &&
+      (place?.trim() ?? '').isEmpty &&
+      (label?.trim() ?? '').isEmpty &&
+      targetId == null &&
+      eventDate == null;
 
   /// Where a happening happened.
   final String? place;

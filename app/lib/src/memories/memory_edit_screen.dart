@@ -1,18 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../contacts/contact_link_button.dart';
 import '../speech/dictated_text_field.dart';
-import 'detail_edit_screen.dart';
+import 'crop_screen.dart';
 import 'detail_list_editor.dart';
 import 'encounter_edit_screen.dart';
 import 'memory_editor.dart';
 import 'memory_tile.dart';
 import 'merge_picker_screen.dart';
+import 'person_card_route.dart';
 import 'pictures_section.dart';
+import 'relationships_section.dart';
 import 'when_where_row.dart';
 
 /// The photo of a person with spoken-or-typed notes, saved as you go.
@@ -33,6 +36,10 @@ class MemoryEditScreen extends StatefulWidget {
 }
 
 class _MemoryEditScreenState extends State<MemoryEditScreen> {
+  /// The route of each person's page that is open, so following a
+  /// relationship back to someone already open returns to that page
+  /// instead of opening a second editor (which would save a stale copy).
+  static final Map<String, Route<dynamic>> _openPages = {};
   late final MemoryEditor _editor = MemoryEditor(
     widget.repository,
     widget.memory,
@@ -56,8 +63,18 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   /// Set when leaving via a merge, whose own snackbar must survive.
   bool _keepSnackBars = false;
 
-  /// Reading [_people]; an editor waits for it so its lists are whole.
-  late Future<void> _peopleLoaded;
+  /// Set while a crop is being saved.
+  bool _cropping = false;
+
+  /// This page's route, kept for [dispose], where it cannot be looked up.
+  Route<dynamic>? _route;
+
+  /// Bumped after a crop, so the photo is read again from its file.
+  int _photoGen = 0;
+
+  /// Places found for new happenings, applied only once Fred writes
+  /// something, so a row he abandons is still empty and never saved.
+  final Map<String, String> _suggestedPlaces = {};
 
   @override
   void initState() {
@@ -66,7 +83,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     _lifecycle = AppLifecycleListener(
       onInactive: () => unawaited(_editor.flush().catchError((_) {})),
     );
-    _peopleLoaded = _loadPeople();
+    unawaited(_loadPeople());
   }
 
   Future<void> _loadPeople() async {
@@ -96,46 +113,129 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         ?.place;
   }
 
-  Future<Detail?> _openDetail(DetailKind kind, {Detail? existing}) async {
-    await _peopleLoaded;
-    if (!mounted) return null;
+  /// Adds an empty row of [kind] to fill in where it stands. A new
+  /// happening's place is filled in from where the phone is, unless Fred
+  /// has typed one first.
+  void _addDetail(DetailKind kind) {
     final now = _editor.clock();
-    return Navigator.of(context).push<Detail>(
-      MaterialPageRoute(
-        builder: (_) => DetailEditScreen(
-          kind: kind,
-          ownerId: _editor.memory.id,
-          people: _people,
-          dictation: widget.services.dictation,
-          newId: now.microsecondsSinceEpoch.toRadixString(36),
-          now: now,
-          existing: existing,
-          placeHere: existing == null && kind == DetailKind.happening
-              ? _placeHere()
-              : null,
-        ),
-      ),
+    final detail = Detail(
+      id: now.microsecondsSinceEpoch.toRadixString(36),
+      text: '',
+      at: now,
+      type: kind,
     );
+    _edit(() => _editor.addDetail(detail));
+    if (kind != DetailKind.happening) return;
+    _placeHere().then((place) {
+      if (!mounted || place == null) return;
+      final current = _editor.memory.details
+          .where((d) => d.id == detail.id)
+          .firstOrNull;
+      if (current == null || (current.place?.trim() ?? '').isNotEmpty) return;
+      if (current.text.trim().isEmpty) {
+        _suggestedPlaces[detail.id] = place;
+      } else {
+        _edit(() => _editor.replaceDetail(current.copyWith(place: place)));
+      }
+    }, onError: (_) {});
   }
 
-  Future<void> _addDetail(DetailKind kind) async {
-    final detail = await _openDetail(kind);
-    if (detail != null && mounted) _edit(() => _editor.addDetail(detail));
+  /// A description typed into row [id]: saved, with any place suggested
+  /// for it while it was still empty.
+  void _describe(String id, String text) => _edit(() {
+    _editor.updateDetail(id, text);
+    final place = _suggestedPlaces[id];
+    if (place == null || text.trim().isEmpty) return;
+    _suggestedPlaces.remove(id);
+    final current = _editor.memory.details.where((d) => d.id == id).firstOrNull;
+    if (current != null && (current.place?.trim() ?? '').isEmpty) {
+      _editor.replaceDetail(current.copyWith(place: place));
+    }
+  });
+
+  /// Opens someone this person is related to, after saving this page; on
+  /// coming back, everyone is read again (that page may have changed them).
+  Future<void> _openRelated(Memory other) async {
+    final navigator = Navigator.of(context);
+    if (_openPages[other.id] case final open?) {
+      // Already open further back: return there (pages above it save as
+      // they close).
+      navigator.popUntil((route) => route == open);
+      return;
+    }
+    try {
+      await _editor.flush();
+    } catch (_) {
+      // Still open them; the edit stays queued for the next flush.
+    }
+    final fresh = (await widget.repository.all())
+        .where((m) => m.id == other.id)
+        .firstOrNull;
+    if (fresh == null || !mounted) return;
+    await navigator.push(
+      PersonCardRoute(services: widget.services, memory: fresh),
+    );
+    if (mounted) await _loadPeople();
   }
 
-  Future<void> _changeDetail(Detail existing) async {
-    final detail = await _openDetail(existing.kind, existing: existing);
-    if (detail != null && mounted) _edit(() => _editor.replaceDetail(detail));
+  /// Crops the picture that represents this person, replacing its file.
+  Future<void> _crop() async {
+    if (_cropping) return;
+    final memory = _editor.memory;
+    final photo = widget.repository.photoFile(memory);
+    final messenger = ScaffoldMessenger.of(context);
+    final Uint8List jpeg;
+    try {
+      jpeg = await photo.readAsBytes();
+    } on Object {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('This photo cannot be opened.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final cropped = await Navigator.of(context).push<Uint8List>(
+      MaterialPageRoute(builder: (_) => CropScreen(jpeg: jpeg)),
+    );
+    if (cropped == null || !mounted) return;
+    setState(() => _cropping = true);
+    try {
+      await _editor.flush();
+      await widget.repository.replaceEncounterPhoto(
+        memory.id,
+        memory.latest.photoFileName,
+        cropped,
+      );
+      // Every screen shows the photo from the same file name.
+      PaintingBinding.instance.imageCache
+        ..clear()
+        ..clearLiveImages();
+      if (mounted) setState(() => _photoGen++);
+    } on Object {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not save the crop. Try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _cropping = false);
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _messenger = ScaffoldMessenger.maybeOf(context);
+    _route ??= ModalRoute.of(context);
+    if (_route case final route?) {
+      // The newest page wins; a closing one removes only its own entry.
+      _openPages[widget.memory.id] = route;
+    }
   }
 
   @override
   void dispose() {
+    if (_openPages[widget.memory.id] == _route) {
+      _openPages.remove(widget.memory.id);
+    }
     // Clearing during dispose upsets the messenger, so do it after the
     // frame. (Leaving via a shortcut skips the PopScope handler.)
     final messenger = _messenger;
@@ -184,7 +284,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     final memory = _editor.memory;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New person'),
+        title: Text(memory.displayName),
         actions: [
           if (widget.services.contacts case final contacts?)
             ContactLinkButton(
@@ -203,17 +303,47 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  widget.repository.photoFile(memory),
-                  height: 280,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      const SizedBox(height: 280, child: Icon(Icons.person)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    widget.repository.photoFile(memory),
+                    key: ValueKey('photo-$_photoGen'),
+                    width: 192,
+                    height: 240,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      width: 192,
+                      height: 240,
+                      child: Icon(Icons.person),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _cropping ? null : _crop,
+                        icon: const Icon(Icons.crop),
+                        label: const Text('Crop'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _merge,
+                        icon: const Icon(Icons.merge),
+                        label: const Text(
+                          'Merge with existing person',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             WhenWhereRow(
               encounter: memory.encounters.first,
@@ -229,21 +359,31 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 initialValue: memory.field(field),
                 dictation: widget.services.dictation,
                 hint: field == MemoryField.name ? MemoryTile.unknownName : null,
-                onChanged: (value) => _editor.update(field.key, value),
+                onChanged: (value) {
+                  _editor.update(field.key, value);
+                  // The title shows the name as it is typed.
+                  if (field == MemoryField.name) setState(() {});
+                },
               ),
             ],
             const SizedBox(height: 16),
-            DetailListEditor(
-              details: _editor.memory.details,
-              dictation: widget.services.dictation,
-              nameOf: (id) => _activeNames[id],
-              onChanged: (id, text) =>
-                  _edit(() => _editor.updateDetail(id, text)),
-              onAdd: _addDetail,
-              onEdit: _changeDetail,
-              onDelete: (id) => _edit(() => _editor.deleteDetail(id)),
-              onRestore: (detail, index) =>
-                  _edit(() => _editor.restoreDetail(detail, index)),
+            _scaledForDetails(
+              context,
+              DetailListEditor(
+                details: _editor.memory.details,
+                dictation: widget.services.dictation,
+                ownerId: memory.id,
+                people: _people,
+                photoOf: widget.repository.photoFile,
+                nameOf: (id) => _activeNames[id],
+                onChanged: _describe,
+                onReplace: (detail) =>
+                    _edit(() => _editor.replaceDetail(detail)),
+                onAdd: _addDetail,
+                onDelete: (id) => _edit(() => _editor.deleteDetail(id)),
+                onRestore: (detail, index) =>
+                    _edit(() => _editor.restoreDetail(detail, index)),
+              ),
             ),
             const SizedBox(height: 16),
             PicturesSection(
@@ -252,10 +392,11 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               onOpen: _openPicture,
             ),
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _merge,
-              icon: const Icon(Icons.merge),
-              label: const Text('Merge with existing person'),
+            RelationshipsSection(
+              person: memory,
+              people: _people,
+              photoOf: widget.repository.photoFile,
+              onOpen: _openRelated,
             ),
             const SizedBox(height: 16),
             Text(
@@ -365,6 +506,22 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
     _fieldsGen++;
   });
+
+  /// Detail text at Fred's chosen size, on top of the phone's own.
+  Widget _scaledForDetails(BuildContext context, Widget child) {
+    final percent = widget.services.settings.value.detailTextPercent;
+    final media = MediaQuery.of(context);
+    return MediaQuery(
+      data: media.copyWith(
+        // Sampled at body size, where Android's nonlinear scaling is
+        // nearest to what Fred sees.
+        textScaler: TextScaler.linear(
+          media.textScaler.scale(14) / 14 * percent / 100,
+        ),
+      ),
+      child: child,
+    );
+  }
 
   /// Applies a detail change and rebuilds so time captions stay current.
   void _edit(VoidCallback change) => setState(change);

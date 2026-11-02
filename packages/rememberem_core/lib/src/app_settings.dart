@@ -1,3 +1,4 @@
+import 'app_palette.dart';
 import 'meeting_finder.dart';
 import 'place_finder.dart';
 import 'remembered_count.dart';
@@ -14,6 +15,10 @@ class AppSettings {
     this.sounds = true,
     this.vibration = true,
     this.streetMaps = true,
+    this.detailTextPercent = defaultDetailTextPercent,
+    this.themeColor = defaultThemeColor,
+    this.backgroundColor = defaultBackgroundColor,
+    this.darkMode = false,
   });
 
   /// Reads what [toJson] wrote. Never throws: a missing, mistyped or
@@ -26,9 +31,14 @@ class AppSettings {
       return value.round().clamp(range.min, range.max);
     }
 
-    bool flag(String key) {
+    bool flag(String key, {bool fallback = true}) {
       final value = json[key];
-      return value is bool ? value : true;
+      return value is bool ? value : fallback;
+    }
+
+    int colour(String key, List<int> palette) {
+      final value = json[key];
+      return value is int && palette.contains(value) ? value : palette.first;
     }
 
     return AppSettings(
@@ -56,19 +66,32 @@ class AppSettings {
       sounds: flag('sounds'),
       vibration: flag('vibration'),
       streetMaps: flag('streetMaps'),
+      detailTextPercent: number(
+        'detailTextPercent',
+        defaultDetailTextPercent,
+        detailTextPercentRange,
+      ),
+      themeColor: colour('themeColor', AppPalette.themeColors),
+      backgroundColor: colour('backgroundColor', AppPalette.backgrounds),
+      darkMode: flag('darkMode', fallback: false),
     );
   }
 
-  static const defaultPlaceRadiusFeet = 300;
+  static const defaultPlaceRadiusFeet = 555;
   static const defaultMeetingWindowMinutes = 120;
   static const defaultGameTurns = 10;
   static const defaultRevealSeconds = 3;
+  static const defaultDetailTextPercent = 80;
+  static const defaultThemeColor = 0xFF0A2A7A; // AppPalette.themeColors.first
+  static const defaultBackgroundColor =
+      0xFFE9EEFC; // AppPalette.backgrounds.first
 
   static const placeRadiusRange = (min: 100, max: 1000);
   static const meetingWindowRange = (min: 30, max: 240);
   static const gameTurnsRange = (min: 5, max: 20);
   static const revealSecondsRange = (min: 1, max: 5);
   static const rememberedThresholdRange = (min: 3, max: 10);
+  static const detailTextPercentRange = (min: 60, max: 150);
 
   static const _metersPerFoot = 0.3048;
 
@@ -93,6 +116,19 @@ class AppSettings {
   /// Whether maps fetch street tiles from OpenStreetMap.
   final bool streetMaps;
 
+  /// The size of detail text, as a percentage of normal (on top of the
+  /// phone's own text size).
+  final int detailTextPercent;
+
+  /// App bars and buttons, from [AppPalette.themeColors].
+  final int themeColor;
+
+  /// The page background in light mode, from [AppPalette.backgrounds].
+  final int backgroundColor;
+
+  /// Dark pages; the background choice then does not apply.
+  final bool darkMode;
+
   PlaceFinder get placeFinder =>
       PlaceFinder(radiusMeters: placeRadiusFeet * _metersPerFoot);
 
@@ -110,6 +146,10 @@ class AppSettings {
     bool? sounds,
     bool? vibration,
     bool? streetMaps,
+    int? detailTextPercent,
+    int? themeColor,
+    int? backgroundColor,
+    bool? darkMode,
   }) =>
       AppSettings(
         placeRadiusFeet: placeRadiusFeet ?? this.placeRadiusFeet,
@@ -120,6 +160,10 @@ class AppSettings {
         sounds: sounds ?? this.sounds,
         vibration: vibration ?? this.vibration,
         streetMaps: streetMaps ?? this.streetMaps,
+        detailTextPercent: detailTextPercent ?? this.detailTextPercent,
+        themeColor: themeColor ?? this.themeColor,
+        backgroundColor: backgroundColor ?? this.backgroundColor,
+        darkMode: darkMode ?? this.darkMode,
       );
 
   Map<String, dynamic> toJson() => {
@@ -131,6 +175,10 @@ class AppSettings {
         'sounds': sounds,
         'vibration': vibration,
         'streetMaps': streetMaps,
+        'detailTextPercent': detailTextPercent,
+        'themeColor': themeColor,
+        'backgroundColor': backgroundColor,
+        'darkMode': darkMode,
       };
 
   @override
@@ -143,7 +191,11 @@ class AppSettings {
       other.rememberedThreshold == rememberedThreshold &&
       other.sounds == sounds &&
       other.vibration == vibration &&
-      other.streetMaps == streetMaps;
+      other.streetMaps == streetMaps &&
+      other.detailTextPercent == detailTextPercent &&
+      other.themeColor == themeColor &&
+      other.backgroundColor == backgroundColor &&
+      other.darkMode == darkMode;
 
   @override
   int get hashCode => Object.hash(
@@ -155,5 +207,9 @@ class AppSettings {
         sounds,
         vibration,
         streetMaps,
+        detailTextPercent,
+        themeColor,
+        backgroundColor,
+        darkMode,
       );
 }

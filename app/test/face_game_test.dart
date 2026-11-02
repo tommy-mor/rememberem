@@ -350,7 +350,7 @@ void main() {
     ) async {
       await people(['Ann', 'Ann', 'Bo', 'Cy']);
       await showList(tester);
-      final button = find.widgetWithText(OutlinedButton, 'Practice faces');
+      final button = find.widgetWithText(OutlinedButton, 'Faces');
       expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
       expect(
         find.text('Name at least 4 different people to practice faces.'),
@@ -362,7 +362,7 @@ void main() {
       await people(['Ann', 'Bo', 'Cy', 'Di']);
       await showList(tester);
 
-      await tester.tap(find.text('Practice faces'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Faces'));
       await tester.pumpAndSettle();
 
       expect(find.byType(FaceGameScreen), findsOneWidget);

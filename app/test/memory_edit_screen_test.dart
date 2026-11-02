@@ -34,26 +34,17 @@ void main() {
 
   Memory saved() => repository.stored[memory.id]!;
 
-  /// Opens the add screen for [kind], types [description], and leaves the
-  /// rest to [fill] before saving.
-  Future<void> addDetail(
-    WidgetTester tester,
-    String kind,
-    String description, {
-    Future<void> Function()? fill,
-  }) async {
+  /// Adds an empty row of [kind] on the card.
+  Future<void> addRow(WidgetTester tester, String kind) async {
     await tester.ensureVisible(find.text('+ $kind'));
     await tester.tap(find.text('+ $kind'));
     await tester.pumpAndSettle();
-    if (fill != null) await fill();
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Description'),
-      description,
-    );
-    await tester.pump();
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
   }
+
+  /// The detail row whose label starts with [kind] (its data follows).
+  Finder rowField(String kind) => find.byWidgetPredicate(
+    (w) => w is TextField && (w.decoration?.labelText ?? '').startsWith(kind),
+  );
 
   Future<Memory> named(String name) async {
     final m = await repository.add(
@@ -98,7 +89,7 @@ void main() {
     for (final kind in ['fact', 'happening', 'relationship', 'anniversary']) {
       expect(find.text('+ $kind'), findsOneWidget);
     }
-    expect(find.widgetWithText(TextField, 'Description'), findsNothing);
+    expect(find.textContaining('Fact'), findsNothing);
     expect(find.textContaining('47.61000, -122.33000'), findsOneWidget);
   });
 
@@ -112,7 +103,7 @@ void main() {
     await speakInto(tester, 'Meeting', 'Sunday Meetings');
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('Alex Davis'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Alex Davis'), findsOneWidget);
     expect(saved().field(MemoryField.name), 'Alex Davis');
     expect(saved().latest.place, 'Stake Center');
     expect(saved().latest.meeting, 'Sunday Meetings');
@@ -126,7 +117,7 @@ void main() {
     dictation.say('Alex');
     await tester.pump();
 
-    expect(find.text('Alex'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Alex'), findsOneWidget);
     expect(find.byTooltip('Stop listening'), findsOneWidget);
   });
 
@@ -166,39 +157,36 @@ void main() {
     expect(find.byTooltip('Speak Name'), findsOneWidget);
   });
 
-  testWidgets('a fact is just a description, spoken or typed', (tester) async {
+  testWidgets('a fact is typed where it was added, and kept on leaving', (
+    tester,
+  ) async {
     await showScreen(tester);
 
-    await tester.tap(find.text('+ fact'));
-    await tester.pumpAndSettle();
-    await speakInto(tester, 'Description', 'Sings in the choir');
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await addRow(tester, 'fact');
+    // The new row has the keyboard, and the screen did not change.
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Fact'), 'Tall');
+    await tester.pumpWidget(const SizedBox());
 
     final fact = saved().details.single;
-    expect(fact.kind, DetailKind.fact);
-    expect(fact.text, 'Sings in the choir');
-    expect(find.text('Fact'), findsOneWidget);
-    expect(find.text('Sings in the choir'), findsOneWidget);
+    expect([fact.kind, fact.text], [DetailKind.fact, 'Tall']);
   });
 
-  testWidgets('Save stays off until the description and the parts of the '
-      'kind are given', (tester) async {
-    await named('Jill');
+  testWidgets('a fact can be spoken into its row', (tester) async {
     await showScreen(tester);
-    await tester.tap(find.text('+ relationship'));
-    await tester.pumpAndSettle();
-    TextButton save() => tester.widget(find.widgetWithText(TextButton, 'Save'));
 
-    expect(save().onPressed, isNull);
-    await tester.enterText(find.widgetWithText(TextField, 'Description'), 'x');
-    await tester.pump();
-    expect(save().onPressed, isNull); // no type or person yet
-    await tester.tap(find.text('boss'));
-    await tester.pump();
-    expect(save().onPressed, isNull); // no person yet
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await addRow(tester, 'fact');
+    await speakInto(tester, 'Fact', 'Sings in the choir');
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(saved().details.single.text, 'Sings in the choir');
+  });
+
+  testWidgets('an added row left empty is never saved', (tester) async {
+    await showScreen(tester);
+
+    await addRow(tester, 'anniversary');
+    await tester.pumpWidget(const SizedBox());
 
     expect(saved().details, isEmpty);
   });
@@ -214,50 +202,123 @@ void main() {
     );
     await showScreen(tester, here: const GeoPoint(47.0, -122.0));
 
-    await addDetail(tester, 'happening', 'Picnic');
+    await addRow(tester, 'happening');
+    await tester.enterText(rowField('Happening'), 'Picnic');
+    await tester.pump(const Duration(seconds: 1));
 
     final happening = saved().details.single;
-    expect(happening.kind, DetailKind.happening);
-    expect(happening.place, 'Park');
-    expect(find.textContaining(', Park'), findsOneWidget);
+    expect(
+      [happening.kind, happening.place, happening.text],
+      [DetailKind.happening, 'Park', 'Picnic'],
+    );
+    expect(find.widgetWithText(TextField, 'Park'), findsOneWidget);
+    expect(find.textContaining('· Park'), findsOneWidget);
   });
 
-  testWidgets('a relationship reads "My boss is Jill" and follows her name', (
+  testWidgets('a happening left empty is not saved, even once its place '
+      'is found', (tester) async {
+    await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 10, 1),
+      location: const GeoPoint(47.0, -122.0),
+      place: 'Park',
+    );
+    await showScreen(tester, here: const GeoPoint(47.0, -122.0));
+
+    await addRow(tester, 'happening');
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpWidget(const SizedBox());
+
+    expect(saved().details, isEmpty);
+  });
+
+  testWidgets('emptying the custom type box keeps the chosen type', (
     tester,
   ) async {
+    await named('Jill');
+    await showScreen(tester);
+    await addRow(tester, 'relationship');
+    await tester.tap(find.text('boss'));
+    await tester.pumpAndSettle();
+    final custom = find.widgetWithText(
+      TextField,
+      'Create a custom relationship type',
+    );
+
+    await tester.enterText(custom, 'b');
+    await tester.pump();
+    await tester.enterText(custom, '');
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(saved().details.single.label, 'b');
+    await tester.tap(find.text('boss'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.enterText(custom, '');
+    await tester.pump(const Duration(seconds: 1));
+    expect(saved().details.single.label, 'boss');
+  });
+
+  testWidgets('a relationship asks Who first, shows faces, and is kept '
+      'with no description', (tester) async {
     final jill = await named('Jill');
     await showScreen(tester);
 
-    await addDetail(
-      tester,
-      'relationship',
-      'Since 2020',
-      fill: () async {
-        await tester.tap(find.text('boss'));
-        await tester.tap(find.byType(DropdownButtonFormField<String>));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Jill').last);
-        await tester.pumpAndSettle();
-      },
+    await addRow(tester, 'relationship');
+    final who = find.byType(DropdownButtonFormField<String>);
+    final custom = find.widgetWithText(
+      TextField,
+      'Create a custom relationship type',
     );
+    expect(tester.getTopLeft(who).dy, lessThan(tester.getTopLeft(custom).dy));
+    await tester.tap(who);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(DropdownMenuItem<String>).last,
+        matching: find.byType(Image),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Jill').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('boss'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
 
     final r = saved().details.single;
     expect(
-      [r.kind, r.label, r.targetId],
-      [DetailKind.relationship, 'boss', jill.id],
+      [r.kind, r.label, r.targetId, r.text],
+      [DetailKind.relationship, 'boss', jill.id, ''],
     );
-    expect(find.text('My boss is Jill'), findsOneWidget);
+  });
+
+  testWidgets('a relationship row reads its type and person on one line and '
+      'follows her name', (tester) async {
+    final jill = await named('Jill');
+    memory = memory.withDetails([
+      Detail(
+        id: 'r',
+        text: 'Since 2020',
+        at: DateTime(2026),
+        type: DetailKind.relationship,
+        label: 'boss',
+        targetId: jill.id,
+      ),
+    ]);
+    await repository.save(memory);
+    await showScreen(tester);
+    await tester.pump();
+    expect(find.text('Relationship · Boss · Jill'), findsOneWidget);
 
     await repository.save(jill.withField('name', 'Jillian'));
-    memory = saved();
     await tester.pumpWidget(const SizedBox());
     await showScreen(tester);
     await tester.pump();
-    expect(find.text('My boss is Jillian'), findsOneWidget);
+    expect(find.text('Relationship · Boss · Jillian'), findsOneWidget);
   });
 
   testWidgets('a relationship to someone in the trash reads "someone '
-      'removed"', (tester) async {
+      'removed" and can be pointed at someone new', (tester) async {
     final jill = await named('Jill');
     memory = memory.withDetails([
       Detail(
@@ -272,24 +333,20 @@ void main() {
     await repository.trash(jill.id, DateTime(2026, 11, 2));
     final bo = await named('Bo');
     await showScreen(tester);
+    await tester.pump();
 
-    expect(find.text('My boss is someone removed'), findsOneWidget);
-
-    // Changing it asks for someone new rather than failing.
-    await tester.tap(find.text('My boss is someone removed'));
+    const label = 'Relationship · Boss · someone removed';
+    expect(find.text(label), findsOneWidget);
+    await tester.tap(find.byTooltip('Change $label'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    TextButton save() => tester.widget(find.widgetWithText(TextButton, 'Save'));
-    expect(save().onPressed, isNull);
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bo').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
 
     expect(saved().details.single.targetId, bo.id);
-    expect(find.text('My boss is Bo'), findsOneWidget);
+    expect(find.text('Relationship · Boss · Bo'), findsOneWidget);
   });
 
   testWidgets('a custom anniversary type is offered while it is in use', (
@@ -297,21 +354,15 @@ void main() {
   ) async {
     await showScreen(tester);
 
-    await addDetail(
-      tester,
-      'anniversary',
-      'At the cabin',
-      fill: () async {
-        await tester.enterText(
-          find.widgetWithText(TextField, 'Or type a new one'),
-          'Baptism',
-        );
-        await tester.tap(find.text('Choose the first date'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('OK'));
-        await tester.pumpAndSettle();
-      },
+    await addRow(tester, 'anniversary');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Create a custom anniversary type'),
+      'Baptism',
     );
+    await tester.tap(find.text('Choose the first date'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
     final a = saved().details.single;
     expect([a.kind, a.label], [DetailKind.anniversary, 'Baptism']);
     expect(a.eventDate, isNotNull);
@@ -319,9 +370,8 @@ void main() {
     memory = saved();
     await tester.pumpWidget(const SizedBox());
     await showScreen(tester); // the card reads people when it opens
-    await tester.ensureVisible(find.text('+ anniversary'));
-    await tester.tap(find.text('+ anniversary'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await addRow(tester, 'anniversary');
     expect(find.widgetWithText(ChoiceChip, 'Baptism'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, 'wedding'), findsOneWidget);
   });
@@ -343,8 +393,164 @@ void main() {
     expect(repository.saves, isEmpty);
   });
 
+  testWidgets('the title is the name as typed, or Unknown', (tester) async {
+    await showScreen(tester);
+    expect(find.widgetWithText(AppBar, 'Unknown'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Ann Lee');
+    await tester.pump();
+
+    expect(find.widgetWithText(AppBar, 'Ann Lee'), findsOneWidget);
+    expect(find.text('New person'), findsNothing);
+  });
+
+  testWidgets('Crop and Merge sit to the right of the photo', (tester) async {
+    await showScreen(tester);
+
+    final photo = tester.getRect(find.byType(Image).first);
+    for (final label in ['Crop', 'Merge with existing person']) {
+      final button = tester.getRect(find.text(label));
+      expect(button.left, greaterThan(photo.right), reason: label);
+      expect(button.top, lessThan(photo.bottom), reason: label);
+    }
+  });
+
+  testWidgets('detail text follows the size in Settings', (tester) async {
+    memory = memory.withDetails([
+      Detail(id: 'a', text: 'From Seattle', at: DateTime(2026)),
+    ]);
+    Future<double> fontSize(int percent) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MemoryEditScreen(
+            memory: memory,
+            services: testServices(
+              repository,
+              settings: AppSettings(
+                detailTextPercent: percent,
+                streetMaps: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final field = tester.element(
+        find.byWidgetPredicate(
+          (w) => w is EditableText && w.controller.text == 'From Seattle',
+        ),
+      );
+      return MediaQuery.textScalerOf(field).scale(10);
+    }
+
+    expect(await fontSize(80), closeTo(8, 1e-9));
+    expect(await fontSize(120), closeTo(12, 1e-9));
+  });
+
+  group('relationships list', () {
+    late Memory jill;
+    late Memory cy;
+
+    Future<void> showRelated(WidgetTester tester) async {
+      jill = await named('Jill');
+      cy = await named('Cy');
+      final ann = await named('Ann');
+      memory = memory.withField('name', 'Bo').withDetails([
+        Detail(
+          id: 'r',
+          text: '',
+          at: DateTime(2026),
+          type: DetailKind.relationship,
+          label: 'boss',
+          targetId: jill.id,
+        ),
+      ]);
+      await repository.save(memory);
+      await repository.save(
+        cy.withDetails([
+          Detail(
+            id: 'c',
+            text: '',
+            at: DateTime(2026),
+            type: DetailKind.relationship,
+            label: 'brother',
+            targetId: memory.id,
+          ),
+        ]),
+      );
+      await repository.save(
+        ann.withDetails([
+          Detail(
+            id: 't',
+            text: '',
+            at: DateTime(2026),
+            type: DetailKind.relationship,
+            label: 'coach',
+            targetId: memory.id,
+          ),
+        ]),
+      );
+      await repository.trash(ann.id, DateTime(2026, 11, 2));
+      await showScreen(tester);
+      await tester.pump();
+    }
+
+    testWidgets('lists both ways with photos, never someone in the trash', (
+      tester,
+    ) async {
+      await showRelated(tester);
+
+      expect(find.text('Relationships'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Boss'), findsOneWidget);
+      expect(
+        find.widgetWithText(ListTile, 'Bo is their brother'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('coach'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.widgetWithText(ListTile, 'Bo is their brother'),
+          matching: find.byType(Image),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('following a link back to someone already open returns to '
+        'that page instead of opening a second one', (tester) async {
+      await showRelated(tester);
+      await tester.ensureVisible(find.widgetWithText(ListTile, 'Cy'));
+      await tester.tap(find.widgetWithText(ListTile, 'Cy'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(AppBar, 'Cy'), findsOneWidget);
+
+      // On Cy's page, Bo is listed as Cy's brother: back to the first page.
+      await tester.ensureVisible(find.widgetWithText(ListTile, 'Bo'));
+      await tester.tap(find.widgetWithText(ListTile, 'Bo'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MemoryEditScreen), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Bo'), findsOneWidget);
+    });
+
+    testWidgets('tapping someone saves this page and opens theirs', (
+      tester,
+    ) async {
+      await showRelated(tester);
+      await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Bob');
+
+      await tester.ensureVisible(find.widgetWithText(ListTile, 'Cy'));
+      await tester.tap(find.widgetWithText(ListTile, 'Cy'));
+      await tester.pumpAndSettle();
+
+      expect(saved().displayName, 'Bob');
+      expect(find.widgetWithText(AppBar, 'Cy'), findsOneWidget);
+    });
+  });
+
   group('person card details', () {
     late Memory jill;
+    const relLabel = 'Relationship · Boss · Jill';
 
     Future<void> showWithDetails(WidgetTester tester) async {
       jill = await named('Jill');
@@ -363,31 +569,28 @@ void main() {
       await repository.save(memory);
       repository.saves.clear();
       await showScreen(tester);
+      await tester.pump();
     }
 
-    testWidgets('each shows its kind in the corner and its prefix', (
+    testWidgets('each row is one field labelled with its kind and data', (
       tester,
     ) async {
       await showWithDetails(tester);
 
-      expect(find.text('Fact'), findsOneWidget);
-      expect(find.text('Relationship'), findsOneWidget);
-      expect(find.text('My boss is Jill'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Fact'), findsOneWidget);
+      expect(find.widgetWithText(TextField, relLabel), findsOneWidget);
+      expect(find.text('Description'), findsNothing);
     });
 
-    testWidgets('tapping the prefix changes the type, keeping the score', (
-      tester,
-    ) async {
+    testWidgets('changing the type in place keeps the score', (tester) async {
       await showWithDetails(tester);
 
-      await tester.tap(find.text('My boss is Jill'));
+      await tester.tap(find.byTooltip('Change $relLabel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('friend'));
-      await tester.pump();
-      await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
-      expect(find.text('My friend is Jill'), findsOneWidget);
+      expect(find.text('Relationship · Friend · Jill'), findsOneWidget);
       final b = repository.saves.last.details.last;
       expect([b.id, b.label, b.text, b.points], ['b', 'friend', 'Sings', 3]);
     });
@@ -421,7 +624,7 @@ void main() {
     ) async {
       await showWithDetails(tester);
 
-      await tester.tap(find.byTooltip('Speak Description').first);
+      await tester.tap(find.byTooltip('Speak Fact'));
       await tester.pump();
       await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();

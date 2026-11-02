@@ -19,6 +19,10 @@ import 'src/reminders/local_notifications_scheduler.dart';
 import 'src/reminders/reminder_coordinator.dart';
 import 'src/settings/app_settings_controller.dart';
 import 'src/settings/file_settings_store.dart';
+import 'src/sound/android_haptics.dart';
+import 'src/sound/device_sounds.dart';
+import 'src/sound/system_haptics.dart';
+import 'src/speech/cued_dictation.dart';
 import 'src/speech/device_dictation.dart';
 
 Future<void> main() async {
@@ -43,6 +47,7 @@ Future<void> main() async {
     await settingsStore.load(),
     settingsStore,
   );
+  final sounds = DeviceSounds(settings);
   final services = AppServices(
     repository: repository,
     capture: PortraitCapture(
@@ -50,14 +55,18 @@ Future<void> main() async {
       faceLocator: MlKitFaceLocator(),
       workFolder: cache,
     ),
-    dictation: DeviceDictation(),
+    dictation: CuedDictation(DeviceDictation(), sounds),
     location: DeviceLocation(),
     reminders: reminders,
     settings: settings,
     photoPicker: Platform.isAndroid
         ? AndroidPhotoPicker()
         : GalleryPhotoPicker(),
-    feedback: DeviceGameFeedback(settings),
+    feedback: DeviceGameFeedback(
+      settings,
+      sounds,
+      Platform.isAndroid ? AndroidHaptics() : SystemHaptics(),
+    ),
     // Not built for iOS yet (no contact picker there).
     contacts: Platform.isAndroid ? AndroidContactsService() : null,
   );

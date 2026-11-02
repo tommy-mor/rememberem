@@ -71,6 +71,15 @@ abstract interface class MemoryRepository {
 
   File encounterPhoto(Encounter encounter);
 
+  /// Replaces the photo [photoFileName] of active memory [id] with [jpeg]
+  /// (a crop), keeping its file name. Throws [StateError] if the memory is
+  /// gone, in the trash, or no longer has that photo, writing nothing.
+  Future<void> replaceEncounterPhoto(
+    String id,
+    String photoFileName,
+    List<int> jpeg,
+  );
+
   /// Deletes just this encounter's photo file (after its encounter has been
   /// removed from the record).
   Future<void> deleteEncounterPhoto(Encounter encounter);

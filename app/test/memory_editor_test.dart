@@ -70,7 +70,7 @@ void main() {
       });
     });
 
-    test('a blank description is never added or saved', () {
+    test('an added empty detail is kept for editing but never saved', () {
       fakeAsync((async) {
         final repository = FakeMemoryRepository();
         final editor = MemoryEditor(repository, memory);
@@ -79,7 +79,31 @@ void main() {
         editor.updateDetail('d2', 'nothing to update');
         async.elapse(const Duration(seconds: 1));
 
-        expect(repository.saves, isEmpty);
+        expect(editor.memory.details.single.id, 'd1');
+        expect(repository.saves.every((m) => m.details.isEmpty), isTrue);
+      });
+    });
+
+    test('a relationship given only a person and a type is saved', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final editor = MemoryEditor(repository, memory);
+        final blank = Detail(
+          id: 'r',
+          text: '',
+          at: DateTime.utc(2026),
+          type: DetailKind.relationship,
+        );
+
+        editor.addDetail(blank);
+        editor.replaceDetail(blank.copyWith(targetId: () => 'b'));
+        editor.replaceDetail(
+          editor.memory.details.single.copyWith(label: 'brother'),
+        );
+        async.elapse(const Duration(seconds: 1));
+
+        final saved = repository.saves.last.details.single;
+        expect([saved.targetId, saved.label, saved.text], ['b', 'brother', '']);
       });
     });
 

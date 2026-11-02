@@ -126,15 +126,30 @@ class _RememberemAppState extends State<RememberemApp>
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Rememberem',
-      navigatorKey: _navigator,
-      navigatorObservers: [_routeObserver],
-      theme: RememberemTheme.light,
-      home: MemoryListScreen(
-        services: widget.services,
-        routeObserver: _routeObserver,
-        onMeetSomeone: _meetSomeone,
+    // The list is built once: rebuilding the app for a colour change must
+    // not rebuild (and reload) the page under it.
+    final home = MemoryListScreen(
+      services: widget.services,
+      routeObserver: _routeObserver,
+      onMeetSomeone: _meetSomeone,
+    );
+    return ValueListenableBuilder<AppSettings>(
+      valueListenable: widget.services.settings,
+      builder: (context, settings, _) => MaterialApp(
+        title: 'Rememberem',
+        navigatorKey: _navigator,
+        navigatorObservers: [_routeObserver],
+        theme: RememberemTheme.light(settings),
+        darkTheme: RememberemTheme.dark(settings),
+        themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
+        // Tapping anywhere that is not a button or field closes the
+        // keyboard.
+        builder: (context, child) => GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child,
+        ),
+        home: home,
       ),
     );
   }

@@ -204,6 +204,23 @@ class JsonFileMemoryRepository implements MemoryRepository {
       });
 
   @override
+  Future<void> replaceEncounterPhoto(
+    String id,
+    String photoFileName,
+    List<int> jpeg,
+  ) =>
+      _serial(() async {
+        final memory = await _readActive(id);
+        final encounter = memory.encounters
+            .where((e) => e.photoFileName == photoFileName)
+            .firstOrNull;
+        if (encounter == null) {
+          throw StateError('Memory $id has no photo $photoFileName');
+        }
+        await _writeAtomically(encounterPhoto(encounter), jpeg);
+      });
+
+  @override
   Future<void> deleteEncounterPhoto(Encounter encounter) => _serial(() async {
         final photo = encounterPhoto(encounter);
         if (await photo.exists()) await photo.delete();

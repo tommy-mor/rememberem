@@ -67,6 +67,15 @@ These summarise the shipped stories. Where they conflict with older entries belo
   - **Verified on the emulator, debug and release.** Linking, opening, and not-found after deleting the contact.
   - **Not verified.** iOS (no icon there), and the S22.
   - **Release.** Play needs a declaration for READ_CONTACTS before a public release.
+- **Story 18: tweaks batch.**
+  - **Details in place.** The four add buttons add an empty row on the card; it is filled in where it stands and saved as you go (no Save button, so Back can no longer lose it). Rows are one field labelled with kind and data ("Relationship · Boss · Jill"); the tune button opens the kind's extras under it (relationship: Who first, with thumbnails). Only `Detail.isEmpty` rows are left out of a save; a relationship with no description is stored but never practised. Detail text is 80 % of normal by default (Settings › Display).
+  - **Relationships list.** The card lists relationships both ways (`RelationshipIndex`), active people only, read again after visiting another card.
+  - **Crop.** Replaces the newest photo's file in place through `replaceEncounterPhoto`, which writes only for an active person that still lists that photo. Destructive by design; no undo.
+  - **Display.** Theme colour and background from `AppPalette`, dark mode (default off; a missing key reads as off). Default place radius is 555 ft.
+  - **Feedback.** Game sounds on the media stream; the buzz is a 30 ms media vibration (`Haptics.kt`, VIBRATE). Dictation dings at start and stop (`CuedDictation`) and the mic pulses while listening.
+  - **Photos.** The gallery button opens the phone's gallery picker (`ACTION_PICK`); a photo whose location was held back says so, with a Settings link.
+  - **Verified on the emulator (debug).** Inline relationship saved without a description; thumbnails; both-way list; dark mode; crop rewrote only that photo; Google Photos pick kept GPS with limited and with no access; game sounds played; vibrations logged as MEDIA.
+  - **Not verified.** The Galaxy S22 (sounds, buzz, Samsung Gallery GPS), dictation dings (no recogniser on the emulator), pinch in the crop screen (maths unit-tested), iOS.
 
 ## Invariants
 
