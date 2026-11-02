@@ -145,7 +145,7 @@ void main() {
       expect(captured.latest.meeting, 'Standup');
     });
 
-    test('a trashed person's meeting is not used', () async {
+    test("a trashed person's meeting is not used", () async {
       await repository.add(
         photoJpeg: jpeg(10, 10),
         capturedAt: DateTime.utc(2026, 10, 1),
@@ -154,7 +154,8 @@ void main() {
       );
       final gone = await repository.add(
         photoJpeg: jpeg(10, 10),
-        capturedAt: DateTime.utc(2026, 11, 1).subtract(const Duration(minutes: 5)),
+        capturedAt:
+            DateTime.utc(2026, 11, 1).subtract(const Duration(minutes: 5)),
         location: cafe,
         place: 'Cafe',
         meeting: 'Secret',
