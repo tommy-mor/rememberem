@@ -264,6 +264,21 @@ void main() {
     });
   });
 
+  test('a failed debounced save raises no unhandled error', () {
+    fakeAsync((async) {
+      final repository = FakeMemoryRepository()..failNextSave = true;
+      final editor = MemoryEditor(repository, memory);
+
+      editor.update('name', 'Alex');
+      async.elapse(const Duration(seconds: 1)); // would throw if unhandled
+
+      expect(repository.saves, isEmpty);
+      editor.flush();
+      async.flushMicrotasks();
+      expect(repository.saves.single.field(MemoryField.name), 'Alex');
+    });
+  });
+
   test('one failed save does not block later saves', () {
     fakeAsync((async) {
       final repository = FakeMemoryRepository()..failNextSave = true;

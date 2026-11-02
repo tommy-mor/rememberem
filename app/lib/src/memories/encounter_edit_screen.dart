@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -40,7 +42,7 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
 
   @override
   void dispose() {
-    _editor.flush();
+    unawaited(_editor.flush().catchError((_) {}));
     super.dispose();
   }
 

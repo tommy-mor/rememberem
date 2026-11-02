@@ -158,7 +158,7 @@ class MemoryEditor {
   void _scheduleSave() {
     _dirty = true;
     _timer?.cancel();
-    _timer = Timer(saveDelay, flush);
+    _timer = Timer(saveDelay, () => unawaited(flush().catchError((_) {})));
   }
 
   /// Saves any unsaved change now. Saves run one at a time, in order.

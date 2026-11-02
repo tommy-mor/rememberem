@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -40,6 +42,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   /// so the Place and Meeting fields reload their text.
   int _fieldsGen = 0;
 
+  /// Set while Back is saving and leaving.
+  bool _leaving = false;
+
   /// Set when leaving via a merge, whose own snackbar must survive.
   bool _keepSnackBars = false;
 
@@ -47,7 +52,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   void initState() {
     super.initState();
     // Saves straight away if the app is sent to the background.
-    _lifecycle = AppLifecycleListener(onInactive: _editor.flush);
+    _lifecycle = AppLifecycleListener(
+      onInactive: () => unawaited(_editor.flush().catchError((_) {})),
+    );
   }
 
   @override
@@ -67,7 +74,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       });
     }
     _lifecycle.dispose();
-    _editor.flush();
+    // Best effort: a failing repository must not raise an unhandled error.
+    unawaited(_editor.flush().catchError((_) {}));
     super.dispose();
   }
 
@@ -77,10 +85,24 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     return PopScope<void>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        final navigator = Navigator.of(context);
+        // Once only: a second Back while saving must not pop another page.
+        if (didPop || _leaving) return;
+        _leaving = true;
         _messenger?.clearSnackBars();
-        await _editor.flush();
+        final navigator = Navigator.of(context);
+        final route = ModalRoute.of(context);
+        try {
+          await _editor.flush();
+        } catch (_) {
+          // Leave anyway; the edit stays unsaved for the dispose flush.
+        }
+        if (!mounted) return;
+        if (route?.isCurrent != true) {
+          // Something opened on top while saving; this Back is dropped
+          // (see docs/reviews/rulings/2026-11-01-back-navigation-1.md).
+          _leaving = false;
+          return;
+        }
         navigator.pop();
       },
       child: _buildScaffold(context),

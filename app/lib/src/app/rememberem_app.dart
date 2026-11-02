@@ -20,7 +20,9 @@ class RememberemApp extends StatefulWidget {
 class _RememberemAppState extends State<RememberemApp> {
   final _navigator = GlobalKey<NavigatorState>();
   final _routeObserver = RouteObserver<ModalRoute<void>>();
-  bool _capturing = false;
+
+  /// Names the camera page, so a second trigger can see it is already open.
+  static const _captureRoute = 'capture';
 
   @override
   void initState() {
@@ -28,20 +30,24 @@ class _RememberemAppState extends State<RememberemApp> {
     widget.shortcut?.install(_meetSomeone);
   }
 
-  Future<void> _meetSomeone() async {
+  /// Opens the camera over the list. Ignored if the camera is already the
+  /// page on top (once it hands over to the notes page, it works again).
+  void _meetSomeone() {
     final navigator = _navigator.currentState;
-    if (navigator == null || _capturing) return;
-    _capturing = true;
-    try {
-      navigator.popUntil((route) => route.isFirst);
-      await navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => CaptureScreen(services: widget.services),
-        ),
-      );
-    } finally {
-      _capturing = false;
-    }
+    if (navigator == null) return;
+    var cameraOnTop = false;
+    navigator.popUntil((route) {
+      cameraOnTop = route.settings.name == _captureRoute;
+      return true; // only looks at the top route
+    });
+    if (cameraOnTop) return;
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: _captureRoute),
+        builder: (_) => CaptureScreen(services: widget.services),
+      ),
+    );
   }
 
   @override
