@@ -1,3 +1,4 @@
+import 'local_day.dart';
 import 'meeting_finder.dart';
 import 'memory.dart';
 
@@ -78,9 +79,6 @@ class MemoryFilter {
 
   static bool _blank(String? value) => value == null || value.trim().isEmpty;
 
-  static bool _sameLocalDay(DateTime a, DateTime b) {
-    final x = a.toLocal();
-    final y = b.toLocal();
-    return x.year == y.year && x.month == y.month && x.day == y.day;
-  }
+  static bool _sameLocalDay(DateTime a, DateTime b) =>
+      LocalDay.of(a) == LocalDay.of(b);
 }

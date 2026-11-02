@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
 import 'matching_screen.dart';
 import 'memory_tile.dart';
@@ -67,6 +68,18 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   void _open(Memory memory) =>
       Navigator.of(context)
           .push(PersonCardRoute(services: widget.services, memory: memory));
+
+  void _openTimeline() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TimelineScreen(
+          services: widget.services,
+          routeObserver: widget.routeObserver,
+        ),
+      ),
+    );
+  }
 
   void _openMatching() {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -141,6 +154,11 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       appBar: AppBar(
         title: const Text('Rememberem'),
         actions: [
+          IconButton(
+            tooltip: 'Timeline',
+            icon: const Icon(Icons.timeline),
+            onPressed: _openTimeline,
+          ),
           IconButton(
             tooltip: 'Match people',
             icon: const Icon(Icons.search),

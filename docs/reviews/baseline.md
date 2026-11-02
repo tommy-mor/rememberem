@@ -31,6 +31,7 @@ These summarise the shipped stories. Where they conflict with older entries belo
 - **Story 5 (b0cd3d7): place auto-fill.** At capture, the place of the closest active encounter within 91.44 m is filled in. It is best effort: any lookup failure leaves it blank and never loses the photo. It is never refilled on load, save or merge. The capture screen now recovers from any error.
 - **Story 6 (822744d): meeting auto-fill.** At capture, the meeting held at that place closest in time (within 2 h) is filled in. `MeetingFinder.samePlace` (trimmed, case-sensitive) is the shared rule for place and meeting identity.
 - **Story 7: matching.** MatchingScreen filters active people by place, meeting, local day and details text. Each filter matches if any encounter matches, and filters combine with AND. It is read-only, has an error state with Retry, and is reached from the list app bar. `PersonCardRoute` opens a person's card from every list.
+- **Story 8: timeline.** TimelineScreen lists local days newest first, with active people grouped by place + meeting. A detail maps to the nearest encounter that day (ties go to the newer one), else to the latest encounter. People with no details appear once as "recorded" on their first day, which is computed and never persisted. `LocalDay` is the shared local calendar day, used by MemoryFilter and TimelineBuilder. It is read-only, with an error state and Retry.
 
 ## Invariants
 
