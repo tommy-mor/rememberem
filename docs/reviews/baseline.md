@@ -1,6 +1,6 @@
 # Rememberem baseline record
 
-Checked at commit 89d8d2c on 2026-11-01
+Checked at commit 89d8d2c on 2026-11-01. Updated through story 7 (see "Changes since the first check"), applying each plan's "Baseline record changes".
 
 All entries were confirmed by Vera by reading the code. Nothing was run: no analyze, tests, build or device check.
 
@@ -16,9 +16,21 @@ Journey:
 
 Platform: the Android manifest requests camera, mic, internet and fine location, with no allowBackup setting. iOS minimum is 15.5. Release builds are signed with the debug key.
 
-Absent from the code: delete, search, share, export, reminders, state restoration, logging and analytics.
+Absent from the code: share, export, reminders, state restoration, logging and analytics. (Delete and search arrived in stories 2, 3 and 7.)
 
 Tests: core covers the framer, capture and repository happy paths. The app has widget tests with fakes that never fail. Real-face cropping exists only in app/integration_test and needs a device.
+
+## Changes since the first check
+
+These summarise the shipped stories. Where they conflict with older entries below, these win.
+
+- **Story 1 (7f4f59e): details.** A record holds `detailItems` (`{id, text, at}`, UTC). A legacy `fields['details']` string loads as one detail, and opening a record writes nothing. The notes screen is a non-lazy scroll view with per-detail dictation boxes. A failed save no longer blocks later saves (risk 3, stall part fixed).
+- **Story 2 (79485d1): person card.** Each detail shows its local time (long-press to re-date it) and can be deleted with Undo. Delete and re-date save at once. Deleted ids are tombstoned so late dictation cannot revive them. A failed save is retried by the next flush.
+- **Story 3 (a74fd7f): trash.** `trashedAt`. `all()` returns only active people. Trash, restore and purge exist (risk 8 resolved). Purge deletes `<id>.*` with the record last, refuses anyone not trashed, and can be repeated. Every repository mutation is serialized (`_serial`), and `save()` keeps the trash state on disk and refuses purged ids.
+- **Story 4 (34a2152): encounters and merge.** A person has 1..n encounters (`{photo, capturedAt, location, place, meeting}`), newest first. The newest photo represents the person. Legacy records load as one encounter. Merge copies photos as `<survivor>.<base>.jpg`, writes the survivor, then deletes the other, and can be retried. The card has a Pictures section where each picture can be edited or deleted with Undo; the last picture cannot be deleted. Undo snackbars use `persist: false` with a 6 s duration.
+- **Story 5 (b0cd3d7): place auto-fill.** At capture, the place of the closest active encounter within 91.44 m is filled in. It is best effort: any lookup failure leaves it blank and never loses the photo. It is never refilled on load, save or merge. The capture screen now recovers from any error.
+- **Story 6 (822744d): meeting auto-fill.** At capture, the meeting held at that place closest in time (within 2 h) is filled in. `MeetingFinder.samePlace` (trimmed, case-sensitive) is the shared rule for place and meeting identity.
+- **Story 7: matching.** MatchingScreen filters active people by place, meeting, local day and details text. Each filter matches if any encounter matches, and filters combine with AND. It is read-only, has an error state with Retry, and is reached from the list app bar. `PersonCardRoute` opens a person's card from every list.
 
 ## Invariants
 

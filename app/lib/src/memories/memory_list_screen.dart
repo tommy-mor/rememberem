@@ -3,8 +3,9 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../trash/trash_screen.dart';
-import 'memory_edit_screen.dart';
+import 'matching_screen.dart';
 import 'memory_tile.dart';
+import 'person_card_route.dart';
 
 /// Home screen: everyone you have met, newest first.
 class MemoryListScreen extends StatefulWidget {
@@ -63,13 +64,17 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     if (mounted && gen == _reloadGen) setState(() => _memories = memories);
   }
 
-  void _open(Memory memory) {
+  void _open(Memory memory) =>
+      Navigator.of(context)
+          .push(PersonCardRoute(services: widget.services, memory: memory));
+
+  void _openMatching() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => MemoryEditScreen(
-          memory: memory,
-          repository: _repository,
-          dictation: widget.services.dictation,
+        builder: (_) => MatchingScreen(
+          services: widget.services,
+          routeObserver: widget.routeObserver,
         ),
       ),
     );
@@ -136,6 +141,11 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       appBar: AppBar(
         title: const Text('Rememberem'),
         actions: [
+          IconButton(
+            tooltip: 'Match people',
+            icon: const Icon(Icons.search),
+            onPressed: _openMatching,
+          ),
           IconButton(
             tooltip: 'Trash',
             icon: const Icon(Icons.delete),
