@@ -12,6 +12,7 @@ import '../trash/trash_screen.dart';
 import 'matching_screen.dart';
 import 'memory_tile.dart';
 import 'person_card_route.dart';
+import 'remembered_label.dart';
 
 /// Home screen: everyone you have met, newest first.
 class MemoryListScreen extends StatefulWidget {
@@ -221,6 +222,9 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // From the list as shown, so a trash or undo updates it at once.
+            RememberedLabel(RememberedCount.of(memories)),
+            const SizedBox(height: 4),
             if (!canPlayFaces)
               Text(
                 'Name at least 4 different people to practice faces.',

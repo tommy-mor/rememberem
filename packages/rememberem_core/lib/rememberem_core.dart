@@ -24,6 +24,7 @@ export 'src/portrait_capture.dart';
 export 'src/practice_weight.dart';
 export 'src/portrait_cropper.dart';
 export 'src/portrait_framer.dart';
+export 'src/remembered_count.dart';
 export 'src/timeline_builder.dart';
 export 'src/timeline_day.dart';
 export 'src/timeline_group.dart';
