@@ -50,8 +50,27 @@ class JsonFileMemoryRepository implements MemoryRepository {
   Future<void> save(Memory memory) => _serial(
         // The trash state on disk wins, so a stale copy cannot untrash.
         () => _update(
-            memory.id, (onDisk) => memory.withTrashedAt(onDisk.trashedAt)),
+          memory.id,
+          (onDisk) => memory
+              .withTrashedAt(onDisk.trashedAt)
+              .withScore(onDisk.points, onDisk.lastCorrectDate),
+        ),
       );
+
+  @override
+  Future<void> recordAnswer(
+    String id, {
+    required bool correctFirstTry,
+    required DateTime at,
+  }) =>
+      _serial(() => _update(id, (onDisk) {
+            if (onDisk.trashedAt != null) {
+              throw StateError('Memory $id is in the trash');
+            }
+            return correctFirstTry
+                ? onDisk.withScore(onDisk.points + 1, at)
+                : onDisk.withScore(0, onDisk.lastCorrectDate);
+          }));
 
   @override
   Future<void> trash(String id, DateTime at) =>

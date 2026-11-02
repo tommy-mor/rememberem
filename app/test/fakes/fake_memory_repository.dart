@@ -48,7 +48,13 @@ class FakeMemoryRepository implements MemoryRepository {
       throw StateError('Memory ${memory.id} was purged');
     }
     // Tests may build a memory without add(); treat it as on disk.
-    final saved = memory.withTrashedAt(stored[memory.id]?.trashedAt);
+    final onDisk = stored[memory.id];
+    final saved = memory
+        .withTrashedAt(onDisk?.trashedAt)
+        .withScore(
+          onDisk?.points ?? memory.points,
+          onDisk == null ? memory.lastCorrectDate : onDisk.lastCorrectDate,
+        );
     stored[memory.id] = saved;
     saves.add(saved);
   }
@@ -63,6 +69,25 @@ class FakeMemoryRepository implements MemoryRepository {
   Future<List<Memory>> trashed() async =>
       stored.values.where((m) => m.trashedAt != null).toList()
         ..sort((a, b) => b.trashedAt!.compareTo(a.trashedAt!));
+
+  /// Every recordAnswer call, in order.
+  final List<(String, bool)> answers = [];
+
+  @override
+  Future<void> recordAnswer(
+    String id, {
+    required bool correctFirstTry,
+    required DateTime at,
+  }) async {
+    final memory = stored[id];
+    if (memory == null || memory.trashedAt != null) {
+      throw StateError('Memory $id cannot be scored');
+    }
+    answers.add((id, correctFirstTry));
+    stored[id] = correctFirstTry
+        ? memory.withScore(memory.points + 1, at)
+        : memory.withScore(0, memory.lastCorrectDate);
+  }
 
   @override
   Future<void> trash(String id, DateTime at) async =>

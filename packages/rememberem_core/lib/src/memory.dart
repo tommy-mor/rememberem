@@ -13,7 +13,10 @@ class Memory {
     Map<String, String> fields = const {},
     List<Detail> details = const [],
     this.trashedAt,
+    this.points = 0,
+    DateTime? lastCorrectDate,
   })  : assert(encounters.isNotEmpty),
+        lastCorrectDate = lastCorrectDate?.toUtc(),
         encounters = List.unmodifiable(
           List<Encounter>.of(encounters)..sort(Encounter.newestFirst),
         ),
@@ -96,6 +99,10 @@ class Memory {
       trashedAt: json['trashedAt'] == null
           ? null
           : DateTime.parse(json['trashedAt'] as String),
+      points: json['points'] as int? ?? 0,
+      lastCorrectDate: json['lastCorrectDate'] == null
+          ? null
+          : DateTime.parse(json['lastCorrectDate'] as String),
     );
   }
 
@@ -117,6 +124,12 @@ class Memory {
 
   /// When this person was moved to the trash; null while they are active.
   final DateTime? trashedAt;
+
+  /// Face practice: first-try-correct answers in a row (a miss resets it).
+  final int points;
+
+  /// When Fred last named this face first try (UTC), or null.
+  final DateTime? lastCorrectDate;
 
   /// The newest encounter: its photo represents the person everywhere.
   Encounter get latest => encounters.first;
@@ -154,11 +167,25 @@ class Memory {
         fields: fields,
         details: details,
         trashedAt: at,
+        points: points,
+        lastCorrectDate: lastCorrectDate,
+      );
+
+  /// This person with face-practice score [points] and [lastCorrectDate].
+  Memory withScore(int points, DateTime? lastCorrectDate) => Memory(
+        id: id,
+        encounters: encounters,
+        fields: fields,
+        details: details,
+        trashedAt: trashedAt,
+        points: points,
+        lastCorrectDate: lastCorrectDate,
       );
 
   /// This person with [other] folded in: [other]'s name if it has one, and
   /// every encounter and detail of both. On a clash this person's copy
-  /// wins, so merging the same pair twice changes nothing.
+  /// wins, so merging the same pair twice changes nothing. The practice
+  /// score stays this person's own.
   Memory merged(Memory other) {
     final otherName = other.fields[MemoryField.name.key] ?? '';
     final photos = {for (final e in encounters) e.photoFileName};
@@ -180,6 +207,8 @@ class Memory {
           if (!detailIds.contains(d.id)) d,
       ]..sort((a, b) => a.at.compareTo(b.at)),
       trashedAt: trashedAt,
+      points: points,
+      lastCorrectDate: lastCorrectDate,
     );
   }
 
@@ -194,6 +223,8 @@ class Memory {
         fields: fields ?? this.fields,
         details: details ?? this.details,
         trashedAt: trashedAt,
+        points: points,
+        lastCorrectDate: lastCorrectDate,
       );
 
   Map<String, dynamic> toJson() => {
@@ -203,5 +234,8 @@ class Memory {
         _detailsKey: details,
         if (trashedAt != null)
           'trashedAt': trashedAt!.toUtc().toIso8601String(),
+        if (points != 0) 'points': points,
+        if (lastCorrectDate != null)
+          'lastCorrectDate': lastCorrectDate!.toIso8601String(),
       };
 }

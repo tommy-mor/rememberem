@@ -1,8 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../places/places_screen.dart';
+import '../practice/face_game_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
 import 'matching_screen.dart';
@@ -33,6 +36,9 @@ class MemoryListScreen extends StatefulWidget {
 class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   MemoryRepository get _repository => widget.services.repository;
   List<Memory>? _memories;
+
+  /// Only used to decide whether there are enough people to practice.
+  final _facePlanner = FaceQuizPlanner(Random(), DateTime.now);
 
   /// Only the newest reload may update the list, so an old, slow one can
   /// never overwrite a later trash or undo.
@@ -194,6 +200,51 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
         onPressed: widget.onMeetSomeone,
         icon: const Icon(Icons.camera_alt),
         label: const Text('Meet someone'),
+      ),
+      bottomNavigationBar: _practiceBar(),
+    );
+  }
+
+  /// Practice controls along the bottom, below the "Meet someone" button.
+  Widget? _practiceBar() {
+    final memories = _memories;
+    if (memories == null || memories.isEmpty) return null;
+    final canPlayFaces = _facePlanner.canPlay(memories);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!canPlayFaces)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'Name at least 4 different people to practice.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            OutlinedButton.icon(
+              onPressed: canPlayFaces ? _practiceFaces : null,
+              icon: const Icon(Icons.face),
+              label: const Text('Practice faces'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _practiceFaces() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FaceGameScreen(
+          repository: _repository,
+          planner: FaceQuizPlanner(Random(), DateTime.now),
+        ),
       ),
     );
   }

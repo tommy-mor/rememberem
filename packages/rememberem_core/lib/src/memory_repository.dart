@@ -17,8 +17,18 @@ abstract interface class MemoryRepository {
   });
 
   /// Saves changes to an existing memory. Throws [StateError] if it has
-  /// been purged. Never changes whether it is in the trash.
+  /// been purged. Never changes whether it is in the trash, nor its
+  /// practice score (see [recordAnswer]).
   Future<void> save(Memory memory);
+
+  /// Records a face-practice answer for active memory [id]: first try
+  /// right adds a point and stamps [at]; otherwise points go to 0. Throws
+  /// [StateError] if [id] is trashed or gone.
+  Future<void> recordAnswer(
+    String id, {
+    required bool correctFirstTry,
+    required DateTime at,
+  });
 
   /// Active (not trashed) memories, newest first.
   Future<List<Memory>> all();
