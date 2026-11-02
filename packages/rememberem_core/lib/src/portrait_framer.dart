@@ -30,7 +30,8 @@ class PortraitFramer {
     final centreX = face.left + face.width / 2;
     final centreY = face.top + face.height / 2;
     final left = (centreX - width / 2).clamp(0.0, imageWidth - width);
-    final top = (centreY - faceCentreRatio * height).clamp(0.0, imageHeight - height);
+    final top =
+        (centreY - faceCentreRatio * height).clamp(0.0, imageHeight - height);
 
     return PixelRect(
       left.round(),

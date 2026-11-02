@@ -61,8 +61,7 @@ void main() {
     expect(redated.at.isAtSameMomentAs(DateTime(2020, 5, 6, 7, 8)), isTrue);
   });
 
-  test('details round-trip through the repository in order, in UTC',
-      () async {
+  test('details round-trip through the repository in order, in UTC', () async {
     final temp = await Directory.systemTemp.createTemp('rememberem_details_');
     addTearDown(() => temp.delete(recursive: true));
     final repository = JsonFileMemoryRepository(temp);
@@ -77,8 +76,9 @@ void main() {
 
     final loaded = (await repository.all()).single;
     expect(loaded.details, details);
-    final raw = jsonDecode(
-        await File('${temp.path}/${memory.id}.json').readAsString()) as Map;
+    final raw =
+        jsonDecode(await File('${temp.path}/${memory.id}.json').readAsString())
+            as Map;
     expect(
       (raw['detailItems'] as List).map((d) => d['at'] as String),
       everyElement(endsWith('Z')),

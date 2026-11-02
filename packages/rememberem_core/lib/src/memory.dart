@@ -11,6 +11,7 @@ class Memory {
     this.location,
     Map<String, String> fields = const {},
     List<Detail> details = const [],
+    this.trashedAt,
   })  : fields = Map.unmodifiable(fields),
         details = List.unmodifiable(details);
 
@@ -41,6 +42,9 @@ class Memory {
           : GeoPoint.fromJson(json['location'] as Map<String, dynamic>),
       fields: fields,
       details: details,
+      trashedAt: json['trashedAt'] == null
+          ? null
+          : DateTime.parse(json['trashedAt'] as String),
     );
   }
 
@@ -62,12 +66,25 @@ class Memory {
   /// Timestamped facts, in the order they were added.
   final List<Detail> details;
 
+  /// When this person was moved to the trash; null while they are active.
+  final DateTime? trashedAt;
+
   String field(MemoryField field) => fields[field.key] ?? '';
 
   Memory withField(String key, String value) =>
       _copy(fields: {...fields, key: value});
 
   Memory withDetails(List<Detail> details) => _copy(details: details);
+
+  Memory withTrashedAt(DateTime? at) => Memory(
+        id: id,
+        photoFileName: photoFileName,
+        capturedAt: capturedAt,
+        location: location,
+        fields: fields,
+        details: details,
+        trashedAt: at,
+      );
 
   Memory _copy({Map<String, String>? fields, List<Detail>? details}) => Memory(
         id: id,
@@ -76,6 +93,7 @@ class Memory {
         location: location,
         fields: fields ?? this.fields,
         details: details ?? this.details,
+        trashedAt: trashedAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -85,5 +103,7 @@ class Memory {
         'location': location?.toJson(),
         'fields': fields,
         _detailsKey: details,
+        if (trashedAt != null)
+          'trashedAt': trashedAt!.toUtc().toIso8601String(),
       };
 }
