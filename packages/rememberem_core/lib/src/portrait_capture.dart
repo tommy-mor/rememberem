@@ -5,6 +5,7 @@ import 'geo_point.dart';
 import 'memory.dart';
 import 'meeting_finder.dart';
 import 'memory_repository.dart';
+import 'pixel_rect.dart';
 import 'place_finder.dart';
 import 'portrait_cropper.dart';
 import 'portrait_framer.dart';
@@ -48,7 +49,7 @@ class PortraitCapture {
     );
     await uprightFile.writeAsBytes(photo.jpeg, flush: true);
     try {
-      final faces = await faceLocator.findFaces(uprightFile);
+      final faces = await _findFaces(uprightFile);
       final List<int> portrait;
       if (faces.isEmpty) {
         portrait = photo.jpeg;
@@ -73,6 +74,16 @@ class PortraitCapture {
       );
     } finally {
       await uprightFile.delete();
+    }
+  }
+
+  /// Faces in [photo], or none if finding them fails: a broken face finder
+  /// must never cost the photo (it is then kept whole).
+  Future<List<PixelRect>> _findFaces(File photo) async {
+    try {
+      return await faceLocator.findFaces(photo);
+    } catch (_) {
+      return const [];
     }
   }
 

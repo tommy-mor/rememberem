@@ -1,0 +1,117 @@
+import 'package:flutter/material.dart';
+import 'package:rememberem_core/rememberem_core.dart';
+
+import 'reminder_coordinator.dart';
+
+/// Turn the daily practice reminder on or off and choose its time.
+class RemindersScreen extends StatefulWidget {
+  const RemindersScreen({super.key, required this.coordinator});
+
+  final ReminderCoordinator coordinator;
+
+  @override
+  State<RemindersScreen> createState() => _RemindersScreenState();
+}
+
+class _RemindersScreenState extends State<RemindersScreen> {
+  ReminderSettings? _settings;
+  bool _denied = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    ReminderSettings settings;
+    try {
+      settings = await widget.coordinator.settings();
+    } catch (_) {
+      // Unreadable just now: show the last known state, or off.
+      settings = _settings ?? const ReminderSettings.off();
+    }
+    if (mounted) setState(() => _settings = settings);
+  }
+
+  Future<void> _setEnabled(bool enabled) async {
+    setState(() => _busy = true);
+    var denied = false;
+    try {
+      denied =
+          await widget.coordinator.setEnabled(enabled) == EnableResult.denied;
+    } catch (_) {
+      // Could not save; the switch shows what is actually stored.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _denied = denied;
+        });
+      }
+    }
+    await _load();
+  }
+
+  Future<void> _pickTime() async {
+    final settings = _settings!;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: settings.hour, minute: settings.minute),
+    );
+    if (time == null || !mounted) return;
+    await widget.coordinator.setTime(time.hour, time.minute);
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = _settings;
+    final small = Theme.of(context).textTheme.bodySmall;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reminders')),
+      body: settings == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              children: [
+                SwitchListTile(
+                  title: const Text('Daily practice reminder'),
+                  subtitle: const Text(
+                    'One gentle nudge a day. It never names anyone.',
+                  ),
+                  value: settings.enabled,
+                  onChanged: _busy ? null : _setEnabled,
+                ),
+                if (settings.enabled)
+                  ListTile(
+                    leading: const Icon(Icons.schedule),
+                    title: Text(
+                      'Around ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay(hour: settings.hour, minute: settings.minute))}',
+                    ),
+                    subtitle: const Text('Tap to change'),
+                    onTap: _pickTime,
+                  ),
+                if (_denied)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Notifications are turned off for Rememberem. To get '
+                      'reminders, allow notifications for it in Settings.',
+                      style: small,
+                    ),
+                  ),
+                if (settings.enabled && widget.coordinator.waitingForPeople)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Reminders start once there are enough people to '
+                      'practice with.',
+                      style: small,
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}

@@ -153,6 +153,12 @@ Check these before any public release. `sally` and `lena` own them.
 - **iOS:** builds need a Mac with Xcode. The minimum is iOS 15.5 because of ML
   Kit (see `app/ios/Podfile`). Permission prompt text is in
   `app/ios/Runner/Info.plist`.
+- **Release builds shrink code:** they can break plugins that use reflection,
+  and debug builds don't show it. ML Kit face detection crashed, and scheduled
+  notifications silently never scheduled, until the keep rules in
+  `app/android/app/proguard-rules.pro` were added. The notification icon is
+  kept by `res/raw/keep.xml`. Before any deployment, install a **release** APK
+  and walk capture and a reminder on a device.
 - **Screenshots from a device:** run `adb exec-out screencap -p > file.png` from
   Bash. PowerShell's `>` corrupts binary output.
 - **Launching the shortcut by hand:** the extra's key contains spaces, so quote

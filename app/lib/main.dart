@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,9 @@ import 'src/app/meet_shortcut.dart';
 import 'src/app/rememberem_app.dart';
 import 'src/capture/ml_kit_face_locator.dart';
 import 'src/location/device_location.dart';
+import 'src/reminders/file_reminder_settings_store.dart';
+import 'src/reminders/local_notifications_scheduler.dart';
+import 'src/reminders/reminder_coordinator.dart';
 import 'src/speech/device_dictation.dart';
 
 Future<void> main() async {
@@ -19,6 +23,13 @@ Future<void> main() async {
   final repository = JsonFileMemoryRepository(
     Directory('${documents.path}${Platform.pathSeparator}memories'),
   );
+  final reminders = ReminderCoordinator(
+    scheduler: LocalNotificationsScheduler(),
+    store: FileReminderSettingsStore(
+      File('${documents.path}${Platform.pathSeparator}reminders.json'),
+    ),
+    repository: repository,
+  );
   final services = AppServices(
     repository: repository,
     capture: PortraitCapture(
@@ -28,6 +39,15 @@ Future<void> main() async {
     ),
     dictation: DeviceDictation(),
     location: DeviceLocation(),
+    reminders: reminders,
   );
   runApp(RememberemApp(services: services, shortcut: MeetShortcut()));
+  // Re-assert the reminder on every open (time zone, reboot, new people).
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => unawaited(
+      reminders.sync().catchError(
+        (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+      ),
+    ),
+  );
 }

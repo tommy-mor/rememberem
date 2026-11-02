@@ -17,6 +17,12 @@ class _FakeFaceLocator implements FaceLocator {
   }
 }
 
+class _BrokenFaceLocator implements FaceLocator {
+  @override
+  Future<List<PixelRect>> findFaces(File photo) async =>
+      throw StateError('face finder crashed');
+}
+
 class _UnreadableRepository extends JsonFileMemoryRepository {
   _UnreadableRepository(super.folder);
 
@@ -66,6 +72,14 @@ void main() {
     final photo = await storedPhoto(memory);
     expect([photo.width, photo.height], [expected.width, expected.height]);
     expect(memory.location, const GeoPoint(1, 2));
+  });
+
+  test('a crashing face finder still saves the whole photo', () async {
+    final memory = await captureWith(_BrokenFaceLocator())
+        .capture(jpeg(600, 800), capturedAt: DateTime.utc(2026, 11, 1));
+
+    final photo = await storedPhoto(memory);
+    expect([photo.width, photo.height], [600, 800]);
   });
 
   test('keeps the whole photo when no face is found', () async {

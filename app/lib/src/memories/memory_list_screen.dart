@@ -3,8 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/app_routes.dart';
 import '../app/app_services.dart';
 import '../places/places_screen.dart';
+import '../reminders/reminders_screen.dart';
 import '../practice/detail_game_screen.dart';
 import '../practice/face_game_screen.dart';
 import '../timeline/timeline_screen.dart';
@@ -191,6 +193,16 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
             icon: const Icon(Icons.place),
             onPressed: _openPlaces,
           ),
+          if (widget.services.reminders case final reminders?)
+            IconButton(
+              tooltip: 'Reminders',
+              icon: const Icon(Icons.notifications_none),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RemindersScreen(coordinator: reminders),
+                ),
+              ),
+            ),
           IconButton(
             tooltip: 'Trash',
             icon: const Icon(Icons.delete),
@@ -279,7 +291,12 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
 
   void _openGame(Widget game) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => game));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.practice),
+        builder: (_) => game,
+      ),
+    );
   }
 
   Widget _body() {
