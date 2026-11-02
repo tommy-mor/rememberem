@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
-import 'package:rememberem/src/memories/matching_screen.dart';
+import 'package:rememberem/src/memories/filter_list_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
@@ -62,7 +62,11 @@ void main() {
     return named;
   }
 
-  Future<void> showMatching(WidgetTester tester) async {
+  Future<void> showMatching(
+    WidgetTester tester, {
+    List<FilterCondition> filters = const [],
+    String? note,
+  }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -70,13 +74,108 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorObservers: [observer],
-        home: MatchingScreen(services: services(), routeObserver: observer),
+        home: FilterListScreen(
+          services: services(),
+          routeObserver: observer,
+          initialFilters: filters,
+          note: note,
+        ),
       ),
     );
     await tester.pumpAndSettle();
   }
 
+  Future<void> addFilter(WidgetTester tester, String kind) async {
+    await tester.tap(find.byTooltip('Add filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(kind).last);
+    await tester.pumpAndSettle();
+  }
+
   setUp(() => repository = FakeMemoryRepository());
+
+  testWidgets('it is the Filter List; it starts with no filters and offers '
+      'all five kinds', (tester) async {
+    await person('Alex', 'Cafe');
+    await showMatching(tester);
+
+    expect(find.text('Filter List'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    await tester.tap(find.byTooltip('Add filter'));
+    await tester.pumpAndSettle();
+    for (final kind in [
+      'Place',
+      'Meeting',
+      'Name contains',
+      'Details contain',
+      'Date range',
+    ]) {
+      expect(find.text(kind), findsOneWidget);
+    }
+  });
+
+  testWidgets('filters stack, two of one kind included; removing one '
+      'widens the list again', (tester) async {
+    await person('Alex', 'Cafe', details: ['Tall', 'Plays chess']);
+    await person('Sam', 'Cafe', details: ['Tall']);
+    await person('Kim', 'Park', details: ['Plays chess']);
+    await showMatching(tester);
+
+    await addFilter(tester, 'Details contain');
+    await tester.enterText(find.byType(TextField).last, 'tall');
+    await addFilter(tester, 'Details contain');
+    await tester.enterText(find.byType(TextField).last, 'chess');
+    await tester.pump();
+    expect(find.text('1 person'), findsOneWidget);
+    expect(find.text('Alex'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remove Details contain filter').first);
+    await tester.pumpAndSettle();
+    expect(find.text('2 people'), findsOneWidget);
+    // The remaining row kept its own text.
+    expect(find.widgetWithText(TextField, 'chess'), findsOneWidget);
+  });
+
+  testWidgets('name contains "unknown" finds the unnamed', (tester) async {
+    await person('Alex', 'Cafe');
+    await person('', 'Cafe');
+    await showMatching(tester);
+
+    await addFilter(tester, 'Name contains');
+    await tester.enterText(find.byType(TextField).last, 'unknown');
+    await tester.pump();
+
+    expect(find.text('1 person'), findsOneWidget);
+    expect(find.text('Unknown'), findsOneWidget);
+  });
+
+  testWidgets('a date range keeps those met on its days', (tester) async {
+    await person('Alex', 'Cafe'); // 1 Nov
+    await person('Sam', 'Cafe'); // 2 Nov
+    await person('Kim', 'Cafe'); // 3 Nov
+    await showMatching(
+      tester,
+      filters: [DateRangeFilter(DateTime(2026, 11, 2), DateTime(2026, 11, 3))],
+    );
+
+    expect(find.text('2 people'), findsOneWidget);
+    expect(find.text('Alex'), findsNothing);
+    expect(find.text('Nov 2, 2026 – Nov 3, 2026'), findsOneWidget);
+  });
+
+  testWidgets('it can open with a filter and a note', (tester) async {
+    await person('Alex', 'Cafe');
+    await person('', 'Cafe');
+    await showMatching(
+      tester,
+      filters: [const NameFilter('unknown')],
+      note: 'Add their names while you remember.',
+    );
+
+    expect(find.text('Add their names while you remember.'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'unknown'), findsOneWidget);
+    expect(find.text('1 person'), findsOneWidget);
+  });
 
   testWidgets('lists active people only, with a count', (tester) async {
     await person('Alex', 'Cafe');
@@ -96,7 +195,9 @@ void main() {
     await showMatching(tester);
     expect(find.text('2 people'), findsOneWidget);
 
-    await tester.tap(find.text('Any').first);
+    await addFilter(tester, 'Place');
+    expect(find.text('2 people'), findsOneWidget); // not chosen yet
+    await tester.tap(find.text('Choose'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Park').last);
     await tester.pumpAndSettle();
@@ -110,6 +211,7 @@ void main() {
     await person('Alex', 'Cafe', details: ['Plays CHESS']);
     await person('Sam', 'Cafe', details: ['Tall']);
     await showMatching(tester);
+    await addFilter(tester, 'Details contain');
 
     await tester.enterText(
       find.widgetWithText(TextField, 'Details contain'),
@@ -146,7 +248,8 @@ void main() {
     final alex = await person('Alex', 'Cafe');
     await person('Sam', 'Park');
     await showMatching(tester);
-    await tester.tap(find.text('Any').first);
+    await addFilter(tester, 'Place');
+    await tester.tap(find.text('Choose'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cafe').last);
     await tester.pumpAndSettle();
@@ -175,7 +278,7 @@ void main() {
     expect(find.text('Alex'), findsOneWidget);
   });
 
-  testWidgets('the list has a Match people action that opens it', (
+  testWidgets('the list has a Filter List button that opens it', (
     tester,
   ) async {
     final observer = RouteObserver<ModalRoute<void>>();
@@ -191,9 +294,9 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byTooltip('Match people'));
+    await tester.tap(find.byTooltip('Filter List'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(MatchingScreen), findsOneWidget);
+    expect(find.byType(FilterListScreen), findsOneWidget);
   });
 }

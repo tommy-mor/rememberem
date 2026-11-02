@@ -31,6 +31,33 @@ class _UnreadableRepository extends JsonFileMemoryRepository {
       throw const FormatException('corrupt record');
 }
 
+/// Fails on the third add, as a full disk would.
+class _FailingThirdAdd extends JsonFileMemoryRepository {
+  _FailingThirdAdd(super.folder);
+
+  int _adds = 0;
+
+  @override
+  Future<Memory> add({
+    required List<int> photoJpeg,
+    required DateTime capturedAt,
+    GeoPoint? location,
+    String place = '',
+    String meeting = '',
+    List<Detail> details = const [],
+  }) {
+    if (++_adds == 3) throw const FileSystemException('disk full');
+    return super.add(
+      photoJpeg: photoJpeg,
+      capturedAt: capturedAt,
+      location: location,
+      place: place,
+      meeting: meeting,
+      details: details,
+    );
+  }
+}
+
 void main() {
   late Directory temp;
   late JsonFileMemoryRepository repository;
@@ -223,6 +250,117 @@ void main() {
       expect(memory.encounters, hasLength(1));
       expect(memory.latest.place, '');
       expect(await repository.photoFile(memory).exists(), isTrue);
+    });
+  });
+
+  group('several faces', () {
+    const left = PixelRect(40, 300, 80, 100);
+    const right = PixelRect(400, 100, 120, 150);
+    const middle = PixelRect(200, 200, 60, 80);
+
+    test('prepare saves nothing, sorts faces left to right and cleans up',
+        () async {
+      final draft = await captureWith(_FakeFaceLocator([right, left, middle]))
+          .prepare(jpeg(600, 800), capturedAt: DateTime.utc(2026, 11, 1));
+
+      expect(draft.faces, [left, middle, right]);
+      expect(draft.largestFace, right);
+      expect(await repository.all(), isEmpty);
+      expect(Directory('${temp.path}/work').listSync(), isEmpty);
+    });
+
+    test('a broken face finder still cleans up and gives no faces', () async {
+      final draft = await captureWith(_BrokenFaceLocator())
+          .prepare(jpeg(60, 80), capturedAt: DateTime.utc(2026, 11, 1));
+
+      expect(draft.faces, isEmpty);
+      expect(Directory('${temp.path}/work').listSync(), isEmpty);
+    });
+
+    test('saveOne crops to the chosen face, not the largest', () async {
+      final capture = captureWith(_FakeFaceLocator([left, right]));
+      final draft = await capture.prepare(
+        jpeg(600, 800),
+        capturedAt: DateTime.utc(2026, 11, 1),
+      );
+
+      final memory = await capture.saveOne(draft, face: left);
+
+      final expected = const PortraitFramer().frame(left, 600, 800);
+      final photo = await storedPhoto(memory);
+      expect([photo.width, photo.height], [expected.width, expected.height]);
+    });
+
+    test(
+        'saveGroup makes one unnamed person per face, each with the place, '
+        'meeting and non-blank details', () async {
+      final capture = captureWith(_FakeFaceLocator([left, right]));
+      final draft = await capture.prepare(
+        jpeg(600, 800),
+        capturedAt: DateTime.utc(2026, 11, 1),
+        location: const GeoPoint(1, 2),
+      );
+      final at = DateTime.utc(2026, 11, 1, 9);
+
+      final saved = await capture.saveGroup(
+        draft,
+        [left, right],
+        place: ' Hall ',
+        meeting: 'Choir',
+        details: [
+          Detail(id: 'd0', text: 'Sings tenor', at: at, type: DetailKind.fact),
+          Detail(id: 'd1', text: '  ', at: at, type: DetailKind.fact),
+        ],
+      );
+
+      final everyone = await repository.all();
+      expect(everyone, hasLength(2));
+      expect(saved.map((m) => m.id).toSet(), everyone.map((m) => m.id).toSet());
+      // Each person's copy has its own id, so a merge keeps an edited copy.
+      expect(saved.map((m) => m.details.single.id).toSet(), hasLength(2));
+      for (final (i, face) in [left, right].indexed) {
+        final m = everyone.firstWhere((m) => m.id == saved[i].id);
+        expect(m.displayName, Memory.unknownName);
+        expect(m.latest.place, 'Hall');
+        expect(m.latest.meeting, 'Choir');
+        expect(m.location, const GeoPoint(1, 2));
+        expect(m.details.map((d) => d.text), ['Sings tenor']);
+        final expected = const PortraitFramer().frame(face, 600, 800);
+        final photo = await storedPhoto(m);
+        expect([photo.width, photo.height], [expected.width, expected.height]);
+      }
+    });
+
+    test('a failure partway keeps everyone saved before it', () async {
+      repository = _FailingThirdAdd(Directory('${temp.path}/memories'));
+      final capture = captureWith(_FakeFaceLocator([left, middle, right]));
+      final draft = await capture.prepare(
+        jpeg(600, 800),
+        capturedAt: DateTime.utc(2026, 11, 1),
+      );
+      final reported = <Memory>[];
+
+      await expectLater(
+        capture.saveGroup(
+          draft,
+          [left, middle, right],
+          place: 'Hall',
+          meeting: '',
+          details: [
+            Detail(id: 'd0', text: 'Tall', at: DateTime.utc(2026)),
+          ],
+          onSaved: reported.add,
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+
+      final everyone = await repository.all();
+      expect(everyone, hasLength(2));
+      expect(reported, hasLength(2));
+      for (final m in everyone) {
+        expect(m.latest.place, 'Hall');
+        expect(m.details.single.text, 'Tall');
+      }
     });
   });
 }

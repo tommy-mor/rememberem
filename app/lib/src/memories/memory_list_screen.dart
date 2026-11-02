@@ -12,7 +12,7 @@ import '../practice/practice_screens.dart';
 import '../settings/settings_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
-import 'matching_screen.dart';
+import 'filter_list_screen.dart';
 import 'memory_tile.dart';
 import 'person_card_route.dart';
 import 'remembered_label.dart';
@@ -122,11 +122,11 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     );
   }
 
-  void _openMatching() {
+  void _openFilterList() {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => MatchingScreen(
+        builder: (_) => FilterListScreen(
           services: widget.services,
           routeObserver: widget.routeObserver,
         ),
@@ -181,9 +181,9 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
             onPressed: _openTimeline,
           ),
           IconButton(
-            tooltip: 'Match people',
-            icon: const Icon(Icons.search),
-            onPressed: _openMatching,
+            tooltip: 'Filter List',
+            icon: const Icon(Icons.filter_list),
+            onPressed: _openFilterList,
           ),
           IconButton(
             tooltip: 'Places',

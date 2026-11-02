@@ -286,16 +286,16 @@ void main() {
     expect(inList('P29').hitTestable(), findsOneWidget);
   });
 
-  testWidgets('a selected place shows its people with photos; a tap opens '
-      'their card and Back keeps the place', (tester) async {
+  testWidgets('a selected place lists its people with photos, only in the '
+      'list; a tap opens their card and Back keeps the place', (tester) async {
     await person('Alex', 'Cafe', north(0));
     await person('Kim', 'Park', north(5));
     await showPlaces(tester);
 
     await tapMarker(tester, 'Cafe');
-    expect(find.widgetWithText(ActionChip, 'Alex'), findsNWidgets(2));
+    expect(find.widgetWithText(ActionChip, 'Alex'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ActionChip, 'Alex').last);
+    await tester.tap(find.widgetWithText(ActionChip, 'Alex'));
     await tester.pumpAndSettle();
     expect(find.byType(MemoryEditScreen), findsOneWidget);
 

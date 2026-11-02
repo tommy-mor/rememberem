@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'detail.dart';
 import 'encounter.dart';
 import 'geo_point.dart';
 import 'memory.dart';
@@ -29,6 +30,7 @@ class JsonFileMemoryRepository implements MemoryRepository {
     GeoPoint? location,
     String place = '',
     String meeting = '',
+    List<Detail> details = const [],
   }) =>
       _serial(() async {
         await folder.create(recursive: true);
@@ -40,6 +42,7 @@ class JsonFileMemoryRepository implements MemoryRepository {
           location: location,
           place: place,
           meeting: meeting,
+          details: details,
         );
         await _writeAtomically(photoFile(memory), photoJpeg);
         await _write(memory);

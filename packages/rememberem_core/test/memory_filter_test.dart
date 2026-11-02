@@ -4,13 +4,14 @@ import 'package:test/test.dart';
 Memory person(
   String id, {
   String name = '',
-  List<(String place, String meeting, DateTime at)> met = const [],
+  List<(String place, String meeting, DateTime at)>? met,
   List<String> details = const [],
 }) =>
     Memory(
       id: id,
       encounters: [
-        for (final (i, (place, meeting, at)) in met.indexed)
+        for (final (i, (place, meeting, at))
+            in (met ?? [('', '', DateTime(2026))]).indexed)
           Encounter(
             photoFileName: '$id-$i.jpg',
             capturedAt: at,
@@ -25,6 +26,9 @@ Memory person(
       ],
     );
 
+MemoryFilter filter(List<FilterCondition> conditions) =>
+    MemoryFilter(conditions);
+
 void main() {
   final day = DateTime(2026, 11, 1);
 
@@ -34,17 +38,25 @@ void main() {
       ('Park', '', DateTime(2026, 6, 1)),
     ]);
 
-    expect(const MemoryFilter(place: 'Cafe').matches(alex), isTrue);
-    expect(const MemoryFilter(place: 'Library').matches(alex), isFalse);
+    expect(filter([const PlaceFilter('Cafe')]).matches(alex), isTrue);
+    expect(filter([const PlaceFilter('Library')]).matches(alex), isFalse);
   });
 
   test('place names match once trimmed; blank filters match everyone', () {
     final alex = person('a', met: [('Cafe ', '', day)]);
 
-    expect(const MemoryFilter(place: 'Cafe').matches(alex), isTrue);
-    expect(
-        const MemoryFilter(place: '  ', detailsContains: ' ').isEmpty, isTrue);
-    expect(const MemoryFilter(place: '  ').matches(alex), isTrue);
+    expect(filter([const PlaceFilter('Cafe')]).matches(alex), isTrue);
+    final blank = filter([
+      const PlaceFilter(),
+      const PlaceFilter('  '),
+      const MeetingFilter(),
+      const NameFilter(' '),
+      const DetailsFilter(),
+      DateRangeFilter(day),
+    ]);
+    expect(blank.isEmpty, isTrue);
+    expect(blank.matches(alex), isTrue);
+    expect(const MemoryFilter().matches(alex), isTrue);
   });
 
   test('filters combine with AND; details are searched, the name is not', () {
@@ -58,8 +70,22 @@ void main() {
     final nameOnly =
         person('d', name: 'Chess', met: [('Cafe', '', day)], details: ['Tall']);
 
-    final matched = const MemoryFilter(place: 'Cafe', detailsContains: 'chess')
-        .apply([chessAtCafe, cafeOnly, chessElsewhere, nameOnly]);
+    final matched = filter([
+      const PlaceFilter('Cafe'),
+      const DetailsFilter('chess'),
+    ]).apply([chessAtCafe, cafeOnly, chessElsewhere, nameOnly]);
+
+    expect(matched.map((m) => m.id), ['a']);
+  });
+
+  test('two filters of one kind must both match', () {
+    final both = person('a', details: ['Tall', 'Plays chess']);
+    final one = person('b', details: ['Tall']);
+
+    final matched = filter([
+      const DetailsFilter('tall'),
+      const DetailsFilter('chess'),
+    ]).apply([both, one]);
 
     expect(matched.map((m) => m.id), ['a']);
   });
@@ -70,15 +96,44 @@ void main() {
       ('Cafe', 'Lunch', DateTime(2026, 2, 1)),
     ]);
 
-    expect(const MemoryFilter(meeting: 'Standup').matches(alex), isTrue);
+    expect(filter([const MeetingFilter('Standup')]).matches(alex), isTrue);
+    expect(filter([const MeetingFilter('Choir')]).matches(alex), isFalse);
   });
 
-  test('day is the local calendar day of any encounter', () {
-    final late =
-        person('a', met: [('Cafe', '', DateTime(2026, 11, 1, 23, 30))]);
+  test('name contains ignores case; "unknown" finds people with no name', () {
+    final named = person('a', name: 'Alex Smith');
+    final unnamed = person('b');
 
-    expect(MemoryFilter(day: DateTime(2026, 11, 1)).matches(late), isTrue);
-    expect(MemoryFilter(day: DateTime(2026, 11, 2)).matches(late), isFalse);
+    expect(
+      filter([const NameFilter('SMITH')]).apply([named, unnamed]).map(
+        (m) => m.id,
+      ),
+      ['a'],
+    );
+    expect(
+      filter([const NameFilter('unknown')]).apply([named, unnamed]).map(
+        (m) => m.id,
+      ),
+      ['b'],
+    );
+  });
+
+  test('a date range holds local days of any encounter, both ends in', () {
+    DateTime on(int d, [int h = 12]) => DateTime(2026, 11, d, h);
+    final first = person('a', met: [('Cafe', '', on(1, 0))]);
+    final last = person('b', met: [('Cafe', '', on(3, 23))]);
+    final before =
+        person('c', met: [('Cafe', '', DateTime(2026, 10, 31, 23, 59))]);
+    final after = person('d', met: [('Cafe', '', on(4, 0))]);
+    final again = person('e', met: [
+      ('Cafe', '', DateTime(2025, 1, 1)),
+      ('Cafe', '', on(2)),
+    ]);
+
+    final matched = filter([DateRangeFilter(on(1), on(3))])
+        .apply([first, last, before, after, again]);
+
+    expect(matched.map((m) => m.id), ['a', 'b', 'e']);
   });
 
   test('places() lists each name once, trimmed, sorted, without blanks', () {

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -13,6 +11,7 @@ import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import 'fakes/fake_memory_repository.dart';
+import 'fakes/recording_capture.dart';
 import 'fakes/test_services.dart';
 
 class _FakePicker implements PhotoPicker {
@@ -30,39 +29,6 @@ class _FakePicker implements PhotoPicker {
 
   @override
   Future<void> openSettings() async => settingsOpened++;
-}
-
-class _NoFaces implements FaceLocator {
-  @override
-  Future<List<PixelRect>> findFaces(File photo) async => [];
-}
-
-/// Records what the screen asks to save, without image work.
-class _RecordingCapture extends PortraitCapture {
-  _RecordingCapture(FakeMemoryRepository repository)
-    : super(
-        repository: repository,
-        faceLocator: _NoFaces(),
-        workFolder: Directory.systemTemp,
-      );
-
-  final calls = <({DateTime capturedAt, GeoPoint? location})>[];
-
-  @override
-  Future<Memory> capture(
-    List<int> rawJpeg, {
-    required DateTime capturedAt,
-    GeoPoint? location,
-    PlaceFinder? placeFinder,
-    MeetingFinder? meetingFinder,
-  }) async {
-    calls.add((capturedAt: capturedAt, location: location));
-    return repository.add(
-      photoJpeg: rawJpeg,
-      capturedAt: capturedAt,
-      location: location,
-    );
-  }
 }
 
 List<int> photoWithExif() {
@@ -86,11 +52,11 @@ List<int> photoWithExif() {
 
 void main() {
   late FakeMemoryRepository repository;
-  late _RecordingCapture capture;
+  late RecordingCapture capture;
 
   setUp(() {
     repository = FakeMemoryRepository();
-    capture = _RecordingCapture(repository);
+    capture = RecordingCapture(repository);
   });
 
   late _FakePicker picker;
@@ -111,6 +77,7 @@ void main() {
             // Where the phone is now must not be used for an old photo.
             location: FakeLocation(const GeoPoint(1, 1)),
           ),
+          routeObserver: RouteObserver<ModalRoute<void>>(),
         ),
       ),
     );

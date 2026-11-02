@@ -85,6 +85,14 @@ These summarise the shipped stories. Where they conflict with older entries belo
   - **About.** From the logo or Settings; links open in the browser through `LinkOpener` (`url_launcher` 6.3.3; `launchUrl` needs no `<queries>` entry).
   - **Verified on the emulator (debug).** List badges and spacing, the page's top group, the detail box opening and closing, About and its link opening Chrome, the timeline indent.
   - **Not verified.** The phone; the happening map on a device (widget-tested); iOS link opening.
+- **Story 20: Filter List and group photos** (plan `docs/plans/20-filters-and-group-photos.md`).
+  - **Places map.** No people card over the map; the selected place's row lists them.
+  - **Filter List.** Replaces "Match people". `MemoryFilter` ANDs any number of `FilterCondition`s (`PlaceFilter`, `MeetingFilter`, `NameFilter`, `DetailsFilter`, `DateRangeFilter`); blank ones match everyone. Name contains matches the shown name, so "unknown" finds the unnamed. Nothing is saved.
+  - **Capture.** Every capture runs `PortraitCapture.prepare` (upright, faces sorted left to right, place and meeting suggested, work file deleted in `finally`), then `saveOne` (zero or one face) or Choose faces. `capture()` remains as `prepare` + `saveOne(largest)`.
+  - **Group photos.** Choose faces (none preselected, "All", consent line) and Group details carry the `capture` route name, so the shortcut and reminders leave them alone. Back from Choose faces asks before discarding; Group details holds Back while saving. `MemoryRepository.add` takes `details`, so each person is one write; each gets their own detail ids. A failure on face k keeps 1..k-1 and says how many were saved. Then the Filter List opens over the list on "Name contains: unknown".
+  - **Accepted.** Android killing the app on Choose faces loses that unsaved photo. Face targets closer than 48 dp overlap (top wins; "All" is the fallback). A dictation result arriving after Add is lost, as elsewhere.
+  - **Verified on the emulator (debug).** A three-face photo through real ML Kit: boxes on each face, All, Group details, three unnamed people cropped to their faces with the shared place and detail, the Filter List on "unknown".
+  - **Not verified.** The phone; the camera shutter path with several faces (same code after the photo); iOS.
 
 ## Invariants
 

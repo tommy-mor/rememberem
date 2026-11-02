@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'detail.dart';
 import 'encounter.dart';
 import 'geo_point.dart';
 import 'memory.dart';
@@ -7,13 +8,14 @@ import 'memory.dart';
 /// Private storage for memories and their photos.
 abstract interface class MemoryRepository {
   /// Stores [photoJpeg] and creates a memory met once, at [place] and
-  /// [meeting].
+  /// [meeting], with [details] (written together, so all or nothing).
   Future<Memory> add({
     required List<int> photoJpeg,
     required DateTime capturedAt,
     GeoPoint? location,
     String place = '',
     String meeting = '',
+    List<Detail> details = const [],
   });
 
   /// Saves changes to an existing memory. Throws [StateError] if it has

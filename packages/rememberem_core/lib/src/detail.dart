@@ -102,6 +102,7 @@ class Detail {
   /// A copy with the given parts changed; the kind and score are kept.
   /// [targetId] uses a function so it can be cleared to null.
   Detail copyWith({
+    String? id,
     String? text,
     DateTime? at,
     String? place,
@@ -110,7 +111,7 @@ class Detail {
     String? Function()? targetId,
   }) =>
       Detail(
-        id: id,
+        id: id ?? this.id,
         text: text ?? this.text,
         at: at ?? this.at,
         type: _type,

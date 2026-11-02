@@ -4,16 +4,26 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/app_routes.dart';
 import '../app/app_services.dart';
 import '../memories/memory_edit_screen.dart';
+import 'face_picker_screen.dart';
 import 'photo_picker.dart';
 
 /// Full-screen camera. Taking a photo saves a cropped portrait and moves on
-/// to the notes for that person.
+/// to the notes for that person; a photo of several people first asks whom
+/// to remember.
 class CaptureScreen extends StatefulWidget {
-  const CaptureScreen({super.key, required this.services});
+  const CaptureScreen({
+    super.key,
+    required this.services,
+    required this.routeObserver,
+  });
 
   final AppServices services;
+
+  /// For the Filter List a group photo ends on.
+  final RouteObserver<ModalRoute<void>> routeObserver;
 
   @override
   State<CaptureScreen> createState() => _CaptureScreenState();
@@ -111,7 +121,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Saves the photo [source] gives (null: nothing chosen) and moves on to
-  /// the notes for that person.
+  /// the notes for that person, or to choosing faces if it has several.
   Future<void> _save(
     Future<({List<int> bytes, DateTime capturedAt, GeoPoint? location})?>
     Function()
@@ -125,13 +135,30 @@ class _CaptureScreenState extends State<CaptureScreen> {
         return;
       }
       final settings = widget.services.settings.value;
-      final memory = await widget.services.capture.capture(
+      final capture = widget.services.capture;
+      final draft = await capture.prepare(
         photo.bytes,
         capturedAt: photo.capturedAt,
         location: photo.location,
         placeFinder: settings.placeFinder,
         meetingFinder: settings.meetingFinder,
       );
+      if (draft.faces.length > 1) {
+        if (!mounted) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            // Still the camera's job: the shortcut and reminders leave it be.
+            settings: const RouteSettings(name: AppRoutes.capture),
+            builder: (_) => FacePickerScreen(
+              draft: draft,
+              services: widget.services,
+              routeObserver: widget.routeObserver,
+            ),
+          ),
+        );
+        return;
+      }
+      final memory = await capture.saveOne(draft, face: draft.largestFace);
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(

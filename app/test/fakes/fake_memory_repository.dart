@@ -17,6 +17,9 @@ class FakeMemoryRepository implements MemoryRepository {
   /// When true, the next save throws (and clears this flag).
   bool failNextSave = false;
 
+  /// The photo bytes given to [add], in order.
+  final photos = <List<int>>[];
+
   @override
   Future<Memory> add({
     required List<int> photoJpeg,
@@ -24,7 +27,9 @@ class FakeMemoryRepository implements MemoryRepository {
     GeoPoint? location,
     String place = '',
     String meeting = '',
+    List<Detail> details = const [],
   }) async {
+    photos.add(photoJpeg);
     final id = 'm${stored.length}';
     final memory = Memory.captured(
       id: id,
@@ -33,6 +38,7 @@ class FakeMemoryRepository implements MemoryRepository {
       location: location,
       place: place,
       meeting: meeting,
+      details: details,
     );
     stored[id] = memory;
     return memory;

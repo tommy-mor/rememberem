@@ -2,27 +2,34 @@
 /// depend on Flutter.
 library;
 
+export 'src/date_range_filter.dart';
 export 'src/detail.dart';
+export 'src/details_filter.dart';
 export 'src/detail_kind.dart';
 export 'src/detail_prompt.dart';
 export 'src/detail_type_catalog.dart';
 export 'src/detail_quiz_planner.dart';
 export 'src/app_palette.dart';
 export 'src/app_settings.dart';
+export 'src/capture_draft.dart';
 export 'src/encounter.dart';
 export 'src/face_locator.dart';
+export 'src/filter_condition.dart';
 export 'src/face_quiz_planner.dart';
 export 'src/geo_point.dart';
 export 'src/json_file_memory_repository.dart';
 export 'src/local_day.dart';
+export 'src/meeting_filter.dart';
 export 'src/meeting_finder.dart';
 export 'src/memory_filter.dart';
 export 'src/memory.dart';
 export 'src/memory_field.dart';
+export 'src/name_filter.dart';
 export 'src/memory_repository.dart';
 export 'src/pixel_rect.dart';
 export 'src/photo_metadata.dart';
 export 'src/place_book.dart';
+export 'src/place_filter.dart';
 export 'src/place_finder.dart';
 export 'src/place_group.dart';
 export 'src/place_renamer.dart';

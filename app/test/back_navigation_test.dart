@@ -8,7 +8,7 @@ import 'package:rememberem/src/app/rememberem_app.dart';
 import 'package:rememberem/src/capture/capture_screen.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/encounter_edit_screen.dart';
-import 'package:rememberem/src/memories/matching_screen.dart';
+import 'package:rememberem/src/memories/filter_list_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/memories/merge_picker_screen.dart';
 import 'package:rememberem/src/memories/person_card_route.dart';
@@ -137,11 +137,11 @@ void main() {
 
   testWidgets('matching, then a card: Back twice', (tester) async {
     await boot(tester);
-    await open(tester, find.byTooltip('Match people'));
+    await open(tester, find.byTooltip('Filter List'));
     await open(tester, find.text('Bo'));
 
     await back(tester);
-    expect(find.byType(MatchingScreen), findsOneWidget);
+    expect(find.byType(FilterListScreen), findsOneWidget);
     await back(tester);
     expectList(tester);
   });

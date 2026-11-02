@@ -68,7 +68,8 @@ class _RememberemAppState extends State<RememberemApp>
   /// page on top (once it hands over to the notes page, it works again).
   void _meetSomeone() => _openOnRoot(
     AppRoutes.capture,
-    (_) => CaptureScreen(services: widget.services),
+    (_) =>
+        CaptureScreen(services: widget.services, routeObserver: _routeObserver),
     blockedBy: {AppRoutes.capture},
   );
 

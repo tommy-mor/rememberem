@@ -95,9 +95,7 @@ void main() {
       expect(find.byTooltip('Open Fact'), findsOneWidget);
     });
 
-    testWidgets('the text selection toolbar does not close it', (
-      tester,
-    ) async {
+    testWidgets('the text selection toolbar does not close it', (tester) async {
       await withDetails([fact('a', 'Tall person')]);
       await showCard(tester);
       await tester.tap(find.byTooltip('Open Fact'));
