@@ -6,8 +6,8 @@ import 'package:rememberem/src/memories/memory_editor.dart';
 import 'package:rememberem/src/memories/merge_picker_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
-import 'fakes/fake_dictation.dart';
 import 'fakes/fake_memory_repository.dart';
+import 'fakes/test_services.dart';
 
 void main() {
   late FakeMemoryRepository repository;
@@ -35,8 +35,7 @@ void main() {
       MaterialPageRoute<void>(
         builder: (_) => MemoryEditScreen(
           memory: memory,
-          repository: repository,
-          dictation: FakeDictation(),
+          services: testServices(repository),
         ),
       ),
     );

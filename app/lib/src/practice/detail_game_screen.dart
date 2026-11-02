@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../memories/memory_tile.dart';
+import 'game_feedback.dart';
 
 enum _Phase { loading, reveal, choose, finished, stopped }
 
-/// Details practice: ten turns, each showing a detail Fred wrote for a
-/// moment, then four people's photos with names. A first-try right pick
+/// Details practice: up to [turns] turns (no detail twice), each showing
+/// a detail Fred wrote for a moment, then four people's photos with names. A first-try right pick
 /// earns that detail a point; any miss resets the detail's points.
 class DetailGameScreen extends StatefulWidget {
   const DetailGameScreen({
@@ -18,6 +19,8 @@ class DetailGameScreen extends StatefulWidget {
     this.clock = DateTime.now,
     this.reveal = const Duration(seconds: 3),
     this.turns = 10,
+    this.feedback,
+    this.pauseAfterRight = const Duration(seconds: 1),
   });
 
   final MemoryRepository repository;
@@ -25,6 +28,10 @@ class DetailGameScreen extends StatefulWidget {
   final DateTime Function() clock;
   final Duration reveal;
   final int turns;
+  final GameFeedback? feedback;
+
+  /// How long a right answer shows before the next question.
+  final Duration pauseAfterRight;
 
   @override
   State<DetailGameScreen> createState() => _DetailGameScreenState();
@@ -34,6 +41,11 @@ class _DetailGameScreenState extends State<DetailGameScreen>
     with WidgetsBindingObserver {
   _Phase _phase = _Phase.loading;
   int _turn = 0;
+
+  /// Fixed when the first question is picked: [DetailGameScreen.turns], or
+  /// fewer when there are fewer details.
+  int? _total;
+  final Set<String> _asked = {};
   int _rightFirstTry = 0;
   DetailPair? _pair;
   List<Memory> _choices = [];
@@ -44,6 +56,9 @@ class _DetailGameScreenState extends State<DetailGameScreen>
   /// Set from a right pick until the next turn shows, so a second tap
   /// cannot score again or skip a turn.
   bool _advancing = false;
+
+  /// The person just picked rightly, shown green during the pause.
+  String? _correctId;
   bool _hidden = false;
   bool _ended = false;
   String _stopReason = '';
@@ -85,9 +100,11 @@ class _DetailGameScreenState extends State<DetailGameScreen>
 
   bool get _live => mounted && !_ended;
 
+  int get _turns => _total ?? widget.turns;
+
   Future<void> _nextTurn() async {
-    if (_turn >= widget.turns) {
-      setState(() => _phase = _Phase.finished);
+    if (_turn >= _turns) {
+      _finish();
       return;
     }
     final List<Memory> people;
@@ -103,17 +120,24 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       _stop('Add a detail and have 4 people to practice.');
       return;
     }
-    final pair = planner.pickNext(
-      planner.eligible(people),
-      previousDetailId: _pair?.detail.id,
-    );
+    final eligible = planner.eligible(people);
+    final pair = planner.pickNext(eligible, asked: _asked);
+    if (pair == null) {
+      _finish(); // every detail has been asked
+      return;
+    }
+    _asked.add(pair.detail.id);
     setState(() {
+      _total ??= eligible.length < widget.turns
+          ? eligible.length
+          : widget.turns;
       _turn++;
       _pair = pair;
       _choices = planner.choicesFor(pair.person, people);
       _wrong.clear();
       _missed = false;
       _advancing = false;
+      _correctId = null;
       _phase = _Phase.reveal;
     });
     if (!_hidden) _startReveal();
@@ -126,6 +150,11 @@ class _DetailGameScreenState extends State<DetailGameScreen>
     });
   }
 
+  void _finish() => setState(() {
+    _total = _turn;
+    _phase = _Phase.finished;
+  });
+
   void _stop(String reason) => setState(() {
     _phase = _Phase.stopped;
     _stopReason = reason;
@@ -137,16 +166,23 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       return;
     }
     if (picked.id != pair.person.id) {
+      widget.feedback?.wrong();
       setState(() => _wrong.add(picked.id));
       if (_missed) return; // one reset per turn is enough
       _missed = true;
       await _record(pair, correctFirstTry: false);
       return;
     }
-    setState(() => _advancing = true);
+    widget.feedback?.right();
+    setState(() {
+      _advancing = true;
+      _correctId = picked.id;
+    });
+    final pause = Future<void>.delayed(widget.pauseAfterRight);
     if (!_missed && await _record(pair, correctFirstTry: true)) {
       _rightFirstTry++;
     }
+    await pause;
     if (_live) await _nextTurn();
   }
 
@@ -172,9 +208,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _turn == 0 ? 'Practice details' : 'Turn $_turn of ${widget.turns}',
-        ),
+        title: Text(_turn == 0 ? 'Practice details' : 'Turn $_turn of $_turns'),
         leading: IconButton(
           tooltip: 'Stop practice',
           icon: const Icon(Icons.close),
@@ -193,7 +227,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       case _Phase.finished:
         return _message(
           context,
-          'Done: $_rightFirstTry of ${widget.turns} right first try.',
+          'Done: $_rightFirstTry of $_turns right first try.',
         );
       case _Phase.stopped:
         return _message(context, _stopReason);
@@ -247,6 +281,12 @@ class _DetailGameScreenState extends State<DetailGameScreen>
         opacity: _wrong.contains(person.id) ? 0.35 : 1,
         child: Card(
           clipBehavior: Clip.antiAlias,
+          shape: person.id == _correctId
+              ? RoundedRectangleBorder(
+                  side: BorderSide(color: Colors.green.shade600, width: 4),
+                  borderRadius: BorderRadius.circular(12),
+                )
+              : null,
           child: InkWell(
             onTap: disabled ? null : () => _choose(person),
             child: Column(

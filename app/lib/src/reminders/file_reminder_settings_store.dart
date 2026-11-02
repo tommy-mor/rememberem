@@ -13,15 +13,18 @@ class FileReminderSettingsStore implements ReminderSettingsStore {
 
   @override
   Future<ReminderSettings> load() async {
-    // Missing or unreadable content means off; other I/O errors are not a
-    // reason to cancel a working reminder, so they surface instead.
-    if (!await file.exists()) return const ReminderSettings.off();
+    // Unreadable content means off; other I/O errors are not a reason to
+    // cancel a working reminder, so they surface instead.
+    if (!await file.exists()) return const ReminderSettings.defaults();
     try {
       return ReminderSettings.fromJson(jsonDecode(await file.readAsString()));
     } on FormatException {
       return const ReminderSettings.off();
     }
   }
+
+  @override
+  Future<bool> hasSaved() => file.exists();
 
   @override
   Future<void> save(ReminderSettings settings) async {

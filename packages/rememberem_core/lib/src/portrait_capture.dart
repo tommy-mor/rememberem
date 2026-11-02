@@ -33,11 +33,14 @@ class PortraitCapture {
   /// Crops [rawJpeg] to the largest face found. If there is no face the
   /// whole photo is kept, so the moment is never lost. The place is filled
   /// from the nearest known place, and the meeting from the one held there
-  /// closest in time; both best effort.
+  /// at that time of week; both best effort. [placeFinder] and
+  /// [meetingFinder] override the defaults for this capture (settings).
   Future<Memory> capture(
     List<int> rawJpeg, {
     required DateTime capturedAt,
     GeoPoint? location,
+    PlaceFinder? placeFinder,
+    MeetingFinder? meetingFinder,
   }) async {
     // Read known places now, so the lookup overlaps the slow photo work.
     final known = location == null ? null : _knownPeople();
@@ -61,10 +64,14 @@ class PortraitCapture {
       final people = await known;
       final place = location == null || people == null
           ? ''
-          : placeFinder.nearest(location, people)?.place ?? '';
+          : (placeFinder ?? this.placeFinder)
+                  .nearest(location, people)
+                  ?.place ??
+              '';
       final meeting = people == null || place.isEmpty
           ? ''
-          : meetingFinder.suggest(place, capturedAt, people);
+          : (meetingFinder ?? this.meetingFinder)
+              .suggest(place, capturedAt, people);
       return await repository.add(
         photoJpeg: portrait,
         capturedAt: capturedAt,

@@ -11,6 +11,7 @@ import 'package:rememberem/src/practice/face_game_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import 'fakes/fake_dictation.dart';
+import 'fakes/fake_game_feedback.dart';
 import 'fakes/fake_memory_repository.dart';
 
 class _NoFaces implements FaceLocator {
@@ -53,7 +54,13 @@ void main() {
     }
   }
 
-  Future<void> showGame(WidgetTester tester, {int turns = 10}) async {
+  late FakeGameFeedback feedback;
+
+  Future<void> showGame(
+    WidgetTester tester, {
+    int turns = 10,
+    Duration pause = Duration.zero,
+  }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -64,9 +71,19 @@ void main() {
           planner: FaceQuizPlanner(Random(1), () => now),
           clock: () => now,
           turns: turns,
+          feedback: feedback,
+          pauseAfterRight: pause,
         ),
       ),
     );
+    await tester.pump();
+  }
+
+  /// Taps [name] and lets the game move on (the pause is zero here).
+  Future<void> pick(WidgetTester tester, String name) async {
+    await tester.tap(find.text(name));
+    await tester.pump();
+    await tester.pump(Duration.zero);
     await tester.pump();
   }
 
@@ -82,7 +99,10 @@ void main() {
   Future<void> reveal(WidgetTester tester) =>
       tester.pump(const Duration(seconds: 3));
 
-  setUp(() => repository = FakeMemoryRepository());
+  setUp(() {
+    repository = FakeMemoryRepository();
+    feedback = FakeGameFeedback();
+  });
 
   testWidgets('the name stays hidden until three seconds have passed', (
     tester,
@@ -108,8 +128,7 @@ void main() {
     final person = showing(tester);
     await reveal(tester);
 
-    await tester.tap(find.text(nameOf(person)));
-    await tester.pump();
+    await pick(tester, nameOf(person));
 
     expect(repository.stored[person.id]!.points, 1);
     expect(repository.stored[person.id]!.lastCorrectDate, now);
@@ -133,8 +152,7 @@ void main() {
     expect(repository.stored[person.id]!.points, 0);
     await tester.tap(find.text(wrong[1]));
     await tester.pump();
-    await tester.tap(find.text(nameOf(person)));
-    await tester.pump();
+    await pick(tester, nameOf(person));
 
     expect(repository.answers, [(person.id, false)]);
     expect(repository.stored[person.id]!.points, 0);
@@ -152,35 +170,82 @@ void main() {
     final slow = repository as _SlowNextTurn;
 
     slow.hold = Completer<void>();
-    await tester.tap(find.text(nameOf(person)));
-    await tester.pump(); // the answer is saved; the next turn is loading
+    await pick(
+      tester,
+      nameOf(person),
+    ); // the answer is saved; the next turn is loading
     await tester.tap(find.text(nameOf(person)), warnIfMissed: false);
     await tester.pump();
     slow.hold!.complete();
     slow.hold = null;
     await tester.pump();
+    await tester.pump();
 
     expect(repository.answers, [(person.id, true)]);
     expect(repository.stored[person.id]!.points, 1);
-    expect(find.text('Turn 2 of 10'), findsOneWidget);
+    expect(find.text('Turn 2 of 4'), findsOneWidget);
   });
 
-  testWidgets('a game is exactly ten turns, then a gentle finish', (
+  testWidgets('no one is asked twice: five people make a five-turn game', (
     tester,
   ) async {
     await people(['Ann', 'Bo', 'Cy', 'Di', 'Ed']);
     await showGame(tester);
+    final asked = <String>[];
 
-    for (var turn = 1; turn <= 10; turn++) {
-      expect(find.text('Turn $turn of 10'), findsOneWidget);
+    for (var turn = 1; turn <= 5; turn++) {
+      expect(find.text('Turn $turn of 5'), findsOneWidget);
       final person = showing(tester);
+      asked.add(person.id);
       await reveal(tester);
-      await tester.tap(find.text(nameOf(person)));
-      await tester.pump();
+      await pick(tester, nameOf(person));
     }
 
-    expect(find.text('Done: 10 of 10 right first try.'), findsOneWidget);
-    expect(repository.answers, hasLength(10));
+    expect(asked.toSet(), hasLength(5));
+    expect(find.text('Done: 5 of 5 right first try.'), findsOneWidget);
+    expect(repository.answers, hasLength(5));
+  });
+
+  testWidgets('with more people than turns the game stops at the setting', (
+    tester,
+  ) async {
+    await people(['Ann', 'Bo', 'Cy', 'Di', 'Ed', 'Flo', 'Gus']);
+    await showGame(tester, turns: 5);
+
+    for (var turn = 1; turn <= 5; turn++) {
+      expect(find.text('Turn $turn of 5'), findsOneWidget);
+      await reveal(tester);
+      await pick(tester, nameOf(showing(tester)));
+    }
+
+    expect(find.text('Done: 5 of 5 right first try.'), findsOneWidget);
+  });
+
+  testWidgets('right: a chime, then a one-second pause; wrong: a nope', (
+    tester,
+  ) async {
+    await people(['Ann', 'Bo', 'Cy', 'Di']);
+    await showGame(tester, pause: const Duration(seconds: 1));
+    final person = showing(tester);
+    await reveal(tester);
+    final wrong = [
+      'Ann',
+      'Bo',
+      'Cy',
+      'Di',
+    ].firstWhere((n) => n != nameOf(person));
+
+    await tester.tap(find.text(wrong));
+    await tester.pump();
+    expect(feedback.given, ['wrong']);
+
+    await pick(tester, nameOf(person));
+    expect(feedback.given, ['wrong', 'right']);
+    await tester.pump(const Duration(milliseconds: 900));
+    expect(find.text('Turn 1 of 4'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    expect(find.text('Turn 2 of 4'), findsOneWidget);
   });
 
   testWidgets('failed saves never stop the game or count as points', (
@@ -193,8 +258,7 @@ void main() {
     for (var turn = 0; turn < 2; turn++) {
       final person = showing(tester);
       await reveal(tester);
-      await tester.tap(find.text(nameOf(person)));
-      await tester.pump();
+      await pick(tester, nameOf(person));
     }
 
     expect(find.text('Done: 0 of 2 right first try.'), findsOneWidget);

@@ -94,8 +94,9 @@ has already been tried and fallen short.
   model, `JsonFileMemoryRepository`, `PortraitFramer` and `PortraitCropper`, and
   the `PortraitCapture` pipeline. Platform features enter through interfaces
   (`FaceLocator`, `MemoryRepository`), so all of this is unit-testable.
-- `app/` is the Flutter app. Under `lib/src/`: `app/` holds the shell, services
-  and the "Meet someone" shortcut; `capture/` the camera and ML Kit face
+- `app/` is the Flutter app. Under `lib/src/`: `app/` holds the shell, services,
+  theme and the "Meet someone" shortcut; `maps/` the street map and location
+  picker; `settings/` the Settings page and store; `capture/` the camera and ML Kit face
   detection; `memories/` the list, the notes screen and the autosaving
   `MemoryEditor`; `speech/` the `Dictation` interface and mic text fields;
   `location/` the GPS lookup.
@@ -127,6 +128,12 @@ has already been tried and fallen short.
   (details practice) are left out of the file until used. They change only
   through `recordAnswer` and `recordDetailAnswer`, and `save()` keeps the stored
   values, so a card autosave never undoes a game result.
+- An encounter with no location and place `Remote` happened online. It is
+  never matched to a real place.
+- Meetings auto-fill by place plus local time of week (a weekly meeting),
+  within the window set in Settings.
+- `settings.json` (`AppSettings`) holds Fred's settings; `reminders.json`
+  holds the reminder. Damage in either never stops the app.
 - `trashedAt` marks a person as in the trash. `all()` returns only active
   people; purge deletes every `<id>.*` file and refuses anyone not in the
   trash.
@@ -141,6 +148,11 @@ Check these before any public release. `sally` and `lena` own them.
   unless on-device recognition is used.
 - **Backups:** Android auto-backup and iOS iCloud backup may copy the
   `memories/` folder off the device.
+- **Map tiles:** with Street maps on (the default, Eric's call), OpenStreetMap
+  sees the device IP, the user agent and the area being viewed. It never sees
+  names, photos or notes. Settings can turn this off.
+- **Imported photos:** reading a photo's GPS needs `ACCESS_MEDIA_LOCATION`,
+  which Android presents as photos and videos access.
 - **Faces:** face detection runs on-device through ML Kit. Laws on biometric
   data, such as BIPA, may still apply to storing faces of people who are not
   users.
@@ -164,6 +176,13 @@ Check these before any public release. `sally` and `lena` own them.
 - **Launching the shortcut by hand:** the extra's key contains spaces, so quote
   the whole command:
   `adb shell "am start -a android.intent.action.RUN -n com.rememberem.rememberem/.MainActivity --es 'some unique action key' meet_someone"`.
+- **Branding:** the images come from `app/assets/branding/` through
+  `app/tool/make_branding.py`, then `dart run flutter_launcher_icons` and
+  `dart run flutter_native_splash:create`. Game sounds come from
+  `app/tool/make_sounds.py`.
+- **Photo GPS on Android:** the system photo picker strips location, so
+  photos from the phone come through `OriginalPhotoPicker.kt`, which uses
+  the document picker plus `MediaStore.setRequireOriginal`.
 - **Test portrait:** `app/integration_test/assets/portrait.jpg` is a
   public-domain NASA portrait for the on-device face test. It is bundled as an
   app asset, so it also ships in release builds.

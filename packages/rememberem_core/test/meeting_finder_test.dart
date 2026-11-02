@@ -3,7 +3,8 @@ import 'package:test/test.dart';
 
 void main() {
   const finder = MeetingFinder();
-  final now = DateTime.utc(2026, 11, 1, 12);
+  // A Tuesday at 15:00, local time (meetings are weekly, in local time).
+  final now = DateTime(2026, 11, 3, 15);
 
   Memory met(String place, String meeting, Duration before,
           {String id = 'p'}) =>
@@ -71,7 +72,7 @@ void main() {
     final memory = Memory(id: 'p', encounters: [
       Encounter(
           photoFileName: 'new.jpg',
-          capturedAt: DateTime.utc(2027),
+          capturedAt: DateTime(2027, 1, 7, 9),
           place: 'Park',
           meeting: 'Picnic'),
       Encounter(
@@ -82,5 +83,61 @@ void main() {
     ]);
 
     expect(finder.suggest('Cafe', now, [memory]), 'Standup');
+  });
+
+  Memory metAt(String place, String meeting, DateTime at, {String id = 'p'}) =>
+      Memory.captured(
+        id: id,
+        photoFileName: '$id.jpg',
+        capturedAt: at,
+        place: place,
+        meeting: meeting,
+      );
+
+  test('the same weekday and time in another week matches', () {
+    final lastTuesday = metAt('Park', 'Chess', DateTime(2026, 10, 27, 15, 20));
+    final monthsAgo = metAt('Park', 'Chess', DateTime(2026, 6, 2, 14, 0));
+
+    expect(finder.suggest('Park', now, [lastTuesday]), 'Chess');
+    expect(finder.suggest('Park', now, [monthsAgo]), 'Chess');
+  });
+
+  test('another weekday at the same time does not match', () {
+    final wednesday = metAt('Park', 'Chess', DateTime(2026, 10, 28, 15));
+
+    expect(finder.suggest('Park', now, [wednesday]), '');
+  });
+
+  test('the window is measured in time of week, both edges', () {
+    final edge = metAt('Park', 'Chess', DateTime(2026, 10, 27, 17));
+    final past = metAt('Park', 'Chess', DateTime(2026, 10, 27, 17, 1));
+
+    expect(finder.suggest('Park', now, [edge]), 'Chess');
+    expect(finder.suggest('Park', now, [past]), '');
+  });
+
+  test('the week wraps: late Sunday is close to early Monday', () {
+    final sunday = metAt('Hall', 'Vigil', DateTime(2026, 11, 1, 23, 30));
+
+    expect(
+      finder.suggest('Hall', DateTime(2026, 11, 9, 0, 30), [sunday]),
+      'Vigil',
+    );
+  });
+
+  test('the window is configurable', () {
+    final hourOff = metAt('Park', 'Chess', DateTime(2026, 10, 27, 16));
+
+    expect(
+      const MeetingFinder(window: Duration(minutes: 30))
+          .suggest('Park', now, [hourOff]),
+      '',
+    );
+  });
+
+  test('the same weekly meeting at another place does not match', () {
+    final elsewhere = metAt('Library', 'Chess', DateTime(2026, 10, 27, 15));
+
+    expect(finder.suggest('Park', now, [elsewhere]), '');
   });
 }

@@ -12,6 +12,8 @@
 	<string>Rememberem turns your spoken notes into text.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Rememberem records where you met someone, to help you remember them.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Rememberem reads the photo you choose, and where and when it was taken, to save it privately on this device.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -74,5 +76,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIStatusBarHidden</key>
+	<false/>
 </dict>
 </plist>

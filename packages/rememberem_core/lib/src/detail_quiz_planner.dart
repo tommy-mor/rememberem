@@ -30,15 +30,14 @@ class DetailQuizPlanner {
       active.length >= choiceCount && eligible(active).isNotEmpty;
 
   /// A weighted random pick over details (not people, so a stale detail of
-  /// a well-known person still comes up). Never [previousDetailId] again
-  /// when there is a choice.
-  DetailPair pickNext(List<DetailPair> pairs, {String? previousDetailId}) {
-    final pool = pairs.length > 1
-        ? [
-            for (final p in pairs)
-              if (p.detail.id != previousDetailId) p,
-          ]
-        : pairs;
+  /// a well-known person still comes up), never a detail in [asked] (ids
+  /// already quizzed this game). Null once every detail has been asked.
+  DetailPair? pickNext(List<DetailPair> pairs, {Set<String> asked = const {}}) {
+    final pool = [
+      for (final p in pairs)
+        if (!asked.contains(p.detail.id)) p,
+    ];
+    if (pool.isEmpty) return null;
     final now = _clock();
     final weights = [
       for (final p in pool)

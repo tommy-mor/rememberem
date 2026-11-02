@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
-import '../memories/memory_tile.dart';
+import '../memories/person_chip.dart';
 
 /// One place in the list: name, how many people and when last, and when
-/// selected, the names of the people met there.
+/// selected, the people met there, each with their photo; tapping one
+/// opens them.
 class PlaceRow extends StatelessWidget {
   const PlaceRow({
     super.key,
@@ -12,6 +13,8 @@ class PlaceRow extends StatelessWidget {
     required this.expanded,
     required this.onTap,
     required this.onRename,
+    required this.onOpenPerson,
+    required this.repository,
   });
 
   /// Height of a collapsed row; the list scrolls by multiples of it.
@@ -21,6 +24,8 @@ class PlaceRow extends StatelessWidget {
   final bool expanded;
   final VoidCallback onTap;
   final VoidCallback onRename;
+  final ValueChanged<Memory> onOpenPerson;
+  final MemoryRepository repository;
 
   @override
   Widget build(BuildContext context) {
@@ -55,10 +60,16 @@ class PlaceRow extends StatelessWidget {
         if (expanded)
           Padding(
             padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                for (final person in people) Text(MemoryTile.nameOf(person)),
+                for (final person in people)
+                  PersonChip(
+                    memory: person,
+                    repository: repository,
+                    onTap: () => onOpenPerson(person),
+                  ),
               ],
             ),
           ),

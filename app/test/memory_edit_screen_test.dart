@@ -5,6 +5,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import 'fakes/fake_dictation.dart';
 import 'fakes/fake_memory_repository.dart';
+import 'fakes/test_services.dart';
 
 void main() {
   late FakeMemoryRepository repository;
@@ -20,8 +21,7 @@ void main() {
       MaterialApp(
         home: MemoryEditScreen(
           memory: memory,
-          repository: repository,
-          dictation: dictation,
+          services: testServices(repository, dictation: dictation),
         ),
       ),
     );
@@ -332,8 +332,7 @@ void main() {
         MaterialPageRoute<void>(
           builder: (_) => MemoryEditScreen(
             memory: memory,
-            repository: repository,
-            dictation: dictation,
+            services: testServices(repository, dictation: dictation),
           ),
         ),
       );

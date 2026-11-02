@@ -157,20 +157,21 @@ void main() {
       var weakPicks = 0;
       final p = planner(7);
       for (var i = 0; i < 50; i++) {
-        if (p.pickNext([weak, strong]).id == 'w') weakPicks++;
+        if (p.pickNext([weak, strong])!.id == 'w') weakPicks++;
       }
 
       expect(weakPicks, greaterThan(40));
     });
 
-    test('never the same person twice in a row when there is a choice', () {
-      final people = [named('a', 'A'), named('b', 'B')];
+    test('never anyone already asked; null once everyone has been', () {
+      final people = [named('a', 'A'), named('b', 'B'), named('c', 'C')];
       final p = planner();
 
       for (var i = 0; i < 20; i++) {
-        expect(p.pickNext(people, previousId: 'a').id, 'b');
+        expect(p.pickNext(people, asked: {'a', 'c'})!.id, 'b');
       }
-      expect(p.pickNext([people.first], previousId: 'a').id, 'a');
+      expect(p.pickNext(people, asked: {'a', 'b', 'c'}), isNull);
+      expect(p.pickNext([]), isNull);
     });
 
     test('blank names cannot be quizzed; shared names count once', () {

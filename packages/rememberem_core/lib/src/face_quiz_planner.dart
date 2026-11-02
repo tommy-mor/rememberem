@@ -29,14 +29,14 @@ class FaceQuizPlanner {
   bool canPlay(List<Memory> active) => distinctNameCount(active) >= choiceCount;
 
   /// A weighted random pick, favouring few points and long-ago (or never)
-  /// right answers. Never [previousId] again when there is a choice.
-  Memory pickNext(List<Memory> eligible, {String? previousId}) {
-    final pool = eligible.length > 1
-        ? [
-            for (final m in eligible)
-              if (m.id != previousId) m
-          ]
-        : eligible;
+  /// right answers, never anyone in [asked] (ids already quizzed this
+  /// game). Null once everyone has been asked.
+  Memory? pickNext(List<Memory> eligible, {Set<String> asked = const {}}) {
+    final pool = [
+      for (final m in eligible)
+        if (!asked.contains(m.id)) m,
+    ];
+    if (pool.isEmpty) return null;
     final now = _clock();
     final weights = [
       for (final m in pool) practiceWeight(m.points, m.lastCorrectDate, now),

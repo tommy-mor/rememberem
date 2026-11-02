@@ -5,13 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
-import 'package:rememberem/src/places/place_map_projection.dart';
-import 'package:rememberem/src/places/places_map.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:rememberem/src/maps/place_marker_view.dart';
+import 'package:rememberem/src/memories/memory_edit_screen.dart';
+import 'package:rememberem/src/places/place_row.dart';
 import 'package:rememberem/src/places/places_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import 'fakes/fake_dictation.dart';
 import 'fakes/fake_memory_repository.dart';
+import 'fakes/test_services.dart';
 
 class _NoFaces implements FaceLocator {
   @override
@@ -59,24 +62,29 @@ void main() {
       MaterialApp(
         navigatorKey: navigator,
         navigatorObservers: [observer],
-        home: PlacesScreen(repository: repository, routeObserver: observer),
+        home: PlacesScreen(
+          services: testServices(repository),
+          routeObserver: observer,
+        ),
       ),
     );
     await tester.pumpAndSettle();
   }
 
-  /// Taps the map dot drawn for [point].
-  Future<void> tapMarker(
-    WidgetTester tester,
-    List<GeoPoint> drawn,
-    GeoPoint point,
-  ) async {
-    final map = find.byType(PlacesMap);
-    final box = tester.getRect(map);
-    final projection = PlaceMapProjection(drawn, box.size);
-    await tester.tapAt(box.topLeft + projection.project(point));
+  /// Taps the map marker labelled [label].
+  Future<void> tapMarker(WidgetTester tester, String label) async {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PlaceMarkerView),
+        matching: find.text(label),
+      ),
+    );
     await tester.pumpAndSettle();
   }
+
+  /// [name] in the list (not on the map).
+  Finder inList(String name) =>
+      find.descendant(of: find.byType(PlaceRow), matching: find.text(name));
 
   setUp(() => repository = FakeMemoryRepository());
 
@@ -95,8 +103,8 @@ void main() {
       await tester.tap(find.textContaining('2 people'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Alex'), findsOneWidget);
-      expect(find.text('Sam'), findsOneWidget);
+      expect(inList('Alex'), findsOneWidget);
+      expect(inList('Sam'), findsOneWidget);
       expect(find.text('Kim'), findsNothing);
     },
   );
@@ -106,9 +114,9 @@ void main() {
     await person('Kim', 'Park', north(5));
     await showPlaces(tester);
 
-    await tapMarker(tester, [north(0), north(5)], north(5));
+    await tapMarker(tester, 'Park');
 
-    expect(find.text('Kim'), findsOneWidget);
+    expect(inList('Kim'), findsOneWidget);
     expect(find.text('Alex'), findsNothing);
   });
 
@@ -119,7 +127,7 @@ void main() {
     await person('Nomad', 'Somewhere', null);
     await showPlaces(tester);
 
-    expect(find.text('Somewhere'), findsOneWidget);
+    expect(inList('Somewhere'), findsOneWidget);
     expect(find.byIcon(Icons.help_outline), findsOneWidget); // no marker
   });
 
@@ -161,18 +169,19 @@ void main() {
   testWidgets('selecting the last of many places brings its row into view', (
     tester,
   ) async {
-    final drawn = <GeoPoint>[];
     for (var i = 0; i < 30; i++) {
-      final at = north(i * 1.0);
-      drawn.add(at);
-      await person('P$i', 'Place ${i.toString().padLeft(2, '0')}', at);
+      await person(
+        'P$i',
+        'Place ${i.toString().padLeft(2, '0')}',
+        north(i * 1.0),
+      );
     }
     await showPlaces(tester);
     expect(find.text('P29'), findsNothing);
 
-    await tapMarker(tester, drawn, drawn.last);
+    await tapMarker(tester, 'Place 29');
 
-    expect(find.text('P29').hitTestable(), findsOneWidget);
+    expect(inList('P29').hitTestable(), findsOneWidget);
   });
 
   testWidgets('the main list has a Places entry that opens the page', (
@@ -240,7 +249,7 @@ void main() {
     navigator.currentState!.pop();
     await tester.pumpAndSettle();
 
-    expect(find.text('Cafe'), findsOneWidget);
+    expect(inList('Cafe'), findsOneWidget);
   });
 
   testWidgets('cancelling a rename keeps an unknown place expanded', (
@@ -248,31 +257,58 @@ void main() {
   ) async {
     await person('Kim', '', north(0));
     await showPlaces(tester);
-    await tester.tap(find.text('unknown'));
+    await tester.tap(inList('unknown'));
     await tester.pumpAndSettle();
-    expect(find.text('Kim'), findsOneWidget);
+    expect(inList('Kim'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Rename unknown'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Kim'), findsOneWidget);
+    expect(inList('Kim'), findsOneWidget);
   });
 
   testWidgets('at double text size the selected row still comes into view', (
     tester,
   ) async {
-    final drawn = <GeoPoint>[];
     for (var i = 0; i < 30; i++) {
-      final at = north(i * 1.0);
-      drawn.add(at);
-      await person('P$i', 'Place ${i.toString().padLeft(2, '0')}', at);
+      await person(
+        'P$i',
+        'Place ${i.toString().padLeft(2, '0')}',
+        north(i * 1.0),
+      );
     }
     await showPlaces(tester, textScale: 2);
 
-    await tapMarker(tester, drawn, drawn.last);
+    await tapMarker(tester, 'Place 29');
 
-    expect(find.text('P29').hitTestable(), findsOneWidget);
+    expect(inList('P29').hitTestable(), findsOneWidget);
+  });
+
+  testWidgets('a selected place shows its people with photos; a tap opens '
+      'their card and Back keeps the place', (tester) async {
+    await person('Alex', 'Cafe', north(0));
+    await person('Kim', 'Park', north(5));
+    await showPlaces(tester);
+
+    await tapMarker(tester, 'Cafe');
+    expect(find.widgetWithText(ActionChip, 'Alex'), findsNWidgets(2));
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Alex').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
+
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(inList('Alex'), findsOneWidget);
+  });
+
+  testWidgets('with street maps off no tiles are fetched', (tester) async {
+    await person('Alex', 'Cafe', north(0));
+    await showPlaces(tester);
+
+    expect(find.byType(FlutterMap), findsOneWidget);
+    expect(find.byType(TileLayer), findsNothing);
   });
 }

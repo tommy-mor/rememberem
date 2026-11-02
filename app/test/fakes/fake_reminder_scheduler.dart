@@ -9,6 +9,9 @@ class FakeReminderScheduler implements ReminderScheduler {
   FakeReminderScheduler({this.granted = true, this.launch});
 
   bool granted;
+
+  /// When set, a permission request grants it from then on.
+  bool grantOnRequest = false;
   PracticeGame? launch;
   final List<String> calls = [];
   (int, int)? scheduled;
@@ -29,6 +32,7 @@ class FakeReminderScheduler implements ReminderScheduler {
   @override
   Future<bool> requestPermission() async {
     calls.add('request');
+    if (grantOnRequest) granted = true;
     return granted;
   }
 

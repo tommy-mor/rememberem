@@ -100,7 +100,7 @@ void main() {
   }
 
   void expectList(WidgetTester tester) {
-    expect(find.text('Rememberem'), findsOneWidget);
+    expect(find.bySemanticsLabel('Rememberem'), findsOneWidget);
     expect(navigator(tester).canPop(), isFalse);
   }
 

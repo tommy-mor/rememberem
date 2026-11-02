@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/app_services.dart';
+import '../memories/person_card_route.dart';
+
 import 'place_row.dart';
 import 'places_map.dart';
 import 'rename_place_dialog.dart';
@@ -11,11 +14,11 @@ import 'rename_place_dialog.dart';
 class PlacesScreen extends StatefulWidget {
   const PlacesScreen({
     super.key,
-    required this.repository,
+    required this.services,
     required this.routeObserver,
   });
 
-  final MemoryRepository repository;
+  final AppServices services;
   final RouteObserver<ModalRoute<void>> routeObserver;
 
   @override
@@ -23,6 +26,7 @@ class PlacesScreen extends StatefulWidget {
 }
 
 class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
+  MemoryRepository get _repository => widget.services.repository;
   final _scroll = ScrollController();
   List<PlaceGroup>? _groups;
   PlaceGroup? _selected;
@@ -55,7 +59,7 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   Future<void> _reload() async {
     final gen = ++_reloadGen;
     try {
-      final groups = PlaceBook.from(await widget.repository.all()).groups;
+      final groups = PlaceBook.from(await _repository.all()).groups;
       if (!mounted || gen != _reloadGen) return;
       setState(() {
         _groups = groups;
@@ -86,6 +90,10 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
         )
         .firstOrNull;
   }
+
+  void _openPerson(Memory person) =>
+      Navigator.of(context)
+          .push(PersonCardRoute(services: widget.services, memory: person));
 
   void _select(PlaceGroup group) {
     final groups = _groups;
@@ -126,7 +134,7 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     final name = group.name;
     if (name != null) {
       try {
-        final trashed = await widget.repository.trashed();
+        final trashed = await _repository.trashed();
         affected += trashed
             .where(
               (m) => m.encounters.any(
@@ -151,7 +159,7 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     if (newName == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await PlaceRenamer(widget.repository).rename(group, newName);
+      await PlaceRenamer(_repository).rename(group, newName);
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not rename the place. Try again.')),
@@ -197,6 +205,8 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
                 expanded: group == _selected,
                 onTap: () => _select(group),
                 onRename: () => _rename(group),
+                onOpenPerson: _openPerson,
+                repository: _repository,
               );
             },
           ),
@@ -207,6 +217,9 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
             groups: groups,
             selected: _selected,
             onSelect: _select,
+            onOpenPerson: _openPerson,
+            repository: _repository,
+            streetMaps: widget.services.settings.value.streetMaps,
           ),
         ),
       ],

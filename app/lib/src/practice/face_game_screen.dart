@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import 'game_feedback.dart';
+
 enum _Phase { loading, reveal, choose, finished, stopped }
 
-/// Face practice: ten turns, each showing a face for a moment with no name,
-/// then four names to choose from. A first-try right answer earns the
-/// person a point; any miss resets their points.
+/// Face practice: up to [turns] turns, each showing a face for a moment
+/// with no name, then four names to choose from. No one is asked twice in
+/// a game, so with fewer people the game is shorter. A first-try right
+/// answer earns the person a point; any miss resets their points.
 class FaceGameScreen extends StatefulWidget {
   const FaceGameScreen({
     super.key,
@@ -16,6 +19,8 @@ class FaceGameScreen extends StatefulWidget {
     this.clock = DateTime.now,
     this.reveal = const Duration(seconds: 3),
     this.turns = 10,
+    this.feedback,
+    this.pauseAfterRight = const Duration(seconds: 1),
   });
 
   final MemoryRepository repository;
@@ -23,6 +28,10 @@ class FaceGameScreen extends StatefulWidget {
   final DateTime Function() clock;
   final Duration reveal;
   final int turns;
+  final GameFeedback? feedback;
+
+  /// How long a right answer shows before the next question.
+  final Duration pauseAfterRight;
 
   @override
   State<FaceGameScreen> createState() => _FaceGameScreenState();
@@ -32,6 +41,11 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     with WidgetsBindingObserver {
   _Phase _phase = _Phase.loading;
   int _turn = 0;
+
+  /// Fixed when the first question is picked: [FaceGameScreen.turns], or
+  /// fewer when there are fewer people.
+  int? _total;
+  final Set<String> _asked = {};
   int _rightFirstTry = 0;
   Memory? _person;
   List<String> _choices = [];
@@ -42,6 +56,9 @@ class _FaceGameScreenState extends State<FaceGameScreen>
   /// Set from a right answer until the next turn shows, so a second tap
   /// cannot score again or skip a turn.
   bool _advancing = false;
+
+  /// The right answer just chosen, shown green during the pause.
+  String? _correct;
   bool _hidden = false;
   bool _ended = false;
   String _stopReason = '';
@@ -83,9 +100,11 @@ class _FaceGameScreenState extends State<FaceGameScreen>
 
   bool get _live => mounted && !_ended;
 
+  int get _turns => _total ?? widget.turns;
+
   Future<void> _nextTurn() async {
-    if (_turn >= widget.turns) {
-      setState(() => _phase = _Phase.finished);
+    if (_turn >= _turns) {
+      _finish();
       return;
     }
     final List<Memory> people;
@@ -102,14 +121,23 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       return;
     }
     final eligible = planner.eligible(people);
-    final person = planner.pickNext(eligible, previousId: _person?.id);
+    final person = planner.pickNext(eligible, asked: _asked);
+    if (person == null) {
+      _finish(); // everyone has been asked
+      return;
+    }
+    _asked.add(person.id);
     setState(() {
+      _total ??= eligible.length < widget.turns
+          ? eligible.length
+          : widget.turns;
       _turn++;
       _person = person;
       _choices = planner.choicesFor(person, eligible);
       _wrong.clear();
       _missed = false;
       _advancing = false;
+      _correct = null;
       _phase = _Phase.reveal;
     });
     if (!_hidden) _startReveal();
@@ -121,6 +149,11 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       if (_live) setState(() => _phase = _Phase.choose);
     });
   }
+
+  void _finish() => setState(() {
+    _total = _turn;
+    _phase = _Phase.finished;
+  });
 
   void _stop(String reason) => setState(() {
     _phase = _Phase.stopped;
@@ -134,16 +167,23 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     }
     final right = name == person.field(MemoryField.name).trim();
     if (!right) {
+      widget.feedback?.wrong();
       setState(() => _wrong.add(name));
       if (_missed) return; // one reset per turn is enough
       _missed = true;
       await _record(person, correctFirstTry: false);
       return;
     }
-    setState(() => _advancing = true);
+    widget.feedback?.right();
+    setState(() {
+      _advancing = true;
+      _correct = name;
+    });
+    final pause = Future<void>.delayed(widget.pauseAfterRight);
     if (!_missed && await _record(person, correctFirstTry: true)) {
       _rightFirstTry++;
     }
+    await pause;
     if (_live) await _nextTurn();
   }
 
@@ -168,9 +208,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _turn == 0 ? 'Practice faces' : 'Turn $_turn of ${widget.turns}',
-        ),
+        title: Text(_turn == 0 ? 'Practice faces' : 'Turn $_turn of $_turns'),
         leading: IconButton(
           tooltip: 'Stop practice',
           icon: const Icon(Icons.close),
@@ -189,7 +227,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       case _Phase.finished:
         return _message(
           context,
-          'Done: $_rightFirstTry of ${widget.turns} right first try.',
+          'Done: $_rightFirstTry of $_turns right first try.',
         );
       case _Phase.stopped:
         return _message(context, _stopReason);
@@ -230,6 +268,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: FilledButton.tonal(
+                  style: name == _correct ? _rightStyle : null,
                   onPressed: _wrong.contains(name) || _writing || _advancing
                       ? null
                       : () => _choose(name),
@@ -240,6 +279,12 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       ),
     );
   }
+
+  /// The right answer, green even while the buttons are disabled.
+  static final _rightStyle = FilledButton.styleFrom(
+    disabledBackgroundColor: Colors.green.shade600,
+    disabledForegroundColor: Colors.white,
+  );
 
   Widget _message(BuildContext context, String text) => Center(
     child: Padding(

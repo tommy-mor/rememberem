@@ -6,7 +6,11 @@ class RememberedCount {
   const RememberedCount(this.faces, this.details);
 
   /// [active] is the list `all()` returns; nothing is changed.
-  factory RememberedCount.of(List<Memory> active) => RememberedCount(
+  factory RememberedCount.of(
+    List<Memory> active, {
+    int threshold = defaultThreshold,
+  }) =>
+      RememberedCount(
         active.where((m) => m.points >= threshold).length,
         [
           for (final m in active)
@@ -15,7 +19,7 @@ class RememberedCount {
         ].length,
       );
 
-  static const int threshold = 5;
+  static const int defaultThreshold = 5;
 
   final int faces;
   final int details;

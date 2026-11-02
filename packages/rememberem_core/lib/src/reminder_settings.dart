@@ -6,13 +6,20 @@ class ReminderSettings {
     required this.minute,
   });
 
-  /// Reminders are opt-in: off, at 19:00 if turned on.
+  /// Off, at 19:00 if turned on.
   const ReminderSettings.off()
       : enabled = false,
         hour = 19,
         minute = 0;
 
-  /// Anything unreadable means [ReminderSettings.off].
+  /// On at 19:00: what a fresh install starts with (nothing saved yet).
+  const ReminderSettings.defaults()
+      : enabled = true,
+        hour = 19,
+        minute = 0;
+
+  /// Anything unreadable means [ReminderSettings.off]: a damaged file
+  /// never turns reminders on or asks for permission again.
   factory ReminderSettings.fromJson(Object? json) {
     if (json is! Map) return const ReminderSettings.off();
     final enabled = json['enabled'];

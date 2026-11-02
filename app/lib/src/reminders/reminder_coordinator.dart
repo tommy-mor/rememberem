@@ -46,7 +46,10 @@ class ReminderCoordinator {
     }
     if (!await scheduler.hasPermission()) {
       // Permission was taken away in Settings: switch off, never re-ask.
-      await store.save(settings.copyWith(enabled: false));
+      // Before the first ask (see [askOnce]) there is nothing to take away.
+      if (await store.hasSaved()) {
+        await store.save(settings.copyWith(enabled: false));
+      }
       await scheduler.cancel();
       return;
     }
@@ -70,6 +73,18 @@ class ReminderCoordinator {
     waitingForPeople = false;
     await scheduler.scheduleDaily(settings.hour, settings.minute);
   }
+
+  /// Reminders start on, but the permission is asked for only here, once,
+  /// at a calm moment the list chooses. The answer is saved either way, so
+  /// Fred is never asked twice.
+  Future<void> askOnce() => _serial(() async {
+    if (await store.hasSaved()) return;
+    final settings = await store.load();
+    final granted =
+        await scheduler.hasPermission() || await scheduler.requestPermission();
+    await store.save(settings.copyWith(enabled: settings.enabled && granted));
+    await _sync();
+  });
 
   /// Turns reminders on (asking permission) or off.
   Future<EnableResult> setEnabled(bool enabled) => _serial(() async {

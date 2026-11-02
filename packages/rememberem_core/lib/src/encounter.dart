@@ -28,6 +28,10 @@ class Encounter {
     return byTime != 0 ? byTime : b.photoFileName.compareTo(a.photoFileName);
   }
 
+  /// The place name for an encounter that happened online, not anywhere:
+  /// it has no location, so it is never matched to a real place.
+  static const remotePlace = 'Remote';
+
   final String photoFileName;
   final DateTime capturedAt;
   final GeoPoint? location;
@@ -38,6 +42,18 @@ class Encounter {
   Encounter withMeeting(String meeting) => _copy(meeting: meeting);
   Encounter withCapturedAt(DateTime at) => _copy(capturedAt: at);
   Encounter withPhotoFileName(String name) => _copy(photoFileName: name);
+
+  /// A copy at [location], which may be null (no known location).
+  Encounter withLocation(GeoPoint? location) => Encounter(
+        photoFileName: photoFileName,
+        capturedAt: capturedAt,
+        location: location,
+        place: place,
+        meeting: meeting,
+      );
+
+  /// A copy that happened online: no location, place [remotePlace].
+  Encounter asRemote() => withLocation(null).withPlace(remotePlace);
 
   Encounter _copy({
     String? photoFileName,

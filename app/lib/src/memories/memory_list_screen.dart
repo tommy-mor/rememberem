@@ -5,10 +5,10 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
+import '../app/brand_logo.dart';
 import '../places/places_screen.dart';
-import '../reminders/reminders_screen.dart';
-import '../practice/detail_game_screen.dart';
-import '../practice/face_game_screen.dart';
+import '../practice/practice_screens.dart';
+import '../settings/settings_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
 import 'matching_screen.dart';
@@ -49,6 +49,9 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   /// never overwrite a later trash or undo.
   int _reloadGen = 0;
 
+  /// The reminder permission is asked at most once per run, from here.
+  bool _askedReminders = false;
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +78,19 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     final gen = ++_reloadGen;
     final memories = await _repository.all();
     if (mounted && gen == _reloadGen) setState(() => _memories = memories);
+    _maybeAskReminders(memories);
+  }
+
+  /// Reminders start on; their permission is asked once, at a calm moment:
+  /// back on the list with someone saved, never over the camera.
+  void _maybeAskReminders(List<Memory> memories) {
+    final reminders = widget.services.reminders;
+    if (_askedReminders || reminders == null || memories.isEmpty) return;
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    _askedReminders = true;
+    reminders.askOnce().catchError(
+      (Object e) => debugPrint('Rememberem: reminder ask failed: $e'),
+    );
   }
 
   void _open(Memory memory) =>
@@ -98,7 +114,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PlacesScreen(
-          repository: widget.services.repository,
+          services: widget.services,
           routeObserver: widget.routeObserver,
         ),
       ),
@@ -162,6 +178,18 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     await _reload();
   }
 
+  void _openSettings() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(
+          settings: widget.services.settings,
+          reminders: widget.services.reminders,
+        ),
+      ),
+    );
+  }
+
   void _openTrash() {
     // A pending Undo must not act on someone the Trash screen is showing.
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -176,11 +204,11 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rememberem'),
+        title: const BrandLogo(),
         actions: [
           IconButton(
             tooltip: 'Timeline',
-            icon: const Icon(Icons.timeline),
+            icon: const Icon(Icons.schedule),
             onPressed: _openTimeline,
           ),
           IconButton(
@@ -193,20 +221,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
             icon: const Icon(Icons.place),
             onPressed: _openPlaces,
           ),
-          if (widget.services.reminders case final reminders?)
-            IconButton(
-              tooltip: 'Reminders',
-              icon: const Icon(Icons.notifications_none),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => RemindersScreen(coordinator: reminders),
-                ),
-              ),
-            ),
           IconButton(
             tooltip: 'Trash',
             icon: const Icon(Icons.delete),
             onPressed: _openTrash,
+          ),
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings),
+            onPressed: _openSettings,
           ),
         ],
       ),
@@ -235,7 +258,12 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // From the list as shown, so a trash or undo updates it at once.
-            RememberedLabel(RememberedCount.of(memories)),
+            RememberedLabel(
+              RememberedCount.of(
+                memories,
+                threshold: widget.services.settings.value.rememberedThreshold,
+              ),
+            ),
             const SizedBox(height: 4),
             if (!canPlayFaces)
               Text(
@@ -275,19 +303,11 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     );
   }
 
-  void _practiceFaces() => _openGame(
-    FaceGameScreen(
-      repository: _repository,
-      planner: FaceQuizPlanner(Random(), DateTime.now),
-    ),
-  );
+  void _practiceFaces() =>
+      _openGame(PracticeScreens.build(PracticeGame.faces, widget.services));
 
-  void _practiceDetails() => _openGame(
-    DetailGameScreen(
-      repository: _repository,
-      planner: DetailQuizPlanner(Random(), DateTime.now),
-    ),
-  );
+  void _practiceDetails() =>
+      _openGame(PracticeScreens.build(PracticeGame.details, widget.services));
 
   void _openGame(Widget game) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();

@@ -6,6 +6,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../memories/memory_edit_screen.dart';
+import 'photo_picker.dart';
 
 /// Full-screen camera. Taking a photo saves a cropped portrait and moves on
 /// to the notes for that person.
@@ -64,25 +65,58 @@ class _CaptureScreenState extends State<CaptureScreen> {
   Future<void> _takePhoto() async {
     final camera = _camera;
     if (camera == null || _saving) return;
-    setState(() => _saving = true);
-    try {
+    await _save(() async {
       final capturedAt = DateTime.now();
       final shot = await camera.takePicture();
       final bytes = await shot.readAsBytes();
       await File(shot.path).delete();
+      return (bytes: bytes, capturedAt: capturedAt, location: await _location);
+    });
+  }
+
+  /// A photo already on the phone: where and when come from the photo
+  /// itself, never from where the phone is now (it may be an old photo).
+  Future<void> _pickPhoto(PhotoPicker picker) async {
+    if (_saving) return;
+    await _save(() async {
+      final bytes = await picker.pick();
+      if (bytes == null) return null;
+      final meta = PhotoMetadata.read(bytes, now: DateTime.now());
+      return (
+        bytes: bytes,
+        capturedAt: meta.takenAt ?? DateTime.now(),
+        location: meta.location,
+      );
+    });
+  }
+
+  /// Saves the photo [source] gives (null: nothing chosen) and moves on to
+  /// the notes for that person.
+  Future<void> _save(
+    Future<({List<int> bytes, DateTime capturedAt, GeoPoint? location})?>
+    Function()
+    source,
+  ) async {
+    setState(() => _saving = true);
+    try {
+      final photo = await source();
+      if (photo == null) {
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
+      final settings = widget.services.settings.value;
       final memory = await widget.services.capture.capture(
-        bytes,
-        capturedAt: capturedAt,
-        location: await _location,
+        photo.bytes,
+        capturedAt: photo.capturedAt,
+        location: photo.location,
+        placeFinder: settings.placeFinder,
+        meetingFinder: settings.meetingFinder,
       );
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => MemoryEditScreen(
-            memory: memory,
-            repository: widget.services.repository,
-            dictation: widget.services.dictation,
-          ),
+          builder: (_) =>
+              MemoryEditScreen(memory: memory, services: widget.services),
         ),
       );
     } catch (e) {
@@ -97,6 +131,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   Widget build(BuildContext context) {
     final camera = _camera;
+    final picker = widget.services.photoPicker;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -121,6 +156,43 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       ),
                     ),
             ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 32),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Balances the gallery button so the shutter stays centred.
+                    const SizedBox(width: 72),
+                    FloatingActionButton.large(
+                      heroTag: 'shutter',
+                      tooltip: 'Take photo',
+                      onPressed: camera == null || _saving ? null : _takePhoto,
+                      child: const Icon(Icons.camera_alt),
+                    ),
+                    SizedBox(
+                      width: 72,
+                      child: Center(
+                        child: picker == null
+                            ? null
+                            : FloatingActionButton.small(
+                                heroTag: 'gallery',
+                                tooltip: 'Choose a photo from the phone',
+                                onPressed: _saving
+                                    ? null
+                                    : () => _pickPhoto(picker),
+                                child: const Icon(Icons.photo_library),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           if (_saving)
             const ColoredBox(
               color: Colors.black54,
@@ -132,12 +204,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ),
             ),
         ],
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FloatingActionButton.large(
-        tooltip: 'Take photo',
-        onPressed: camera == null || _saving ? null : _takePhoto,
-        child: const Icon(Icons.camera_alt),
       ),
     );
   }

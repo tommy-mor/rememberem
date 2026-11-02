@@ -103,11 +103,7 @@ void main() {
       );
       navigator.currentState!.pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => MemoryEditScreen(
-            memory: memory,
-            repository: repository,
-            dictation: services.dictation,
-          ),
+          builder: (_) => MemoryEditScreen(memory: memory, services: services),
         ),
       );
       await tester.pumpAndSettle();

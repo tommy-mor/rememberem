@@ -8,10 +8,6 @@ import 'memory_edit_screen.dart';
 class PersonCardRoute extends MaterialPageRoute<void> {
   PersonCardRoute({required AppServices services, required Memory memory})
     : super(
-        builder: (_) => MemoryEditScreen(
-          memory: memory,
-          repository: services.repository,
-          dictation: services.dictation,
-        ),
+        builder: (_) => MemoryEditScreen(memory: memory, services: services),
       );
 }

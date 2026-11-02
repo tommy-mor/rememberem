@@ -1,16 +1,15 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../capture/capture_screen.dart';
 import '../memories/memory_list_screen.dart';
-import '../practice/detail_game_screen.dart';
-import '../practice/face_game_screen.dart';
+import '../practice/practice_screens.dart';
 import 'app_routes.dart';
 import 'app_services.dart';
 import 'meet_shortcut.dart';
+import 'rememberem_theme.dart';
 
 class RememberemApp extends StatefulWidget {
   const RememberemApp({super.key, required this.services, this.shortcut});
@@ -87,16 +86,7 @@ class _RememberemAppState extends State<RememberemApp>
       if (game == null || !mounted) return; // nothing to practise: the list
       _openOnRoot(
         AppRoutes.practice,
-        (_) => switch (game) {
-          PracticeGame.faces => FaceGameScreen(
-            repository: repository,
-            planner: FaceQuizPlanner(Random(), DateTime.now),
-          ),
-          PracticeGame.details => DetailGameScreen(
-            repository: repository,
-            planner: DetailQuizPlanner(Random(), DateTime.now),
-          ),
-        },
+        (_) => PracticeScreens.build(game, widget.services),
         blockedBy: {AppRoutes.capture, AppRoutes.practice},
       );
     } catch (_) {
@@ -140,9 +130,7 @@ class _RememberemAppState extends State<RememberemApp>
       title: 'Rememberem',
       navigatorKey: _navigator,
       navigatorObservers: [_routeObserver],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-      ),
+      theme: RememberemTheme.light,
       home: MemoryListScreen(
         services: widget.services,
         routeObserver: _routeObserver,

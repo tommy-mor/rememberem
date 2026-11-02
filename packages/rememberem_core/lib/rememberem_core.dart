@@ -4,6 +4,7 @@ library;
 
 export 'src/detail.dart';
 export 'src/detail_quiz_planner.dart';
+export 'src/app_settings.dart';
 export 'src/encounter.dart';
 export 'src/face_locator.dart';
 export 'src/face_quiz_planner.dart';
@@ -16,6 +17,7 @@ export 'src/memory.dart';
 export 'src/memory_field.dart';
 export 'src/memory_repository.dart';
 export 'src/pixel_rect.dart';
+export 'src/photo_metadata.dart';
 export 'src/place_book.dart';
 export 'src/place_finder.dart';
 export 'src/place_group.dart';

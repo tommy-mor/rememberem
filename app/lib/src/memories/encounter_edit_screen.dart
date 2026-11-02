@@ -3,9 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/app_services.dart';
 import '../speech/dictated_text_field.dart';
-import '../speech/dictation.dart';
 import 'memory_editor.dart';
+import 'when_where_row.dart';
 
 /// One picture of a person: change its place, meeting or date, or delete
 /// it. Edits go through the person card's [editor]. Pops with the removed
@@ -14,14 +15,12 @@ class EncounterEditScreen extends StatefulWidget {
   const EncounterEditScreen({
     super.key,
     required this.editor,
-    required this.repository,
-    required this.dictation,
+    required this.services,
     required this.photoFileName,
   });
 
   final MemoryEditor editor;
-  final MemoryRepository repository;
-  final Dictation dictation;
+  final AppServices services;
   final String photoFileName;
 
   @override
@@ -38,7 +37,8 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
     return null;
   }
 
-  Encounter get _encounter => _encounterOrNull!;
+  /// Bumped when Remote changes the place, so its field reloads.
+  int _placeGen = 0;
 
   @override
   void dispose() {
@@ -48,30 +48,6 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
 
   void _update(Encounter Function(Encounter) change, {bool now = false}) =>
       _editor.updateEncounter(widget.photoFileName, change, now: now);
-
-  Future<void> _changeDate() async {
-    final local = _encounter.capturedAt.toLocal();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: local,
-      firstDate: DateTime(1970),
-      lastDate: DateTime(2100, 12, 31),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(local),
-    );
-    if (time == null || !mounted) return;
-    final picked = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
-    setState(() => _update((e) => e.withCapturedAt(picked), now: true));
-  }
 
   void _delete() {
     final removed = _editor.removeEncounter(widget.photoFileName);
@@ -88,8 +64,6 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
       });
       return const Scaffold();
     }
-    final localizations = MaterialLocalizations.of(context);
-    final local = encounter.capturedAt.toLocal();
     final isLast = _editor.memory.encounters.length < 2;
     return Scaffold(
       appBar: AppBar(title: const Text('Picture')),
@@ -101,7 +75,7 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.file(
-                widget.repository.encounterPhoto(encounter),
+                widget.services.repository.encounterPhoto(encounter),
                 height: 320,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) =>
@@ -109,32 +83,30 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${localizations.formatFullDate(local)}, '
-                    '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local))}',
-                  ),
-                ),
-                TextButton(
-                  onPressed: _changeDate,
-                  child: const Text('Change date'),
-                ),
-              ],
+            WhenWhereRow(
+              encounter: encounter,
+              services: widget.services,
+              onTimeChanged: (at) => setState(
+                () => _update((e) => e.withCapturedAt(at), now: true),
+              ),
+              onLocationChosen: (choice) => setState(() {
+                _update(choice.applyTo, now: true);
+                _placeGen++;
+              }),
             ),
             const SizedBox(height: 16),
             DictatedTextField(
+              key: ValueKey('place-$_placeGen'),
               label: MemoryField.place.label,
               initialValue: encounter.place,
-              dictation: widget.dictation,
+              dictation: widget.services.dictation,
               onChanged: (v) => _update((e) => e.withPlace(v)),
             ),
             const SizedBox(height: 16),
             DictatedTextField(
               label: MemoryField.meeting.label,
               initialValue: encounter.meeting,
-              dictation: widget.dictation,
+              dictation: widget.services.dictation,
               onChanged: (v) => _update((e) => e.withMeeting(v)),
             ),
             const SizedBox(height: 24),

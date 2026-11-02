@@ -123,4 +123,25 @@ void main() {
             const GeoPoint(double.nan, 0), [at('Cafe', north(here, 10))]),
         isNull);
   });
+
+  test('a remote encounter is never matched to a real place', () {
+    final remote = Memory(id: 'r', encounters: [
+      Encounter(
+        photoFileName: 'r.jpg',
+        capturedAt: DateTime.utc(2026, 1, 1),
+        location: here,
+        place: 'Office',
+      ).asRemote(),
+    ]);
+
+    expect(remote.encounters.single.location, isNull);
+    expect(remote.encounters.single.place, Encounter.remotePlace);
+    expect(finder.nearest(here, [remote]), isNull);
+  });
+
+  test('withLocation can set and clear a location', () {
+    final e = Encounter(photoFileName: 'e.jpg', capturedAt: DateTime(2026));
+    expect(e.withLocation(here).location, here);
+    expect(e.withLocation(here).withLocation(null).location, isNull);
+  });
 }

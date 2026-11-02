@@ -3,27 +3,28 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/app_services.dart';
 import '../speech/dictated_text_field.dart';
-import '../speech/dictation.dart';
 import 'detail_list_editor.dart';
 import 'encounter_edit_screen.dart';
 import 'memory_editor.dart';
 import 'memory_tile.dart';
 import 'merge_picker_screen.dart';
 import 'pictures_section.dart';
+import 'when_where_row.dart';
 
 /// The photo of a person with spoken-or-typed notes, saved as you go.
 class MemoryEditScreen extends StatefulWidget {
   const MemoryEditScreen({
     super.key,
     required this.memory,
-    required this.repository,
-    required this.dictation,
+    required this.services,
   });
 
   final Memory memory;
-  final MemoryRepository repository;
-  final Dictation dictation;
+  final AppServices services;
+
+  MemoryRepository get repository => services.repository;
 
   @override
   State<MemoryEditScreen> createState() => _MemoryEditScreenState();
@@ -132,11 +133,11 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _captionFor(memory),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
+            WhenWhereRow(
+              encounter: memory.encounters.first,
+              services: widget.services,
+              onTimeChanged: (at) => _changeNewest((e) => e.withCapturedAt(at)),
+              onLocationChosen: (choice) => _changeNewest(choice.applyTo),
             ),
             for (final field in MemoryField.values) ...[
               const SizedBox(height: 16),
@@ -144,14 +145,15 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 key: ValueKey('${field.key}-$_fieldsGen'),
                 label: field.label,
                 initialValue: memory.field(field),
-                dictation: widget.dictation,
+                dictation: widget.services.dictation,
+                hint: field == MemoryField.name ? MemoryTile.unknownName : null,
                 onChanged: (value) => _editor.update(field.key, value),
               ),
             ],
             const SizedBox(height: 16),
             DetailListEditor(
               details: _editor.memory.details,
-              dictation: widget.dictation,
+              dictation: widget.services.dictation,
               onChanged: (id, text) =>
                   _edit(() => _editor.updateDetail(id, text)),
               onTimeChanged: (id, at) =>
@@ -189,8 +191,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       MaterialPageRoute(
         builder: (_) => EncounterEditScreen(
           editor: _editor,
-          repository: widget.repository,
-          dictation: widget.dictation,
+          services: widget.services,
           photoFileName: encounter.photoFileName,
         ),
       ),
@@ -271,16 +272,17 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
   }
 
+  /// Changes the picture that represents this person (the newest), saving
+  /// at once, and reloads the Place and Meeting fields (Remote sets Place).
+  void _changeNewest(Encounter Function(Encounter) change) => setState(() {
+    _editor.updateEncounter(
+      _editor.memory.encounters.first.photoFileName,
+      change,
+      now: true,
+    );
+    _fieldsGen++;
+  });
+
   /// Applies a detail change and rebuilds so time captions stay current.
   void _edit(VoidCallback change) => setState(change);
-
-  String _captionFor(Memory memory) {
-    final when = MaterialLocalizations.of(context)
-        .formatMediumDate(memory.capturedAt);
-    final where = memory.location;
-    return where == null
-        ? when
-        : '$when · ${where.latitude.toStringAsFixed(5)}, '
-              '${where.longitude.toStringAsFixed(5)}';
-  }
 }

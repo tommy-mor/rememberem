@@ -14,7 +14,7 @@ import 'package:rememberem/src/reminders/file_reminder_settings_store.dart';
 import 'package:rememberem/src/reminders/local_notifications_scheduler.dart';
 import 'package:rememberem/src/reminders/reminder_coordinator.dart';
 import 'package:rememberem/src/reminders/reminder_settings_store.dart';
-import 'package:rememberem/src/reminders/reminders_screen.dart';
+import 'package:rememberem/src/reminders/reminders_section.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import 'fakes/fake_dictation.dart';
@@ -27,10 +27,15 @@ class _NoFaces implements FaceLocator {
 }
 
 class _MemoryStore implements ReminderSettingsStore {
-  ReminderSettings value = const ReminderSettings.off();
+  /// Null until something is saved.
+  ReminderSettings? value;
 
   @override
-  Future<ReminderSettings> load() async => value;
+  Future<ReminderSettings> load() async =>
+      value ?? const ReminderSettings.defaults();
+
+  @override
+  Future<bool> hasSaved() async => value != null;
 
   @override
   Future<void> save(ReminderSettings settings) async => value = settings;
@@ -112,21 +117,70 @@ void main() {
       expect(scheduler.scheduled, (7, 30));
       await coordinator.setEnabled(false);
       expect(scheduler.scheduled, isNull);
-      expect(store.value.enabled, isFalse);
+      expect(store.value!.enabled, isFalse);
     });
 
     test('a refused permission stays off', () async {
       scheduler.granted = false;
 
       expect(await coordinator.setEnabled(true), EnableResult.denied);
-      expect(store.value.enabled, isFalse);
+      expect(store.value!.enabled, isFalse);
       expect(scheduler.scheduled, isNull);
     });
 
-    test('launch with default settings never asks or schedules', () async {
+    test('before the first ask, a launch never asks and never switches '
+        'off', () async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      scheduler.granted = false;
+
       await coordinator.sync();
 
       expect(scheduler.calls.where((c) => c != 'cancel'), isEmpty);
+      expect(store.value, isNull);
+    });
+
+    test('on by default: with permission already there it schedules at '
+        '19:00 without asking', () async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+
+      await coordinator.sync();
+
+      expect(scheduler.scheduled, (19, 0));
+      expect(scheduler.calls, isNot(contains('request')));
+    });
+
+    test('askOnce asks, saves a yes, and schedules', () async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      scheduler.granted = false;
+      scheduler.grantOnRequest = true;
+
+      await coordinator.askOnce();
+
+      expect(scheduler.calls.where((c) => c == 'request'), hasLength(1));
+      expect(store.value!.enabled, isTrue);
+      expect(scheduler.scheduled, (19, 0));
+    });
+
+    test('askOnce saves a no, and never asks again', () async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      scheduler.granted = false;
+
+      await coordinator.askOnce();
+      await coordinator.askOnce();
+
+      expect(scheduler.calls.where((c) => c == 'request'), hasLength(1));
+      expect(store.value!.enabled, isFalse);
+      expect(scheduler.scheduled, isNull);
+    });
+
+    test('askOnce does nothing once a choice is saved', () async {
+      store.value = const ReminderSettings.off();
+      scheduler.granted = false;
+
+      await coordinator.askOnce();
+
+      expect(scheduler.calls, isNot(contains('request')));
+      expect(store.value!.enabled, isFalse);
     });
 
     test('a permission taken away in Settings turns reminders off', () async {
@@ -136,7 +190,7 @@ void main() {
 
       await coordinator.sync();
 
-      expect(store.value.enabled, isFalse);
+      expect(store.value!.enabled, isFalse);
       expect(scheduler.scheduled, isNull);
       expect(scheduler.calls, isNot(contains('request')));
     });
@@ -147,7 +201,7 @@ void main() {
 
       await coordinator.sync();
       expect(scheduler.scheduled, isNull);
-      expect(store.value.enabled, isTrue);
+      expect(store.value!.enabled, isTrue);
       expect(coordinator.waitingForPeople, isTrue);
 
       await people(['Ann', 'Bo', 'Cy', 'Di']);
@@ -180,18 +234,22 @@ void main() {
     });
   });
 
-  test('the store round-trips and reads a corrupt file as off', () async {
+  test('the store starts at the defaults, round-trips, and reads a corrupt '
+      'file as off', () async {
     final temp = await Directory.systemTemp.createTemp('rememberem_rem_');
     addTearDown(() => temp.delete(recursive: true));
     final file = File('${temp.path}/reminders.json');
     final fileStore = FileReminderSettingsStore(file);
 
-    expect(await fileStore.load(), const ReminderSettings.off());
+    expect(await fileStore.load(), const ReminderSettings.defaults());
+    expect(await fileStore.hasSaved(), isFalse);
     const set = ReminderSettings(enabled: true, hour: 6, minute: 45);
     await fileStore.save(set);
     expect(await fileStore.load(), set);
+    expect(await fileStore.hasSaved(), isTrue);
     await file.writeAsString('{oops');
     expect(await fileStore.load(), const ReminderSettings.off());
+    expect(await fileStore.hasSaved(), isTrue);
   });
 
   test('the notification names no one and carries only a game id', () async {
@@ -211,26 +269,29 @@ void main() {
     Future<void> show(WidgetTester tester) async {
       makeCoordinator();
       await tester.pumpWidget(
-        MaterialApp(home: RemindersScreen(coordinator: coordinator)),
+        MaterialApp(
+          home: Scaffold(body: RemindersSection(coordinator: coordinator)),
+        ),
       );
       await tester.pumpAndSettle();
     }
 
-    testWidgets('off by default; on shows the time', (tester) async {
+    testWidgets('on by default at 7 PM; off hides the time', (tester) async {
       await people(['Ann', 'Bo', 'Cy', 'Di']);
       await show(tester);
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
-      expect(find.textContaining('Around'), findsNothing);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+      expect(find.text('Around 7:00 PM'), findsOneWidget);
 
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
 
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
-      expect(find.text('Around 7:00 PM'), findsOneWidget);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      expect(find.textContaining('Around'), findsNothing);
     });
 
     testWidgets('refused permission stays off and explains', (tester) async {
       scheduler.granted = false;
+      store.value = const ReminderSettings.off();
       await show(tester);
 
       await tester.tap(find.byType(Switch));
@@ -307,7 +368,7 @@ void main() {
       expect(find.byType(FaceGameScreen), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Rememberem'), findsOneWidget);
+      expect(find.bySemanticsLabel('Rememberem'), findsOneWidget);
       expect(navigator(tester).canPop(), isFalse);
     });
 

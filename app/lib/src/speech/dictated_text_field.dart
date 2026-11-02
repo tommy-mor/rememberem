@@ -11,6 +11,7 @@ class DictatedTextField extends StatefulWidget {
     required this.dictation,
     required this.onChanged,
     this.multiline = false,
+    this.hint,
   });
 
   final String label;
@@ -18,6 +19,9 @@ class DictatedTextField extends StatefulWidget {
   final Dictation dictation;
   final ValueChanged<String> onChanged;
   final bool multiline;
+
+  /// Shown greyed out while the field is empty.
+  final String? hint;
 
   @override
   State<DictatedTextField> createState() => _DictatedTextFieldState();
@@ -83,6 +87,11 @@ class _DictatedTextFieldState extends State<DictatedTextField> {
       maxLines: widget.multiline ? 5 : 1,
       decoration: InputDecoration(
         labelText: widget.label,
+        hintText: widget.hint,
+        // Keep the label up so the hint shows while the field is empty.
+        floatingLabelBehavior: widget.hint == null
+            ? null
+            : FloatingLabelBehavior.always,
         border: const OutlineInputBorder(),
         suffixIcon: IconButton(
           tooltip: _listening ? 'Stop listening' : 'Speak ${widget.label}',

@@ -1,0 +1,52 @@
+import 'dart:io';
+
+import 'package:rememberem/src/app/app_services.dart';
+import 'package:rememberem/src/capture/photo_picker.dart';
+import 'package:rememberem/src/location/device_location.dart';
+import 'package:rememberem/src/practice/game_feedback.dart';
+import 'package:rememberem/src/settings/app_settings_controller.dart';
+import 'package:rememberem/src/speech/dictation.dart';
+import 'package:rememberem_core/rememberem_core.dart';
+
+import 'fake_dictation.dart';
+
+class _NoFaces implements FaceLocator {
+  @override
+  Future<List<PixelRect>> findFaces(File photo) async => [];
+}
+
+/// A [DeviceLocation] that answers [here] without asking the platform.
+class FakeLocation extends DeviceLocation {
+  FakeLocation([this.here]);
+
+  GeoPoint? here;
+
+  @override
+  Future<GeoPoint?> current() async => here;
+}
+
+/// Services for widget tests. Street maps are off, so nothing touches the
+/// network.
+AppServices testServices(
+  MemoryRepository repository, {
+  Dictation? dictation,
+  DeviceLocation? location,
+  AppSettings settings = const AppSettings(streetMaps: false),
+  PhotoPicker? photoPicker,
+  GameFeedback? feedback,
+  PortraitCapture? capture,
+}) => AppServices(
+  repository: repository,
+  capture:
+      capture ??
+      PortraitCapture(
+        repository: repository,
+        faceLocator: _NoFaces(),
+        workFolder: Directory.systemTemp,
+      ),
+  dictation: dictation ?? FakeDictation(),
+  location: location ?? FakeLocation(),
+  settings: AppSettingsController(settings),
+  photoPicker: photoPicker,
+  feedback: feedback,
+);

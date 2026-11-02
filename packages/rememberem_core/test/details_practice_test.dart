@@ -180,14 +180,14 @@ void main() {
       );
       var weakPicks = 0;
       for (var i = 0; i < 50; i++) {
-        if (p.pickNext([weak, strong]).detail.id == 'w') weakPicks++;
+        if (p.pickNext([weak, strong])!.detail.id == 'w') weakPicks++;
       }
 
       expect(weakPicks, greaterThan(40));
       for (var i = 0; i < 10; i++) {
-        expect(
-            p.pickNext([weak, strong], previousDetailId: 'w').detail.id, 's');
+        expect(p.pickNext([weak, strong], asked: {'w'})!.detail.id, 's');
       }
+      expect(p.pickNext([weak, strong], asked: {'w', 's'}), isNull);
     });
 
     test('choices are four different people, same names allowed', () {
