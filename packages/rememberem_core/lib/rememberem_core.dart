@@ -3,6 +3,9 @@
 library;
 
 export 'src/detail.dart';
+export 'src/detail_kind.dart';
+export 'src/detail_prompt.dart';
+export 'src/detail_type_catalog.dart';
 export 'src/detail_quiz_planner.dart';
 export 'src/app_settings.dart';
 export 'src/encounter.dart';

@@ -1,6 +1,8 @@
 import 'dart:math';
 
 import 'detail.dart';
+import 'detail_kind.dart';
+import 'detail_prompt.dart';
 import 'memory.dart';
 import 'practice_weight.dart';
 
@@ -17,12 +19,46 @@ class DetailQuizPlanner {
   /// How many people (photos) each turn offers.
   static const choiceCount = 4;
 
-  /// Every non-blank detail of [active] people, with its owner.
-  List<DetailPair> eligible(List<Memory> active) => [
-        for (final person in active)
-          for (final detail in person.details)
-            if (detail.text.trim().isNotEmpty) (person: person, detail: detail),
-      ];
+  /// The details that can be asked, with their owners: non-blank, complete
+  /// (a relationship's other person is active and not the owner; an
+  /// anniversary has its type and date), and read differently from every
+  /// other active person's details, so exactly one choice is ever right.
+  List<DetailPair> eligible(List<Memory> active) {
+    final prompt = promptFor(active);
+    final owners = <String, Set<String>>{};
+    for (final person in active) {
+      for (final detail in person.details) {
+        owners
+            .putIfAbsent(prompt(detail).equivalenceKey, () => {})
+            .add(person.id);
+      }
+    }
+    final ids = {for (final m in active) m.id};
+    return [
+      for (final person in active)
+        for (final detail in person.details)
+          if (detail.text.trim().isNotEmpty &&
+              _complete(detail, person.id, ids) &&
+              owners[prompt(detail).equivalenceKey]!.length == 1)
+            (person: person, detail: detail),
+    ];
+  }
+
+  /// How each detail reads among [active] people.
+  static DetailPrompt Function(Detail) promptFor(List<Memory> active) {
+    final names = {for (final m in active) m.id: m.displayName};
+    return (detail) => DetailPrompt(detail, (id) => names[id]);
+  }
+
+  static bool _complete(Detail d, String ownerId, Set<String> activeIds) =>
+      switch (d.kind) {
+        DetailKind.relationship => d.targetId != null &&
+            d.targetId != ownerId &&
+            activeIds.contains(d.targetId),
+        DetailKind.anniversary =>
+          (d.label?.trim() ?? '').isNotEmpty && d.eventDate != null,
+        DetailKind.fact || DetailKind.happening => true,
+      };
 
   /// Enough to play: [choiceCount] people and at least one detail. The one
   /// definition used by the list button and the game.

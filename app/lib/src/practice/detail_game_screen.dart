@@ -57,6 +57,9 @@ class _DetailGameScreenState extends State<DetailGameScreen>
   /// cannot score again or skip a turn.
   bool _advancing = false;
 
+  /// How the current detail reads (its kind, extra data and text).
+  DetailPrompt? _prompt;
+
   /// The person just picked rightly, shown green during the pause.
   String? _correctId;
   bool _hidden = false;
@@ -138,6 +141,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       _missed = false;
       _advancing = false;
       _correctId = null;
+      _prompt = DetailQuizPlanner.promptFor(people)(pair.detail);
       _phase = _Phase.reveal;
     });
     if (!_hidden) _startReveal();
@@ -237,11 +241,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
             padding: const EdgeInsets.all(32),
             child: _hidden
                 ? const Icon(Icons.visibility_off, size: 64)
-                : Text(
-                    _pair!.detail.text,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall,
-                  ),
+                : _promptView(theme, theme.textTheme.headlineSmall),
           ),
         );
       case _Phase.choose:
@@ -254,7 +254,9 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          Text('Who is this about?', style: theme.textTheme.titleMedium),
+          _promptView(theme, theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text('Who is this about?', style: theme.textTheme.bodyMedium),
           const SizedBox(height: 8),
           Expanded(
             child: GridView.count(
@@ -267,6 +269,19 @@ class _DetailGameScreenState extends State<DetailGameScreen>
           ),
         ],
       ),
+    );
+  }
+
+  /// The detail as it reads: its kind small above, then the words.
+  Widget _promptView(ThemeData theme, TextStyle? style) {
+    final prompt = _prompt!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(prompt.caption, style: theme.textTheme.labelMedium),
+        const SizedBox(height: 4),
+        Text(prompt.full, textAlign: TextAlign.center, style: style),
+      ],
     );
   }
 

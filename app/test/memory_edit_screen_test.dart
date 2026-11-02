@@ -12,7 +12,7 @@ void main() {
   late FakeDictation dictation;
   late Memory memory;
 
-  Future<void> showScreen(WidgetTester tester) async {
+  Future<void> showScreen(WidgetTester tester, {GeoPoint? here}) async {
     // A phone-sized screen, so every field is laid out.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
@@ -21,10 +21,48 @@ void main() {
       MaterialApp(
         home: MemoryEditScreen(
           memory: memory,
-          services: testServices(repository, dictation: dictation),
+          services: testServices(
+            repository,
+            dictation: dictation,
+            location: FakeLocation(here),
+          ),
         ),
       ),
     );
+    await tester.pump();
+  }
+
+  Memory saved() => repository.stored[memory.id]!;
+
+  /// Opens the add screen for [kind], types [description], and leaves the
+  /// rest to [fill] before saving.
+  Future<void> addDetail(
+    WidgetTester tester,
+    String kind,
+    String description, {
+    Future<void> Function()? fill,
+  }) async {
+    await tester.ensureVisible(find.text('+ $kind'));
+    await tester.tap(find.text('+ $kind'));
+    await tester.pumpAndSettle();
+    if (fill != null) await fill();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Description'),
+      description,
+    );
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<Memory> named(String name) async {
+    final m = await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 10, repository.stored.length + 1),
+    );
+    final withName = m.withField('name', name);
+    await repository.save(withName);
+    return withName;
   }
 
   Future<void> speakInto(
@@ -49,15 +87,18 @@ void main() {
     );
   });
 
-  testWidgets('shows empty Name, Place, Meeting and Detail fields', (
-    tester,
-  ) async {
+  testWidgets('shows Name, Place and Meeting, and four add buttons with no '
+      'empty detail', (tester) async {
     await showScreen(tester);
 
-    for (final label in ['Name', 'Place', 'Meeting', 'Detail']) {
+    for (final label in ['Name', 'Place', 'Meeting']) {
       expect(find.widgetWithText(TextField, label), findsOneWidget);
       expect(find.byTooltip('Speak $label'), findsOneWidget);
     }
+    for (final kind in ['fact', 'happening', 'relationship', 'anniversary']) {
+      expect(find.text('+ $kind'), findsOneWidget);
+    }
+    expect(find.widgetWithText(TextField, 'Description'), findsNothing);
     expect(find.textContaining('47.61000, -122.33000'), findsOneWidget);
   });
 
@@ -69,21 +110,12 @@ void main() {
     await speakInto(tester, 'Name', 'Alex Davis');
     await speakInto(tester, 'Place', 'Stake Center');
     await speakInto(tester, 'Meeting', 'Sunday Meetings');
-    await speakInto(
-      tester,
-      'Detail',
-      'Alex is from Seattle and wants to sing in the choir.',
-    );
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Alex Davis'), findsOneWidget);
-    final saved = repository.stored[memory.id]!;
-    expect(saved.field(MemoryField.name), 'Alex Davis');
-    expect(saved.latest.place, 'Stake Center');
-    expect(saved.latest.meeting, 'Sunday Meetings');
-    expect(saved.details.map((d) => d.text), [
-      'Alex is from Seattle and wants to sing in the choir.',
-    ]);
+    expect(saved().field(MemoryField.name), 'Alex Davis');
+    expect(saved().latest.place, 'Stake Center');
+    expect(saved().latest.meeting, 'Sunday Meetings');
   });
 
   testWidgets('words appear while still being spoken', (tester) async {
@@ -101,10 +133,10 @@ void main() {
   testWidgets('dictation adds to text already typed', (tester) async {
     await showScreen(tester);
 
-    await tester.enterText(find.widgetWithText(TextField, 'Detail'), 'Tall.');
-    await speakInto(tester, 'Detail', 'Likes hiking.');
+    await tester.enterText(find.widgetWithText(TextField, 'Meeting'), 'Choir');
+    await speakInto(tester, 'Meeting', 'practice');
 
-    expect(find.text('Tall. Likes hiking.'), findsOneWidget);
+    expect(find.text('Choir practice'), findsOneWidget);
   });
 
   testWidgets('leaving the screen saves a change straight away', (
@@ -115,7 +147,7 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
 
-    expect(repository.stored[memory.id]!.field(MemoryField.name), 'Alex');
+    expect(saved().field(MemoryField.name), 'Alex');
   });
 
   testWidgets('explains when speech recognition is unavailable', (
@@ -134,57 +166,164 @@ void main() {
     expect(find.byTooltip('Speak Name'), findsOneWidget);
   });
 
-  testWidgets('Add detail gives another box; both save in order', (
-    tester,
-  ) async {
+  testWidgets('a fact is just a description, spoken or typed', (tester) async {
     await showScreen(tester);
 
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Detail'),
-      'From Seattle',
-    );
-    await tester.tap(find.text('Add detail'));
-    await tester.pump();
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Detail 2'),
-      'Sings in the choir',
-    );
-    await tester.tap(find.text('Add detail'));
-    await tester.pump();
-    await tester.pumpWidget(const SizedBox());
+    await tester.tap(find.text('+ fact'));
+    await tester.pumpAndSettle();
+    await speakInto(tester, 'Description', 'Sings in the choir');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
 
-    expect(repository.stored[memory.id]!.details.map((d) => d.text), [
-      'From Seattle',
-      'Sings in the choir',
-    ]);
+    final fact = saved().details.single;
+    expect(fact.kind, DetailKind.fact);
+    expect(fact.text, 'Sings in the choir');
+    expect(find.text('Fact'), findsOneWidget);
+    expect(find.text('Sings in the choir'), findsOneWidget);
   });
 
-  testWidgets('adding a box mid-dictation keeps the words in the first box', (
+  testWidgets('Save stays off until the description and the parts of the '
+      'kind are given', (tester) async {
+    await named('Jill');
+    await showScreen(tester);
+    await tester.tap(find.text('+ relationship'));
+    await tester.pumpAndSettle();
+    TextButton save() => tester.widget(find.widgetWithText(TextButton, 'Save'));
+
+    expect(save().onPressed, isNull);
+    await tester.enterText(find.widgetWithText(TextField, 'Description'), 'x');
+    await tester.pump();
+    expect(save().onPressed, isNull); // no type or person yet
+    await tester.tap(find.text('boss'));
+    await tester.pump();
+    expect(save().onPressed, isNull); // no person yet
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(saved().details, isEmpty);
+  });
+
+  testWidgets('a happening starts now at the known place where the phone is', (
+    tester,
+  ) async {
+    await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 10, 1),
+      location: const GeoPoint(47.0, -122.0),
+      place: 'Park',
+    );
+    await showScreen(tester, here: const GeoPoint(47.0, -122.0));
+
+    await addDetail(tester, 'happening', 'Picnic');
+
+    final happening = saved().details.single;
+    expect(happening.kind, DetailKind.happening);
+    expect(happening.place, 'Park');
+    expect(find.textContaining(', Park'), findsOneWidget);
+  });
+
+  testWidgets('a relationship reads "My boss is Jill" and follows her name', (
+    tester,
+  ) async {
+    final jill = await named('Jill');
+    await showScreen(tester);
+
+    await addDetail(
+      tester,
+      'relationship',
+      'Since 2020',
+      fill: () async {
+        await tester.tap(find.text('boss'));
+        await tester.tap(find.byType(DropdownButtonFormField<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Jill').last);
+        await tester.pumpAndSettle();
+      },
+    );
+
+    final r = saved().details.single;
+    expect(
+      [r.kind, r.label, r.targetId],
+      [DetailKind.relationship, 'boss', jill.id],
+    );
+    expect(find.text('My boss is Jill'), findsOneWidget);
+
+    await repository.save(jill.withField('name', 'Jillian'));
+    memory = saved();
+    await tester.pumpWidget(const SizedBox());
+    await showScreen(tester);
+    await tester.pump();
+    expect(find.text('My boss is Jillian'), findsOneWidget);
+  });
+
+  testWidgets('a relationship to someone in the trash reads "someone '
+      'removed"', (tester) async {
+    final jill = await named('Jill');
+    memory = memory.withDetails([
+      Detail(
+        id: 'r',
+        text: 'Kind',
+        at: DateTime(2026),
+        type: DetailKind.relationship,
+        label: 'boss',
+        targetId: jill.id,
+      ),
+    ]);
+    await repository.trash(jill.id, DateTime(2026, 11, 2));
+    final bo = await named('Bo');
+    await showScreen(tester);
+
+    expect(find.text('My boss is someone removed'), findsOneWidget);
+
+    // Changing it asks for someone new rather than failing.
+    await tester.tap(find.text('My boss is someone removed'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    TextButton save() => tester.widget(find.widgetWithText(TextButton, 'Save'));
+    expect(save().onPressed, isNull);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bo').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(saved().details.single.targetId, bo.id);
+    expect(find.text('My boss is Bo'), findsOneWidget);
+  });
+
+  testWidgets('a custom anniversary type is offered while it is in use', (
     tester,
   ) async {
     await showScreen(tester);
 
-    await tester.tap(find.byTooltip('Speak Detail'));
-    await tester.pump();
-    dictation.say('From');
-    await tester.pump();
-    final firstTime = repository.stored[memory.id]!.details.single.at;
-    await tester.tap(find.text('Add detail'));
-    await tester.pump();
-    dictation.say('From Seattle');
-    dictation.goQuiet();
-    await tester.pump(const Duration(seconds: 1));
-
-    final details = repository.stored[memory.id]!.details;
-    expect(details.single.text, 'From Seattle');
-    expect(details.single.at, firstTime);
-    expect(
-      tester
-          .widget<TextField>(find.widgetWithText(TextField, 'Detail 2'))
-          .controller!
-          .text,
-      isEmpty,
+    await addDetail(
+      tester,
+      'anniversary',
+      'At the cabin',
+      fill: () async {
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Or type a new one'),
+          'Baptism',
+        );
+        await tester.tap(find.text('Choose the first date'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+      },
     );
+    final a = saved().details.single;
+    expect([a.kind, a.label], [DetailKind.anniversary, 'Baptism']);
+    expect(a.eventDate, isNotNull);
+
+    memory = saved();
+    await tester.pumpWidget(const SizedBox());
+    await showScreen(tester); // the card reads people when it opens
+    await tester.ensureVisible(find.text('+ anniversary'));
+    await tester.tap(find.text('+ anniversary'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ChoiceChip, 'Baptism'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'wedding'), findsOneWidget);
   });
 
   testWidgets('a legacy record shows its details and is not rewritten '
@@ -198,60 +337,59 @@ void main() {
     await showScreen(tester);
 
     expect(find.text('Likes hiking'), findsOneWidget);
+    expect(find.text('Fact'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
 
     expect(repository.saves, isEmpty);
   });
 
   group('person card details', () {
+    late Memory jill;
+
     Future<void> showWithDetails(WidgetTester tester) async {
+      jill = await named('Jill');
       memory = memory.withDetails([
         Detail(id: 'a', text: 'From Seattle', at: DateTime(2026, 11, 1, 10)),
-        Detail(id: 'b', text: 'Sings', at: DateTime(2026, 11, 1, 11, 30)),
+        Detail(
+          id: 'b',
+          text: 'Sings',
+          at: DateTime(2026, 11, 1, 11, 30),
+          type: DetailKind.relationship,
+          label: 'boss',
+          targetId: jill.id,
+          points: 3,
+        ),
       ]);
+      await repository.save(memory);
+      repository.saves.clear();
       await showScreen(tester);
     }
 
-    testWidgets('each saved detail shows its local recorded time', (
+    testWidgets('each shows its kind in the corner and its prefix', (
       tester,
     ) async {
       await showWithDetails(tester);
 
-      expect(find.text('Sunday, November 1, 2026, 10:00 AM'), findsOneWidget);
-      expect(find.text('Sunday, November 1, 2026, 11:30 AM'), findsOneWidget);
-      expect(find.byTooltip('Delete Detail 3'), findsOneWidget);
-      expect(find.textContaining('2026, '), findsNWidgets(2));
+      expect(find.text('Fact'), findsOneWidget);
+      expect(find.text('Relationship'), findsOneWidget);
+      expect(find.text('My boss is Jill'), findsOneWidget);
     });
 
-    testWidgets('long-press the time to pick a new date and time', (
+    testWidgets('tapping the prefix changes the type, keeping the score', (
       tester,
     ) async {
       await showWithDetails(tester);
 
-      await tester.longPress(find.text('Sunday, November 1, 2026, 10:00 AM'));
+      await tester.tap(find.text('My boss is Jill'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('15'));
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Sunday, November 15, 2026, 10:00 AM'), findsOneWidget);
-      final saved = repository.saves.last.details.first;
-      expect(saved.at.isAtSameMomentAs(DateTime(2026, 11, 15, 10)), isTrue);
-      expect(saved.text, 'From Seattle');
-    });
-
-    testWidgets('cancelling the date picker changes nothing', (tester) async {
-      await showWithDetails(tester);
-
-      await tester.longPress(find.text('Sunday, November 1, 2026, 10:00 AM'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancel'));
+      await tester.tap(find.text('friend'));
+      await tester.pump();
+      await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Sunday, November 1, 2026, 10:00 AM'), findsOneWidget);
-      expect(repository.saves, isEmpty);
+      expect(find.text('My friend is Jill'), findsOneWidget);
+      final b = repository.saves.last.details.last;
+      expect([b.id, b.label, b.text, b.points], ['b', 'friend', 'Sings', 3]);
     });
 
     testWidgets('delete removes a detail at once; Undo puts it back', (
@@ -259,19 +397,16 @@ void main() {
     ) async {
       await showWithDetails(tester);
 
-      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1)); // snackbar slides in
       expect(find.text('From Seattle'), findsNothing);
-      expect(repository.saves.last.details.map((d) => d.text), ['Sings']);
+      expect(repository.saves.last.details.map((d) => d.id), ['b']);
 
       await tester.tap(find.text('Undo'));
       await tester.pump();
       expect(find.text('From Seattle'), findsOneWidget);
-      expect(repository.saves.last.details.map((d) => d.text), [
-        'From Seattle',
-        'Sings',
-      ]);
+      expect(repository.saves.last.details.map((d) => d.id), ['a', 'b']);
 
       await tester.enterText(
         find.widgetWithText(TextField, 'From Seattle'),
@@ -281,35 +416,19 @@ void main() {
       expect(repository.saves.last.details.first.text, 'From Tacoma');
     });
 
-    testWidgets('deleting the only detail leaves one blank box', (
-      tester,
-    ) async {
-      memory = memory.withDetails([
-        Detail(id: 'a', text: 'Tall', at: DateTime(2026, 11, 1)),
-      ]);
-      await showScreen(tester);
-
-      await tester.tap(find.byTooltip('Delete Detail'));
-      await tester.pump();
-
-      expect(find.widgetWithText(TextField, 'Detail'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Detail 2'), findsNothing);
-      expect(repository.saves.last.details, isEmpty);
-    });
-
     testWidgets('a late dictation result cannot revive a deleted detail', (
       tester,
     ) async {
       await showWithDetails(tester);
 
-      await tester.tap(find.byTooltip('Speak Detail'));
+      await tester.tap(find.byTooltip('Speak Description').first);
       await tester.pump();
-      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();
       dictation.sayLate('late words');
       await tester.pump(const Duration(seconds: 1));
 
-      expect(repository.saves.last.details.map((d) => d.text), ['Sings']);
+      expect(repository.saves.last.details.map((d) => d.id), ['b']);
     });
   });
 
@@ -338,7 +457,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.tap(find.byTooltip('Delete Fact').first);
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('Undo'), findsOneWidget);
@@ -347,7 +466,7 @@ void main() {
 
       expect(find.text('list'), findsOneWidget);
       expect(find.text('Undo'), findsNothing);
-      expect(repository.stored[memory.id]!.details.map((d) => d.id), ['b']);
+      expect(saved().details.map((d) => d.id), ['b']);
     });
 
     testWidgets('leaving without the back handler also clears it', (
@@ -357,7 +476,7 @@ void main() {
         Detail(id: 'a', text: 'Tall', at: DateTime(2026, 11, 1)),
       ]);
       await showScreen(tester);
-      await tester.tap(find.byTooltip('Delete Detail'));
+      await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
@@ -365,19 +484,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Undo'), findsNothing);
-      expect(repository.stored[memory.id]!.details, isEmpty);
-    });
-
-    testWidgets('deleting a blank row saves nothing', (tester) async {
-      await showScreen(tester);
-      await tester.tap(find.text('Add detail'));
-      await tester.pump();
-
-      await tester.tap(find.byTooltip('Delete Detail 2'));
-      await tester.pump();
-
-      expect(find.widgetWithText(TextField, 'Detail 2'), findsNothing);
-      expect(repository.saves, isEmpty);
+      expect(saved().details, isEmpty);
     });
   });
 

@@ -137,7 +137,9 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(Image), findsNWidgets(4));
-    expect(find.textContaining('about #'), findsNothing);
+    // The detail stays above the choices, with its kind.
+    expect(find.textContaining('about #'), findsOneWidget);
+    expect(find.text('Fact'), findsOneWidget);
   });
 
   testWidgets('first try right scores the detail', (tester) async {
@@ -314,5 +316,40 @@ void main() {
     await tester.tap(find.text('Practice details'));
     await tester.pumpAndSettle();
     expect(find.byType(DetailGameScreen), findsOneWidget);
+  });
+
+  testWidgets('a relationship reads "My boss is Bo"; its owner is the answer', (
+    tester,
+  ) async {
+    final ids = <String>[];
+    for (final name in ['Ann', 'Bo', 'Cy', 'Di']) {
+      final m = await repository.add(
+        photoJpeg: [],
+        capturedAt: DateTime(2026, 1, ids.length + 1),
+      );
+      await repository.save(m.withField('name', name));
+      ids.add(m.id);
+    }
+    final ann = repository.stored[ids[0]]!;
+    await repository.save(
+      ann.withDetails([
+        Detail(
+          id: 'r',
+          text: 'Since 2020',
+          at: DateTime.utc(2026),
+          type: DetailKind.relationship,
+          label: 'boss',
+          targetId: ids[1],
+        ),
+      ]),
+    );
+    await showGame(tester);
+
+    expect(find.text('My boss is Bo: Since 2020'), findsOneWidget);
+    expect(find.text('Relationship'), findsOneWidget);
+    await reveal(tester);
+    await pick(tester, repository.stored[ids[0]]!);
+
+    expect(repository.detailAnswers, [(ids[0], 'r', true)]);
   });
 }

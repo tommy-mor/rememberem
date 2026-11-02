@@ -38,39 +38,38 @@ class MemoryEditor {
     _scheduleSave();
   }
 
-  /// Sets the text of detail [id]. A new detail is stamped with the time
-  /// its text first becomes non-blank and saved straight away; later edits
-  /// keep that time.
+  /// Adds a new [detail] and saves at once; one with a blank description
+  /// is ignored.
+  void addDetail(Detail detail) {
+    if (_closed || detail.text.trim().isEmpty) return;
+    if (_memory.details.any((d) => d.id == detail.id)) return;
+    _memory = _memory.withDetails([..._memory.details, detail]);
+    _flushNow();
+  }
+
+  /// Puts [detail] in place of the detail with its id (its kind's extra
+  /// data was changed) and saves at once. Build it with [Detail.copyWith]
+  /// so its score is kept.
+  void replaceDetail(Detail detail) {
+    if (_closed || _deleted.contains(detail.id)) return;
+    final details = _memory.details;
+    final index = details.indexWhere((d) => d.id == detail.id);
+    if (index == -1 || detail.text.trim().isEmpty) return;
+    _memory = _memory.withDetails([...details]..[index] = detail);
+    _flushNow();
+  }
+
+  /// Sets the description of saved detail [id], saved shortly after.
   void updateDetail(String id, String text) {
     if (_closed || _deleted.contains(id)) return;
     final details = _memory.details;
     final index = details.indexWhere((d) => d.id == id);
-    if (index == -1) {
-      if (text.trim().isEmpty) return;
-      _memory = _memory.withDetails([
-        ...details,
-        Detail(id: id, text: text, at: clock()),
-      ]);
-      _flushNow();
-      return;
-    }
+    if (index == -1) return;
     if (details[index].text == text) return;
     _memory = _memory.withDetails(
       [...details]..[index] = details[index].copyWith(text: text),
     );
     _scheduleSave();
-  }
-
-  /// Changes when detail [id] was recorded, keeping its text and place.
-  void setDetailTime(String id, DateTime at) {
-    if (_closed) return;
-    final details = _memory.details;
-    final index = details.indexWhere((d) => d.id == id);
-    if (index == -1) return;
-    _memory = _memory.withDetails(
-      [...details]..[index] = details[index].copyWith(at: at),
-    );
-    _flushNow();
   }
 
   /// Removes detail [id] (saved or not) and saves at once. Later edits to

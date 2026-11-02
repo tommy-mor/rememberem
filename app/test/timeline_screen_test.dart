@@ -47,7 +47,12 @@ void main() {
     );
     final named = memory.withField('name', name).withDetails([
       for (final (i, at) in details.indexed)
-        Detail(id: '${memory.id}-$i', text: 'detail', at: at),
+        Detail(
+          id: '${memory.id}-$i',
+          text: 'detail',
+          at: at,
+          type: DetailKind.happening,
+        ),
     ]);
     await repository.save(named);
     return named;

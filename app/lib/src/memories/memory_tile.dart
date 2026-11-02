@@ -19,12 +19,9 @@ class MemoryTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// What to call someone whose name is blank (nothing is stored).
-  static const unknownName = 'Unknown';
+  static const unknownName = Memory.unknownName;
 
-  static String nameOf(Memory memory) {
-    final name = memory.field(MemoryField.name).trim();
-    return name.isEmpty ? unknownName : name;
-  }
+  static String nameOf(Memory memory) => memory.displayName;
 
   @override
   Widget build(BuildContext context) {

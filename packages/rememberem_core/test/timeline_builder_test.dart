@@ -18,7 +18,12 @@ Memory person(
       fields: {'name': name},
       details: [
         for (final (i, at) in detailTimes.indexed)
-          Detail(id: '$id-$i', text: 'detail $i', at: at),
+          Detail(
+            id: '$id-$i',
+            text: 'detail $i',
+            at: at,
+            type: DetailKind.happening,
+          ),
       ],
     );
 
@@ -167,5 +172,39 @@ void main() {
 
     expect(LocalDay.of(local.toUtc()), LocalDay.of(local));
     expect(LocalDay.of(local), const LocalDay(2026, 11, 1));
+  });
+
+  test(
+      'facts, relationships and anniversaries never reach the timeline; '
+      'their owner appears once as recorded', () {
+    final first = DateTime(2026, 10, 1, 12);
+    final alex = Memory(
+      id: 'a',
+      encounters: [Encounter(photoFileName: 'a.jpg', capturedAt: first)],
+      details: [
+        Detail(id: 'f', text: 'Loves jazz', at: d), // untyped: a fact
+        Detail(
+          id: 'r',
+          text: 'Since 2020',
+          at: d,
+          type: DetailKind.relationship,
+          targetId: 'j',
+          label: 'boss',
+        ),
+        Detail(
+          id: 'n',
+          text: 'Big party',
+          at: d,
+          type: DetailKind.anniversary,
+          label: 'wedding',
+          eventDate: DateTime(2010, 6, 3),
+        ),
+      ],
+    );
+
+    final days = builder.build([alex]);
+
+    expect(days.single.day, LocalDay.of(first));
+    expect(days.single.groups.single.recordedIds, {'a'});
   });
 }

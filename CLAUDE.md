@@ -124,6 +124,11 @@ has already been tried and fallen short.
   written before it existed kept one `fields['details']` string. That string
   loads as a single detail timed at the first encounter, and the key is
   dropped on the next save.
+- Each detail has a `type` (fact, happening, relationship or anniversary).
+  Records written before typed details have no `type` and read as facts.
+  Relationships keep the other person's id in `targetId`; merge and purge
+  repoint or clear it in every record. Relationship and anniversary types
+  are derived from the data, never stored.
 - `points` and `lastCorrectDate` on a person (face practice) and on a detail
   (details practice) are left out of the file until used. They change only
   through `recordAnswer` and `recordDetailAnswer`, and `save()` keeps the stored

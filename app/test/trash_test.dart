@@ -165,6 +165,7 @@ void main() {
     await tester.tap(find.byTooltip('Delete forever'));
     await tester.pumpAndSettle();
     expect(find.text('Delete Alex forever?'), findsOneWidget);
+    expect(find.textContaining('no longer link to them'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(repository.purges, isEmpty);

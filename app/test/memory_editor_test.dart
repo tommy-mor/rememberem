@@ -46,63 +46,86 @@ void main() {
   });
 
   group('details', () {
-    test('a new detail is stamped with the clock and saved at once; '
-        'later edits keep its time', () {
+    test('an added detail saves at once; later edits keep its time and '
+        'kind', () {
       fakeAsync((async) {
         final repository = FakeMemoryRepository();
-        var now = DateTime.utc(2026, 11, 1, 10, 0);
-        final editor = MemoryEditor(repository, memory, clock: () => now);
+        final editor = MemoryEditor(repository, memory);
+        final at = DateTime.utc(2026, 11, 1, 10);
 
-        editor.updateDetail('d1', 'From');
+        editor.addDetail(
+          Detail(id: 'd1', text: 'From', at: at, type: DetailKind.fact),
+        );
         async.flushMicrotasks();
-        expect(repository.saves.single.details.single.at, now);
+        expect(repository.saves.single.details.single.at, at);
 
-        final first = now;
-        now = DateTime.utc(2026, 11, 1, 10, 5);
         editor.updateDetail('d1', 'From Seattle');
-        editor.updateDetail('d2', 'Choir');
         async.elapse(const Duration(seconds: 1));
 
-        final saved = repository.saves.last.details;
-        expect(saved.map((d) => d.text), ['From Seattle', 'Choir']);
-        expect(saved[0].at, first);
-        expect(saved[1].at, now);
+        final saved = repository.saves.last.details.single;
+        expect(
+          [saved.text, saved.at, saved.kind],
+          ['From Seattle', at, DetailKind.fact],
+        );
       });
     });
 
-    test('blank text never creates or saves a detail', () {
+    test('a blank description is never added or saved', () {
       fakeAsync((async) {
         final repository = FakeMemoryRepository();
         final editor = MemoryEditor(repository, memory);
 
-        editor.updateDetail('d1', '   ');
+        editor.addDetail(Detail(id: 'd1', text: '  ', at: DateTime.utc(2026)));
+        editor.updateDetail('d2', 'nothing to update');
         async.elapse(const Duration(seconds: 1));
 
         expect(repository.saves, isEmpty);
       });
     });
 
-    test(
-      'clearing a detail drops it from the save; retyping keeps its time',
-      () {
-        fakeAsync((async) {
-          final repository = FakeMemoryRepository();
-          var now = DateTime.utc(2026, 11, 1, 10);
-          final editor = MemoryEditor(repository, memory, clock: () => now);
-          editor.updateDetail('d1', 'Tall');
-          final first = now;
-          now = DateTime.utc(2026, 11, 2);
+    test('clearing a description drops it from the save; retyping brings '
+        'it back with its time', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final at = DateTime.utc(2026, 11, 1, 10);
+        final editor = MemoryEditor(repository, memory)
+          ..addDetail(Detail(id: 'd1', text: 'Tall', at: at));
 
-          editor.updateDetail('d1', '');
-          async.elapse(const Duration(seconds: 1));
-          expect(repository.saves.last.details, isEmpty);
+        editor.updateDetail('d1', '');
+        async.elapse(const Duration(seconds: 1));
+        expect(repository.saves.last.details, isEmpty);
 
-          editor.updateDetail('d1', 'Very tall');
-          async.elapse(const Duration(seconds: 1));
-          expect(repository.saves.last.details.single.at, first);
-        });
-      },
-    );
+        editor.updateDetail('d1', 'Very tall');
+        async.elapse(const Duration(seconds: 1));
+        expect(repository.saves.last.details.single.at, at);
+      });
+    });
+
+    test('replacing a detail keeps its score and ignores a deleted one', () {
+      fakeAsync((async) {
+        final repository = FakeMemoryRepository();
+        final scored = Detail(
+          id: 'r',
+          text: 'Kind',
+          at: DateTime.utc(2026),
+          type: DetailKind.relationship,
+          label: 'boss',
+          targetId: 'jill',
+          points: 4,
+        );
+        final editor = MemoryEditor(repository, memory.withDetails([scored]));
+
+        editor.replaceDetail(scored.copyWith(label: 'friend'));
+        async.flushMicrotasks();
+        expect(repository.saves.last.details.single.label, 'friend');
+        expect(repository.saves.last.details.single.points, 4);
+
+        editor.deleteDetail('r');
+        editor.replaceDetail(scored.copyWith(label: 'mentor'));
+        async.flushMicrotasks();
+        expect(repository.saves.last.details, isEmpty);
+      });
+    });
 
     test('editing only the name of a legacy record keeps its details once', () {
       fakeAsync((async) {
@@ -157,13 +180,13 @@ void main() {
       Detail(id: 'b', text: 'Sings', at: at2),
     ]);
 
-    test('setDetailTime saves at once and survives a later text edit', () {
+    test('re-dating saves at once and survives a later text edit', () {
       fakeAsync((async) {
         final repository = FakeMemoryRepository();
         final editor = MemoryEditor(repository, withTwo);
         final newAt = DateTime.utc(2020, 1, 2, 3, 4);
 
-        editor.setDetailTime('a', newAt);
+        editor.replaceDetail(withTwo.details.first.copyWith(at: newAt));
         async.flushMicrotasks();
         expect(repository.saves.last.details.first.at, newAt);
 
@@ -232,14 +255,14 @@ void main() {
 
         editor.deleteDetail('a');
         async.flushMicrotasks();
-        editor.setDetailTime('b', at1);
+        editor.replaceDetail(withTwo.details.last.copyWith(at: at1));
         async.flushMicrotasks();
 
         expect(repository.saves.last.details.single.at, at1);
       });
     });
 
-    test('a legacy detail can be re-dated and deleted for good', () {
+    test('a legacy detail can be changed and deleted for good', () {
       fakeAsync((async) {
         final repository = FakeMemoryRepository();
         final legacy = Memory.fromJson({
@@ -250,7 +273,7 @@ void main() {
         });
         final editor = MemoryEditor(repository, legacy);
 
-        editor.setDetailTime('old-legacy', at2);
+        editor.replaceDetail(legacy.details.single.copyWith(at: at2));
         async.flushMicrotasks();
         expect(repository.saves.last.details.single.at, at2);
 

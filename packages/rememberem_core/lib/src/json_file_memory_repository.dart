@@ -113,8 +113,36 @@ class JsonFileMemoryRepository implements MemoryRepository {
         if (await record.exists() && _isActive(await record.readAsString())) {
           throw StateError('Memory $id is not in the trash');
         }
+        // Others' relationships to this person lose the link (their label
+        // and description stay). Before the delete, so a crash leaves a
+        // trashed record that a retry purges again.
+        await _retarget(id, null);
         await _deleteFiles(id);
       });
+
+  /// Points every relationship to [from] at [to] (or at no one), in active
+  /// and trashed records alike, writing only records that change. Reads
+  /// each file on its own and skips any it cannot read, so one corrupt
+  /// record never blocks a purge or merge. Safe to repeat. Run only inside
+  /// [_serial].
+  Future<void> _retarget(String from, String? to) async {
+    if (!await folder.exists()) return;
+    final files = await folder.list().toList();
+    for (final entity in files) {
+      if (entity is! File || !entity.path.endsWith('.json')) continue;
+      final Memory memory;
+      try {
+        memory = Memory.fromJson(
+          jsonDecode(await entity.readAsString()) as Map<String, dynamic>,
+        );
+      } catch (_) {
+        continue;
+      }
+      if (memory.id == from) continue;
+      final changed = memory.withRelationshipsRetargeted(from, to);
+      if (!identical(changed, memory)) await _write(changed);
+    }
+  }
 
   /// Deletes every file of [id]: photos and temp files first, the record
   /// last. Run only inside [_serial].
@@ -159,11 +187,13 @@ class JsonFileMemoryRepository implements MemoryRepository {
           }
           moved.add(renamed);
         }
-        final merged = survivor.merged(discarded.withEncounters(moved));
-        await _write(merged);
+        await _write(survivor.merged(discarded.withEncounters(moved)));
+        // Everyone's relationships to the other person now mean the
+        // survivor (the survivor's own included, which are dropped).
+        await _retarget(discardedId, survivorId);
         // Only now is it safe to delete the other person.
         await _deleteFiles(discardedId);
-        return merged;
+        return _readActive(survivorId);
       });
 
   @override

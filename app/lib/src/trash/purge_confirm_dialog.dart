@@ -19,7 +19,8 @@ class PurgeConfirmDialog extends StatelessWidget {
     return AlertDialog(
       title: Text('Delete $name forever?'),
       content: const Text(
-        'This deletes their photo and notes from this phone.',
+        'This deletes their photo and notes from this phone. Notes about '
+        'them on other people stay, but no longer link to them.',
       ),
       actions: [
         TextButton(

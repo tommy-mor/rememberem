@@ -1,3 +1,4 @@
+import 'detail_kind.dart';
 import 'encounter.dart';
 import 'local_day.dart';
 import 'meeting_finder.dart';
@@ -6,9 +7,10 @@ import 'memory_field.dart';
 import 'timeline_day.dart';
 import 'timeline_group.dart';
 
-/// Lays people out by the days of their details, grouped by where and at
-/// which meeting. A person with no details stands in once, as "recorded"
-/// on the day they were first met. Never changes a [Memory].
+/// Lays people out by the days of their happenings, grouped by where and
+/// at which meeting. Facts, relationships and anniversaries have no place
+/// here. A person with no happenings stands in once, as "recorded" on the
+/// day they were first met. Never changes a [Memory].
 class TimelineBuilder {
   const TimelineBuilder();
 
@@ -16,12 +18,16 @@ class TimelineBuilder {
   List<TimelineDay> build(List<Memory> active, {LocalDay? only}) {
     final buckets = <_Bucket>[];
     for (final memory in active) {
-      if (memory.details.isEmpty) {
+      final happenings = [
+        for (final d in memory.details)
+          if (d.kind == DetailKind.happening) d,
+      ];
+      if (happenings.isEmpty) {
         final first = memory.encounters.last;
         _add(buckets, LocalDay.of(first.capturedAt), first, memory, true);
         continue;
       }
-      for (final detail in memory.details) {
+      for (final detail in happenings) {
         final day = LocalDay.of(detail.at);
         _add(
             buckets, day, _encounterFor(memory, day, detail.at), memory, false);

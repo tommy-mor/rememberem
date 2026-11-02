@@ -50,6 +50,16 @@ These summarise the shipped stories. Where they conflict with older entries belo
   - **Photos from the phone.** On Android they come from the document picker through `OriginalPhotoPicker.kt`, with `ACCESS_MEDIA_LOCATION` asked on the first pick. The original bytes go straight to Dart with no copy. The system photo picker strips GPS, which was verified on the emulator. On iOS, `image_picker` is used, with its cache copy deleted; this is unverified.
   - **Photo metadata.** `PhotoMetadata.read` never throws. It rejects bad rationals and coordinates, and dates before 2000 or in the future. With no EXIF, the location is null, never the phone's current location.
   - **Games.** No person or detail is asked twice, so a game is `min(setting, eligible)` turns. A right answer gives a light haptic (if vibration is on) and a chime, the right choice turns green, and the next question comes after a 1 s pause. A wrong answer plays a soft sound. Sounds respect silent mode and take no audio focus on Android.
+- **Story 16: typed details.**
+  - **The model.** `Detail` has a kind: fact, happening, relationship or anniversary. It can also carry `place`, `targetId`, `label` and `eventDate` (`YYYY-MM-DD`).
+  - **Old details stay untyped.** Details written before this story have no `type` key. They read as facts and are never rewritten on open. New details always write `type`, facts included, so the old ones stay recognisable if their meaning is ever revisited. This deviates from the plan on purpose.
+  - **Bad data.** A bad value in a new key loses only that value.
+  - **Relationship targets.** These are memory ids, resolved to active names when shown ("someone removed" otherwise). A merge points them at the survivor and drops any that point at their own owner. A purge clears them in every other record, label and description kept. Both use a tolerant per-file scan before the delete and rewrite only changed records.
+  - **Types.** Relationship and anniversary types are the defaults plus custom ones derived from active and trashed people. Nothing is stored.
+  - **Quiz eligibility.** `DetailPrompt` is the one wording, on the card and in the game. The planner skips any detail that reads the same as another active person's (equivalence key from the rendered prompt), a relationship whose target is not active or is the owner, and an incomplete anniversary. So every turn has exactly one right answer: the owner.
+  - **Timeline.** Only happenings reach it; anyone without one appears once as "recorded".
+  - **Card.** The card shows four add buttons. Each kind is added and changed on its own screen, and a blank description is never saved.
+  - **Rollback risk.** A build older than this one would drop the new keys on its next save of a record, so never install an older build over newer data.
 
 ## Invariants
 

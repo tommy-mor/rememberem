@@ -5,6 +5,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../speech/dictated_text_field.dart';
+import 'detail_edit_screen.dart';
 import 'detail_list_editor.dart';
 import 'encounter_edit_screen.dart';
 import 'memory_editor.dart';
@@ -43,11 +44,19 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   /// so the Place and Meeting fields reload their text.
   int _fieldsGen = 0;
 
+  /// Everyone active and in the trash, read once on opening: names for
+  /// relationships, and the types in use.
+  List<Memory> _people = const [];
+  Map<String, String> _activeNames = const {};
+
   /// Set while Back is saving and leaving.
   bool _leaving = false;
 
   /// Set when leaving via a merge, whose own snackbar must survive.
   bool _keepSnackBars = false;
+
+  /// Reading [_people]; an editor waits for it so its lists are whole.
+  late Future<void> _peopleLoaded;
 
   @override
   void initState() {
@@ -56,6 +65,66 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     _lifecycle = AppLifecycleListener(
       onInactive: () => unawaited(_editor.flush().catchError((_) {})),
     );
+    _peopleLoaded = _loadPeople();
+  }
+
+  Future<void> _loadPeople() async {
+    try {
+      final active = await widget.repository.all();
+      final trashed = await widget.repository.trashed();
+      if (!mounted) return;
+      setState(() {
+        _people = [...active, ...trashed];
+        _activeNames = {for (final m in active) m.id: m.displayName};
+      });
+    } catch (_) {
+      // Names then read as "someone removed" until the card reopens.
+    }
+  }
+
+  /// The known place nearest to where the phone is now, or null.
+  Future<String?> _placeHere() async {
+    final at = await widget.services.location.current();
+    if (at == null) return null;
+    final active = [
+      for (final m in _people)
+        if (m.trashedAt == null) m,
+    ];
+    return widget.services.settings.value.placeFinder
+        .nearest(at, active)
+        ?.place;
+  }
+
+  Future<Detail?> _openDetail(DetailKind kind, {Detail? existing}) async {
+    await _peopleLoaded;
+    if (!mounted) return null;
+    final now = _editor.clock();
+    return Navigator.of(context).push<Detail>(
+      MaterialPageRoute(
+        builder: (_) => DetailEditScreen(
+          kind: kind,
+          ownerId: _editor.memory.id,
+          people: _people,
+          dictation: widget.services.dictation,
+          newId: now.microsecondsSinceEpoch.toRadixString(36),
+          now: now,
+          existing: existing,
+          placeHere: existing == null && kind == DetailKind.happening
+              ? _placeHere()
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addDetail(DetailKind kind) async {
+    final detail = await _openDetail(kind);
+    if (detail != null && mounted) _edit(() => _editor.addDetail(detail));
+  }
+
+  Future<void> _changeDetail(Detail existing) async {
+    final detail = await _openDetail(existing.kind, existing: existing);
+    if (detail != null && mounted) _edit(() => _editor.replaceDetail(detail));
   }
 
   @override
@@ -154,10 +223,11 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             DetailListEditor(
               details: _editor.memory.details,
               dictation: widget.services.dictation,
+              nameOf: (id) => _activeNames[id],
               onChanged: (id, text) =>
                   _edit(() => _editor.updateDetail(id, text)),
-              onTimeChanged: (id, at) =>
-                  _edit(() => _editor.setDetailTime(id, at)),
+              onAdd: _addDetail,
+              onEdit: _changeDetail,
               onDelete: (id) => _edit(() => _editor.deleteDetail(id)),
               onRestore: (detail, index) =>
                   _edit(() => _editor.restoreDetail(detail, index)),

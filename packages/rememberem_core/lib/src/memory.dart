@@ -1,4 +1,5 @@
 import 'detail.dart';
+import 'detail_kind.dart';
 import 'encounter.dart';
 import 'geo_point.dart';
 import 'memory_field.dart';
@@ -135,6 +136,16 @@ class Memory {
   Encounter get latest => encounters.first;
 
   String get photoFileName => latest.photoFileName;
+
+  /// What to call someone whose name is blank (nothing is stored).
+  static const unknownName = 'Unknown';
+
+  /// The name to show: the name, or [unknownName].
+  String get displayName {
+    final name = field(MemoryField.name).trim();
+    return name.isEmpty ? unknownName : name;
+  }
+
   DateTime get capturedAt => latest.capturedAt;
   GeoPoint? get location => latest.location;
 
@@ -171,6 +182,33 @@ class Memory {
         else
           d,
     ]);
+  }
+
+  /// This record with relationships to [from] pointing at [to] instead
+  /// (a merge), or at no one if [to] is null (a purge: the label and
+  /// description stay). A relationship that would point at its owner is
+  /// dropped. Returns this same object when nothing changes.
+  Memory withRelationshipsRetargeted(String from, String? to) {
+    var changed = false;
+    final kept = <Detail>[];
+    for (final d in details) {
+      if (d.kind != DetailKind.relationship) {
+        kept.add(d);
+        continue;
+      }
+      final target = d.targetId == from ? to : d.targetId;
+      if (target == id) {
+        changed = true; // pointing at themselves: meaningless, so dropped
+        continue;
+      }
+      if (target != d.targetId) {
+        changed = true;
+        kept.add(d.copyWith(targetId: () => target));
+      } else {
+        kept.add(d);
+      }
+    }
+    return changed ? withDetails(kept) : this;
   }
 
   Memory withEncounters(List<Encounter> encounters) =>

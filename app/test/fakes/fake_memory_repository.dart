@@ -132,7 +132,16 @@ class FakeMemoryRepository implements MemoryRepository {
       throw StateError('Memory $id is not in the trash');
     }
     purges.add(id);
+    _retarget(id, null);
     stored.remove(id);
+  }
+
+  /// As the real repository: relationships to [from] now mean [to].
+  void _retarget(String from, String? to) {
+    for (final id in [...stored.keys]) {
+      if (id == from) continue;
+      stored[id] = stored[id]!.withRelationshipsRetargeted(from, to);
+    }
   }
 
   @override
@@ -158,9 +167,10 @@ class FakeMemoryRepository implements MemoryRepository {
       ]),
     );
     stored[survivorId] = merged;
+    _retarget(discardedId, survivorId);
     stored.remove(discardedId);
     purges.add(discardedId);
-    return merged;
+    return stored[survivorId]!;
   }
 
   @override
