@@ -158,6 +158,21 @@ class Memory {
 
   Memory withDetails(List<Detail> details) => _copy(details: details);
 
+  /// This record with each detail's practice score taken from [onDisk]
+  /// (matched by id), wholesale: the stored score always wins over an
+  /// in-memory copy, so a stale editor save never undoes a game result.
+  /// Details not on disk keep their own score; none are added.
+  Memory withDetailScores(List<Detail> onDisk) {
+    final stored = {for (final d in onDisk) d.id: d};
+    return withDetails([
+      for (final d in details)
+        if (stored[d.id] case final disk?)
+          d.withScore(disk.points, disk.lastCorrectDate)
+        else
+          d,
+    ]);
+  }
+
   Memory withEncounters(List<Encounter> encounters) =>
       _copy(encounters: encounters);
 

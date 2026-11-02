@@ -117,11 +117,16 @@ has already been tried and fallen short.
 - `fields` is an open map holding the name. **Adding keys needs no migration;
   renaming or removing keys does,** and the change must still load records
   written by older versions.
-- `detailItems` is an ordered list of details, each `{id, text, at}` with `at`
+- `detailItems` is an ordered list of details, each `{id, text, at}` (plus
+  `points` and `lastCorrectDate` once practised) with `at`
   in UTC: the time the detail was recorded (Fred can re-date it). Records
   written before it existed kept one `fields['details']` string. That string
   loads as a single detail timed at the first encounter, and the key is
   dropped on the next save.
+- `points` and `lastCorrectDate` on a person (face practice) and on a detail
+  (details practice) are left out of the file until used. They change only
+  through `recordAnswer` and `recordDetailAnswer`, and `save()` keeps the stored
+  values, so a card autosave never undoes a game result.
 - `trashedAt` marks a person as in the trash. `all()` returns only active
   people; purge deletes every `<id>.*` file and refuses anyone not in the
   trash.

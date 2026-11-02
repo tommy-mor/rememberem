@@ -54,7 +54,8 @@ class FakeMemoryRepository implements MemoryRepository {
         .withScore(
           onDisk?.points ?? memory.points,
           onDisk == null ? memory.lastCorrectDate : onDisk.lastCorrectDate,
-        );
+        )
+        .withDetailScores(onDisk?.details ?? const []);
     stored[memory.id] = saved;
     saves.add(saved);
   }
@@ -87,6 +88,34 @@ class FakeMemoryRepository implements MemoryRepository {
     stored[id] = correctFirstTry
         ? memory.withScore(memory.points + 1, at)
         : memory.withScore(0, memory.lastCorrectDate);
+  }
+
+  /// Every recordDetailAnswer call, in order.
+  final List<(String, String, bool)> detailAnswers = [];
+
+  @override
+  Future<void> recordDetailAnswer(
+    String memoryId,
+    String detailId, {
+    required bool correctFirstTry,
+    required DateTime at,
+  }) async {
+    final memory = stored[memoryId];
+    if (memory == null ||
+        memory.trashedAt != null ||
+        !memory.details.any((d) => d.id == detailId)) {
+      throw StateError('Detail $detailId cannot be scored');
+    }
+    detailAnswers.add((memoryId, detailId, correctFirstTry));
+    stored[memoryId] = memory.withDetails([
+      for (final d in memory.details)
+        if (d.id != detailId)
+          d
+        else if (correctFirstTry)
+          d.withScore(d.points + 1, at)
+        else
+          d.withScore(0, d.lastCorrectDate),
+    ]);
   }
 
   @override

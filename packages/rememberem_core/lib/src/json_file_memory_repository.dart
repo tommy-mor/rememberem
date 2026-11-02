@@ -53,7 +53,8 @@ class JsonFileMemoryRepository implements MemoryRepository {
           memory.id,
           (onDisk) => memory
               .withTrashedAt(onDisk.trashedAt)
-              .withScore(onDisk.points, onDisk.lastCorrectDate),
+              .withScore(onDisk.points, onDisk.lastCorrectDate)
+              .withDetailScores(onDisk.details),
         ),
       );
 
@@ -70,6 +71,31 @@ class JsonFileMemoryRepository implements MemoryRepository {
             return correctFirstTry
                 ? onDisk.withScore(onDisk.points + 1, at)
                 : onDisk.withScore(0, onDisk.lastCorrectDate);
+          }));
+
+  @override
+  Future<void> recordDetailAnswer(
+    String memoryId,
+    String detailId, {
+    required bool correctFirstTry,
+    required DateTime at,
+  }) =>
+      _serial(() => _update(memoryId, (onDisk) {
+            if (onDisk.trashedAt != null) {
+              throw StateError('Memory $memoryId is in the trash');
+            }
+            if (!onDisk.details.any((d) => d.id == detailId)) {
+              throw StateError('Memory $memoryId has no detail $detailId');
+            }
+            return onDisk.withDetails([
+              for (final d in onDisk.details)
+                if (d.id != detailId)
+                  d
+                else if (correctFirstTry)
+                  d.withScore(d.points + 1, at)
+                else
+                  d.withScore(0, d.lastCorrectDate),
+            ]);
           }));
 
   @override

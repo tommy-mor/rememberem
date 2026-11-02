@@ -3,6 +3,7 @@
 library;
 
 export 'src/detail.dart';
+export 'src/detail_quiz_planner.dart';
 export 'src/encounter.dart';
 export 'src/face_locator.dart';
 export 'src/face_quiz_planner.dart';

@@ -5,6 +5,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../places/places_screen.dart';
+import '../practice/detail_game_screen.dart';
 import '../practice/face_game_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
@@ -39,6 +40,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
 
   /// Only used to decide whether there are enough people to practice.
   final _facePlanner = FaceQuizPlanner(Random(), DateTime.now);
+  final _detailPlanner = DetailQuizPlanner(Random(), DateTime.now);
 
   /// Only the newest reload may update the list, so an old, slow one can
   /// never overwrite a later trash or undo.
@@ -210,6 +212,8 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     final memories = _memories;
     if (memories == null || memories.isEmpty) return null;
     final canPlayFaces = _facePlanner.canPlay(memories);
+    final canPlayDetails = _detailPlanner.canPlay(memories);
+    final small = Theme.of(context).textTheme.bodySmall;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -218,18 +222,36 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!canPlayFaces)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  'Name at least 4 different people to practice.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+              Text(
+                'Name at least 4 different people to practice faces.',
+                textAlign: TextAlign.center,
+                style: small,
               ),
-            OutlinedButton.icon(
-              onPressed: canPlayFaces ? _practiceFaces : null,
-              icon: const Icon(Icons.face),
-              label: const Text('Practice faces'),
+            if (!canPlayDetails)
+              Text(
+                'Add a detail and have 4 people to practice details.',
+                textAlign: TextAlign.center,
+                style: small,
+              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: canPlayFaces ? _practiceFaces : null,
+                    icon: const Icon(Icons.face),
+                    label: const Text('Practice faces'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: canPlayDetails ? _practiceDetails : null,
+                    icon: const Icon(Icons.notes),
+                    label: const Text('Practice details'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -237,16 +259,23 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     );
   }
 
-  void _practiceFaces() {
+  void _practiceFaces() => _openGame(
+    FaceGameScreen(
+      repository: _repository,
+      planner: FaceQuizPlanner(Random(), DateTime.now),
+    ),
+  );
+
+  void _practiceDetails() => _openGame(
+    DetailGameScreen(
+      repository: _repository,
+      planner: DetailQuizPlanner(Random(), DateTime.now),
+    ),
+  );
+
+  void _openGame(Widget game) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FaceGameScreen(
-          repository: _repository,
-          planner: FaceQuizPlanner(Random(), DateTime.now),
-        ),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => game));
   }
 
   Widget _body() {

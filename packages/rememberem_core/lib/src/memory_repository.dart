@@ -30,6 +30,16 @@ abstract interface class MemoryRepository {
     required DateTime at,
   });
 
+  /// Records a details-practice answer for detail [detailId] of active
+  /// memory [memoryId], as [recordAnswer] does for faces. Throws
+  /// [StateError] if the person is trashed or gone, or has no such detail.
+  Future<void> recordDetailAnswer(
+    String memoryId,
+    String detailId, {
+    required bool correctFirstTry,
+    required DateTime at,
+  });
+
   /// Active (not trashed) memories, newest first.
   Future<List<Memory>> all();
 

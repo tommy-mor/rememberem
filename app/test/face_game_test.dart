@@ -289,7 +289,7 @@ void main() {
       final button = find.widgetWithText(OutlinedButton, 'Practice faces');
       expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
       expect(
-        find.text('Name at least 4 different people to practice.'),
+        find.text('Name at least 4 different people to practice faces.'),
         findsOneWidget,
       );
     });
