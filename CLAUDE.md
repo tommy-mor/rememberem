@@ -148,6 +148,10 @@ has already been tried and fallen short.
   holds the reminder and the anniversary-notices switch (missing in older
   files: it follows the reminder switch). Damage in either never stops the
   app.
+- `settings.json` may also hold `placeRadii` (a place's own radius in
+  metres, keyed by its trimmed name; a rename carries it) and
+  `metricUnits` (missing: by the phone's region; feet and miles in the US,
+  Liberia, Myanmar and the UK).
 - Anniversary notices are scheduled 30 days ahead on each sync (app open,
   resume, back to the list), ids 100–129, at 09:00 on each day whose next
   week holds an anniversary. They name no one; a tap opens the Filter List

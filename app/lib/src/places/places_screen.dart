@@ -4,13 +4,16 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../app/app_services.dart';
 import '../memories/person_card_route.dart';
 
+import '../settings/units.dart';
+import 'confirm_rename_dialog.dart';
 import 'place_row.dart';
 import 'places_map.dart';
-import 'rename_place_dialog.dart';
+import 'radius_panel.dart';
 
 /// Every place Fred has met people: a list on top, a map below. Picking a
 /// place in either selects it, centres the map on it and lists its people.
-/// Places can be renamed, or named if unknown.
+/// Places are renamed, or named if unknown, in the list itself, and a
+/// named place's radius is adjusted on a slider over the map.
 class PlacesScreen extends StatefulWidget {
   const PlacesScreen({
     super.key,
@@ -30,6 +33,12 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   final _scroll = ScrollController();
   List<PlaceGroup>? _groups;
   PlaceGroup? _selected;
+
+  /// The place whose radius panel is open, the radius being dragged (null
+  /// once let go), and whether the map should fit it exactly.
+  PlaceGroup? _adjusting;
+  double? _draft;
+  bool _settled = true;
   Object? _error;
   int _reloadGen = 0;
 
@@ -65,6 +74,7 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
         _groups = groups;
         _error = null;
         _selected = _sameGroup(_selected, groups);
+        _adjusting = _sameGroup(_adjusting, groups);
       });
     } catch (error) {
       if (mounted && gen == _reloadGen) setState(() => _error = error);
@@ -111,10 +121,9 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   Future<void> _scrollTo(int index, {bool settled = false}) async {
     if (!_scroll.hasClients) return;
     final position = _scroll.position;
-    final target = (index * PlaceRow.collapsedExtent).clamp(
-      0.0,
-      position.maxScrollExtent,
-    );
+    final rowHeight = MediaQuery.textScalerOf(context)
+        .scale(PlaceRow.collapsedExtent);
+    final target = (index * rowHeight).clamp(0.0, position.maxScrollExtent);
     if ((position.pixels - target).abs() < 1) return;
     await _scroll.animateTo(
       target,
@@ -128,11 +137,20 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     }
   }
 
-  Future<void> _rename(PlaceGroup group) async {
+  /// Renames [group] to [newName]; true if it was renamed. A known place
+  /// asks first; an unknown one is just named. Its own radius moves with
+  /// it once the rename has worked.
+  Future<bool> _rename(PlaceGroup group, String newName) async {
     final groups = _groups ?? [];
-    var affected = group.people.length;
     final name = group.name;
+    final merges = groups.any(
+      (g) =>
+          g != group &&
+          g.name != null &&
+          MeetingFinder.samePlace(g.name!, newName),
+    );
     if (name != null) {
+      var affected = group.people.length;
       try {
         final trashed = await _repository.trashed();
         affected += trashed
@@ -145,28 +163,80 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
       } catch (_) {
         // The count is only advice.
       }
+      if (!mounted) return false;
+      final confirmed = await ConfirmRenameDialog.show(
+        context,
+        from: name,
+        to: newName,
+        peopleAffected: affected,
+        merges: merges,
+      );
+      if (!confirmed || !mounted) return false;
     }
-    if (!mounted) return;
-    final newName = await RenamePlaceDialog.show(
-      context,
-      group: group,
-      otherNames: [
-        for (final g in groups)
-          if (g != group && g.name != null) g.name!,
-      ],
-      peopleAffected: affected,
-    );
-    if (newName == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final settings = widget.services.settings;
     try {
       await PlaceRenamer(_repository).rename(group, newName);
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not rename the place. Try again.')),
       );
+      await _reload();
+      return false;
     }
+    // A radius left under the new name by a place now gone is dropped; a
+    // place merged into keeps its own.
+    var updated = settings.value;
+    if (!merges) updated = updated.withPlaceRadius(newName, null);
+    if (name != null) updated = updated.withPlaceRenamed(name, newName);
+    if (updated != settings.value) await settings.update(updated);
     _selected = null;
+    _adjusting = null;
     await _reload();
+    return true;
+  }
+
+  /// Opens the radius panel for [group] (selecting it).
+  void _adjust(PlaceGroup group) {
+    _select(group);
+    setState(() {
+      _adjusting = group;
+      _draft = null;
+      _settled = true;
+    });
+  }
+
+  /// The radius on show for [place]: the one being dragged, else saved.
+  double _radiusFor(String place) {
+    final adjusting = _adjusting?.name;
+    final draft = _draft;
+    if (draft != null && adjusting == place) return draft;
+    return widget.services.settings.value.radiusFor(place);
+  }
+
+  void _drag(double meters) => setState(() {
+    _draft = meters;
+    _settled = false;
+  });
+
+  void _settle(double? meters) {
+    final name = _adjusting?.name;
+    if (name == null) return;
+    final settings = widget.services.settings;
+    settings.update(settings.value.withPlaceRadius(name, meters));
+    setState(() {
+      _draft = null;
+      _settled = true;
+    });
+  }
+
+  /// The radius being adjusted, for the map to keep in view.
+  ({GeoPoint at, double meters, bool settled})? get _focus {
+    final group = _adjusting;
+    final at = group?.marker;
+    final name = group?.name;
+    if (at == null || name == null) return null;
+    return (at: at, meters: _radiusFor(name), settled: _settled);
   }
 
   @override
@@ -177,7 +247,12 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     );
   }
 
-  Widget _body() {
+  Widget _body() => ValueListenableBuilder<AppSettings>(
+    valueListenable: widget.services.settings,
+    builder: (context, settings, _) => _content(settings),
+  );
+
+  Widget _content(AppSettings settings) {
     if (_error != null) {
       return Center(
         child: Column(
@@ -200,25 +275,59 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
             itemCount: groups.length,
             itemBuilder: (context, index) {
               final group = groups[index];
+              final name = group.name;
               return PlaceRow(
+                // Keyed by place, so a name being typed stays with it.
+                key: ValueKey(
+                  name ??
+                      'unknown ${group.members.first.$1.id}/'
+                          '${group.members.first.$2.photoFileName}',
+                ),
                 group: group,
                 expanded: group == _selected,
                 onTap: () => _select(group),
-                onRename: () => _rename(group),
+                onRename: (newName) => _rename(group, newName),
                 onOpenPerson: _openPerson,
                 repository: _repository,
+                radius: name == null
+                    ? null
+                    : Units.distance(settings, _radiusFor(name)),
+                onRadius: name == null ? null : () => _adjust(group),
               );
             },
           ),
         ),
         const Divider(height: 1),
         Expanded(
-          child: PlacesMap(
-            groups: groups,
-            selected: _selected,
-            onSelect: _select,
-            streetMaps: widget.services.settings.value.streetMaps,
-            links: widget.services.links,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: PlacesMap(
+                  groups: groups,
+                  selected: _selected,
+                  onSelect: _select,
+                  streetMaps: settings.streetMaps,
+                  links: widget.services.links,
+                  radiusFor: _radiusFor,
+                  focus: _focus,
+                ),
+              ),
+              if (_adjusting case PlaceGroup(:final name?))
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: RadiusPanel(
+                    place: name,
+                    meters: _radiusFor(name),
+                    format: (m) => Units.distance(settings, m),
+                    onChanged: _drag,
+                    onSettled: _settle,
+                    onUseDefault: () => _settle(null),
+                    onDone: () => setState(() => _adjusting = null),
+                  ),
+                ),
+            ],
           ),
         ),
       ],

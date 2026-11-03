@@ -3,6 +3,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import 'location_choice.dart';
+import 'place_circle.dart';
 import 'place_marker.dart';
 import 'place_name_dialog.dart';
 import 'street_map.dart';
@@ -109,6 +110,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         streetMaps: widget.services.settings.value.streetMaps,
                         links: widget.services.links,
                         centre: _start,
+                        circles: [
+                          for (final g in _places)
+                            if (g.name case final name?)
+                              PlaceCircle(
+                                at: g.marker!,
+                                meters: widget.services.settings.value
+                                    .radiusFor(name),
+                                scheme: Theme.of(context).colorScheme,
+                              ),
+                        ],
                         markers: [
                           for (final g in _places)
                             PlaceMarker(

@@ -9,10 +9,13 @@ import 'app_settings_controller.dart';
 import 'colour_choice.dart';
 import 'setting_stepper.dart';
 import 'settings_heading.dart';
+import 'units.dart';
 
 /// Fred's choices: reminders, how matching and practice behave, and
 /// whether maps fetch streets. Every change applies at once.
 class SettingsScreen extends StatelessWidget {
+  static const _metersPerFoot = 0.3048;
+
   const SettingsScreen({
     super.key,
     required this.settings,
@@ -71,7 +74,7 @@ class SettingsScreen extends StatelessWidget {
               value: s.placeRadiusFeet,
               range: AppSettings.placeRadiusRange,
               step: 50,
-              format: (v) => '$v ft',
+              format: (v) => Units.distance(s, v * _metersPerFoot),
               onChanged: (v) => settings.update(s.copyWith(placeRadiusFeet: v)),
             ),
             SettingStepper(
@@ -124,6 +127,14 @@ class SettingsScreen extends StatelessWidget {
               ),
               value: s.streetMaps,
               onChanged: (v) => settings.update(s.copyWith(streetMaps: v)),
+            ),
+            SwitchListTile(
+              title: const Text('Metric units (m, km)'),
+              subtitle: const Text(
+                "Off shows feet and miles. Starts from your phone's region.",
+              ),
+              value: Units.metric(s),
+              onChanged: (v) => settings.update(s.copyWith(metricUnits: v)),
             ),
             const Divider(),
             ListTile(

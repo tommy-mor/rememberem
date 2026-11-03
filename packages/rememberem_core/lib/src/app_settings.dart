@@ -1,6 +1,7 @@
 import 'app_palette.dart';
 import 'meeting_finder.dart';
 import 'place_finder.dart';
+import 'radius_scale.dart';
 import 'remembered_count.dart';
 
 /// Fred's choices for how the app behaves. Reminders keep their own
@@ -19,6 +20,8 @@ class AppSettings {
     this.themeColor = defaultThemeColor,
     this.backgroundColor = defaultBackgroundColor,
     this.darkMode = false,
+    this.placeRadii = const {},
+    this.metricUnits,
   });
 
   /// Reads what [toJson] wrote. Never throws: a missing, mistyped or
@@ -74,8 +77,34 @@ class AppSettings {
       themeColor: colour('themeColor', AppPalette.themeColors),
       backgroundColor: colour('backgroundColor', AppPalette.backgrounds),
       darkMode: flag('darkMode', fallback: false),
+      placeRadii: _radii(json['placeRadii']),
+      metricUnits:
+          json['metricUnits'] is bool ? json['metricUnits'] as bool : null,
     );
   }
+
+  /// Places' radii as written; a bad entry is dropped, a value outside the
+  /// slider's range clamped.
+  static Map<String, double> _radii(Object? json) {
+    if (json is! Map) return const {};
+    return {
+      for (final MapEntry(:key, :value) in json.entries)
+        if (key is String &&
+            key.trim().isNotEmpty &&
+            value is num &&
+            value.isFinite)
+          key.trim(): value
+              .toDouble()
+              .clamp(RadiusScale.minMeters, RadiusScale.maxMeters),
+    };
+  }
+
+  /// Regions that measure distance in feet and miles.
+  static const _imperialRegions = {'US', 'LR', 'MM', 'GB'};
+
+  /// Metric unless the phone's region ([countryCode]) uses feet and miles.
+  static bool metricByDefault(String? countryCode) =>
+      !_imperialRegions.contains(countryCode?.toUpperCase());
 
   static const defaultPlaceRadiusFeet = 555;
   static const defaultMeetingWindowMinutes = 120;
@@ -129,8 +158,43 @@ class AppSettings {
   /// Dark pages; the background choice then does not apply.
   final bool darkMode;
 
-  PlaceFinder get placeFinder =>
-      PlaceFinder(radiusMeters: placeRadiusFeet * _metersPerFoot);
+  /// Places' own radii in metres, by trimmed name. A place not here uses
+  /// [placeRadiusFeet].
+  final Map<String, double> placeRadii;
+
+  /// Metres and kilometres (true) or feet and miles; null until Fred
+  /// chooses, when the phone's region decides ([metricFor]).
+  final bool? metricUnits;
+
+  bool metricFor(String? countryCode) =>
+      metricUnits ?? metricByDefault(countryCode);
+
+  /// [place]'s radius in metres: its own, or the default.
+  double radiusFor(String place) => placeFinder.radiusFor(place);
+
+  /// With [place]'s own radius set to [meters], or removed if null.
+  AppSettings withPlaceRadius(String place, double? meters) {
+    final radii = {...placeRadii}..remove(place.trim());
+    if (meters != null) {
+      radii[place.trim()] =
+          meters.clamp(RadiusScale.minMeters, RadiusScale.maxMeters);
+    }
+    return copyWith(placeRadii: radii);
+  }
+
+  /// After [from] is renamed [to]: its radius moves with it, unless [to]
+  /// already has one (the two places merged; the one kept wins).
+  AppSettings withPlaceRenamed(String from, String to) {
+    final radius = placeRadii[from.trim()];
+    final radii = {...placeRadii}..remove(from.trim());
+    if (radius != null) radii.putIfAbsent(to.trim(), () => radius);
+    return copyWith(placeRadii: radii);
+  }
+
+  PlaceFinder get placeFinder => PlaceFinder(
+        radiusMeters: placeRadiusFeet * _metersPerFoot,
+        radii: placeRadii,
+      );
 
   MeetingFinder get meetingFinder =>
       MeetingFinder(window: Duration(minutes: meetingWindowMinutes));
@@ -150,6 +214,8 @@ class AppSettings {
     int? themeColor,
     int? backgroundColor,
     bool? darkMode,
+    Map<String, double>? placeRadii,
+    bool? metricUnits,
   }) =>
       AppSettings(
         placeRadiusFeet: placeRadiusFeet ?? this.placeRadiusFeet,
@@ -164,6 +230,8 @@ class AppSettings {
         themeColor: themeColor ?? this.themeColor,
         backgroundColor: backgroundColor ?? this.backgroundColor,
         darkMode: darkMode ?? this.darkMode,
+        placeRadii: placeRadii ?? this.placeRadii,
+        metricUnits: metricUnits ?? this.metricUnits,
       );
 
   Map<String, dynamic> toJson() => {
@@ -179,6 +247,8 @@ class AppSettings {
         'themeColor': themeColor,
         'backgroundColor': backgroundColor,
         'darkMode': darkMode,
+        if (placeRadii.isNotEmpty) 'placeRadii': placeRadii,
+        if (metricUnits != null) 'metricUnits': metricUnits,
       };
 
   @override
@@ -195,7 +265,10 @@ class AppSettings {
       other.detailTextPercent == detailTextPercent &&
       other.themeColor == themeColor &&
       other.backgroundColor == backgroundColor &&
-      other.darkMode == darkMode;
+      other.darkMode == darkMode &&
+      other.metricUnits == metricUnits &&
+      other.placeRadii.length == placeRadii.length &&
+      placeRadii.entries.every((e) => other.placeRadii[e.key] == e.value);
 
   @override
   int get hashCode => Object.hash(
@@ -211,5 +284,10 @@ class AppSettings {
         themeColor,
         backgroundColor,
         darkMode,
+        metricUnits,
+        // Order-independent, as == is.
+        Object.hashAllUnordered(
+          placeRadii.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
       );
 }

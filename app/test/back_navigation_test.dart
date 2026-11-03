@@ -241,7 +241,9 @@ void main() {
   testWidgets('an open dialog closes first; the page stays', (tester) async {
     await boot(tester);
     await open(tester, find.byTooltip('Places'));
-    await open(tester, find.byTooltip('Rename Cafe'));
+    await tester.enterText(find.widgetWithText(TextField, 'Cafe'), 'Diner');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
 
     await back(tester);

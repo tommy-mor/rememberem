@@ -86,6 +86,19 @@ void main() {
   Finder inList(String name) =>
       find.descendant(of: find.byType(PlaceRow), matching: find.text(name));
 
+  /// Types [to] into the name of the place called [from] and presses Done.
+  Future<void> renameInList(WidgetTester tester, String from, String to) async {
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(PlaceRow),
+        matching: find.widgetWithText(TextField, from),
+      ),
+      to,
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+  }
+
   setUp(() => repository = FakeMemoryRepository());
 
   testWidgets(
@@ -137,10 +150,9 @@ void main() {
     final alex = await person('Alex', 'Cafe', north(0));
     await showPlaces(tester);
 
-    await tester.tap(find.byTooltip('Rename Cafe'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Cafe'), 'Diner');
-    await tester.tap(find.text('Save'));
+    await renameInList(tester, 'Cafe', 'Diner');
+    expect(find.text('Rename "Cafe" to "Diner"?'), findsOneWidget);
+    await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
 
     expect(find.text('Diner'), findsWidgets);
@@ -154,10 +166,8 @@ void main() {
     await showPlaces(tester);
     (repository as _FailingSaves).fail = true;
 
-    await tester.tap(find.byTooltip('Rename Cafe'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Cafe'), 'Diner');
-    await tester.tap(find.text('Save'));
+    await renameInList(tester, 'Cafe', 'Diner');
+    await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
 
     expect(find.text('Could not rename the place. Try again.'), findsOneWidget);
@@ -223,10 +233,7 @@ void main() {
     await person('Kim', 'Park', north(5));
     await showPlaces(tester);
 
-    await tester.tap(find.byTooltip('Rename Park'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Park'), 'Cafe');
-    await tester.pump();
+    await renameInList(tester, 'Park', 'Cafe');
 
     expect(find.textContaining('already exists'), findsOneWidget);
     expect(find.text('Changes 1 person.'), findsOneWidget);
@@ -252,21 +259,57 @@ void main() {
     expect(inList('Cafe'), findsOneWidget);
   });
 
-  testWidgets('cancelling a rename keeps an unknown place expanded', (
-    tester,
-  ) async {
-    await person('Kim', '', north(0));
+  testWidgets('an unknown place is named without asking, and stays '
+      'expanded', (tester) async {
+    final kim = await person('Kim', '', north(0));
     await showPlaces(tester);
     await tester.tap(inList('unknown'));
     await tester.pumpAndSettle();
     expect(inList('Kim'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Rename unknown'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(PlaceRow),
+        matching: find.byType(TextField),
+      ),
+      'Gym',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
-    expect(inList('Kim'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(repository.stored[kim.id]!.latest.place, 'Gym');
+    expect(inList('Gym'), findsOneWidget);
+  });
+
+  testWidgets('Cancel, or leaving the field, keeps a known name', (
+    tester,
+  ) async {
+    final alex = await person('Alex', 'Cafe', north(0));
+    await person('Kim', 'Park', north(5));
+    await showPlaces(tester);
+
+    await renameInList(tester, 'Cafe', 'Diner');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(inList('Cafe'), findsOneWidget);
+    expect(repository.stored[alex.id]!.latest.place, 'Cafe');
+
+    // Typing, then tapping another place, renames nothing.
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(PlaceRow),
+        matching: find.widgetWithText(TextField, 'Cafe'),
+      ),
+      'Diner',
+    );
+    await tester.pump();
+    expect(find.byTooltip('Save the name'), findsOneWidget);
+    await tester.tap(find.textContaining('1 person').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(inList('Cafe'), findsOneWidget);
+    expect(inList('Diner'), findsNothing);
   });
 
   testWidgets('at double text size the selected row still comes into view', (
