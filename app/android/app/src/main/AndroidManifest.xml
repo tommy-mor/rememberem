@@ -24,11 +24,18 @@
          Deliberately no exact-alarm permission (inexact delivery is fine). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Place notifications (off by default): Android's geofencing notices
+         Fred arriving at a known place while the app is closed. Asked only
+         when he turns them on in Settings. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
     <!-- Backup stays on (Eric's call): the phone's Google backup includes
          Fred's people, so a new phone can get them back. About says so.
-         Capture work files are in the cache, which is never backed up. -->
+         Capture work files are in the cache, which is never backed up.
+         The watched-places list is left out (see res/xml). -->
     <application
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="Rememberem"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
@@ -61,6 +68,15 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        <!-- Place notifications: the arrival event, and watching again after
+             a restart or update. Neither can be called by other apps. -->
+        <receiver android:exported="false" android:name=".PlaceFenceReceiver" />
+        <receiver android:exported="false" android:name=".PlaceFenceBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
         </receiver>
         <!-- Don't delete the meta-data below.

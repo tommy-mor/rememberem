@@ -165,6 +165,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           settings: widget.services.settings,
           links: widget.services.links,
           reminders: widget.services.reminders,
+          placeAlerts: widget.services.placeAlerts,
         ),
       ),
     );

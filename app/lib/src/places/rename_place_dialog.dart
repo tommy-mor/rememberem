@@ -3,30 +3,39 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 /// Asks for a place's new name. Warns when the name is already another
 /// place's (the two will merge) and says how many people it touches.
+/// Where place notifications exist, also asks whether this place notifies.
 class RenamePlaceDialog extends StatefulWidget {
   const RenamePlaceDialog({
     super.key,
     required this.group,
     required this.otherNames,
     required this.peopleAffected,
+    this.alertSettings,
   });
 
   final PlaceGroup group;
   final List<String> otherNames;
   final int peopleAffected;
 
-  /// The trimmed new name, or null if cancelled.
-  static Future<String?> show(
+  /// The place-notification choices; null hides the checkbox.
+  final AppSettings? alertSettings;
+
+  static const notifyLabel = 'Notify me when I arrive here';
+
+  /// The trimmed new name and the checkbox, or null if cancelled.
+  static Future<({String name, bool notify})?> show(
     BuildContext context, {
     required PlaceGroup group,
     required List<String> otherNames,
     required int peopleAffected,
-  }) => showDialog<String>(
+    AppSettings? alertSettings,
+  }) => showDialog<({String name, bool notify})>(
     context: context,
     builder: (_) => RenamePlaceDialog(
       group: group,
       otherNames: otherNames,
       peopleAffected: peopleAffected,
+      alertSettings: alertSettings,
     ),
   );
 
@@ -46,6 +55,23 @@ class _RenamePlaceDialogState extends State<RenamePlaceDialog> {
   }
 
   String get _trimmed => _name.text.trim();
+
+  /// Fred's tick, once he has touched the box. Until then the box shows
+  /// the place's own choice if he made one (a rename carries it), or else
+  /// what the typed name gets by default (so typing "Home" unticks it).
+  bool? _notify;
+
+  bool get _notifyShown {
+    final settings = widget.alertSettings;
+    if (_notify case final notify?) return notify;
+    if (settings == null) return false;
+    final current = widget.group.name;
+    final keepsChoice =
+        current != null &&
+        (MeetingFinder.samePlace(current, _trimmed) ||
+            settings.placeAlertChoices.containsKey(current.trim()));
+    return settings.alertsFor(keepsChoice ? current : _trimmed);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +103,14 @@ class _RenamePlaceDialogState extends State<RenamePlaceDialog> {
               '"$_trimmed" already exists; the two places will become one.',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
+          if (widget.alertSettings != null)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text(RenamePlaceDialog.notifyLabel),
+              value: _notifyShown,
+              onChanged: (v) => setState(() => _notify = v ?? false),
+            ),
         ],
       ),
       actions: [
@@ -87,7 +121,9 @@ class _RenamePlaceDialogState extends State<RenamePlaceDialog> {
         TextButton(
           onPressed: _trimmed.isEmpty
               ? null
-              : () => Navigator.of(context).pop(_trimmed),
+              : () =>
+                    Navigator.of(context)
+                        .pop((name: _trimmed, notify: _notifyShown)),
           child: const Text('Save'),
         ),
       ],

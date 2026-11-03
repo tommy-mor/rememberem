@@ -1,5 +1,6 @@
 import 'app_palette.dart';
 import 'meeting_finder.dart';
+import 'place_alert_defaults.dart';
 import 'place_finder.dart';
 import 'remembered_count.dart';
 
@@ -19,6 +20,8 @@ class AppSettings {
     this.themeColor = defaultThemeColor,
     this.backgroundColor = defaultBackgroundColor,
     this.darkMode = false,
+    this.placeAlerts = false,
+    this.placeAlertChoices = const {},
   });
 
   /// Reads what [toJson] wrote. Never throws: a missing, mistyped or
@@ -34,6 +37,16 @@ class AppSettings {
     bool flag(String key, {bool fallback = true}) {
       final value = json[key];
       return value is bool ? value : fallback;
+    }
+
+    Map<String, bool> choices(String key) {
+      final value = json[key];
+      if (value is! Map) return const {};
+      return Map.unmodifiable({
+        for (final MapEntry(:key, :value) in value.entries)
+          if (key is String && key.trim().isNotEmpty && value is bool)
+            key.trim(): value,
+      });
     }
 
     int colour(String key, List<int> palette) {
@@ -74,6 +87,8 @@ class AppSettings {
       themeColor: colour('themeColor', AppPalette.themeColors),
       backgroundColor: colour('backgroundColor', AppPalette.backgrounds),
       darkMode: flag('darkMode', fallback: false),
+      placeAlerts: flag('placeAlerts', fallback: false),
+      placeAlertChoices: choices('placeAlertChoices'),
     );
   }
 
@@ -129,6 +144,33 @@ class AppSettings {
   /// Dark pages; the background choice then does not apply.
   final bool darkMode;
 
+  /// Whether arriving at a known place sends a notification.
+  final bool placeAlerts;
+
+  /// Fred's own on/off for a place's notifications, by trimmed place name.
+  /// A place not listed follows [PlaceAlertDefaults].
+  final Map<String, bool> placeAlertChoices;
+
+  /// Whether [place] notifies when Fred arrives (ignoring [placeAlerts]).
+  bool alertsFor(String place) {
+    final name = place.trim();
+    return placeAlertChoices[name] ?? !PlaceAlertDefaults.quiet(name);
+  }
+
+  /// The same settings with [place]'s notifications turned [on].
+  AppSettings withPlaceAlert(String place, bool on) =>
+      renamePlaceAlert(place, place, on);
+
+  /// After renaming [from] to [to] (two places may become one): [to]
+  /// notifies if [on], and [from] keeps no choice of its own.
+  AppSettings renamePlaceAlert(String from, String to, bool on) {
+    final name = to.trim();
+    if (name.isEmpty) return this;
+    final choices = {...placeAlertChoices}..remove(from.trim());
+    choices[name] = on;
+    return copyWith(placeAlertChoices: choices);
+  }
+
   PlaceFinder get placeFinder =>
       PlaceFinder(radiusMeters: placeRadiusFeet * _metersPerFoot);
 
@@ -150,6 +192,8 @@ class AppSettings {
     int? themeColor,
     int? backgroundColor,
     bool? darkMode,
+    bool? placeAlerts,
+    Map<String, bool>? placeAlertChoices,
   }) =>
       AppSettings(
         placeRadiusFeet: placeRadiusFeet ?? this.placeRadiusFeet,
@@ -164,6 +208,10 @@ class AppSettings {
         themeColor: themeColor ?? this.themeColor,
         backgroundColor: backgroundColor ?? this.backgroundColor,
         darkMode: darkMode ?? this.darkMode,
+        placeAlerts: placeAlerts ?? this.placeAlerts,
+        placeAlertChoices: placeAlertChoices == null
+            ? this.placeAlertChoices
+            : Map.unmodifiable(placeAlertChoices),
       );
 
   Map<String, dynamic> toJson() => {
@@ -179,6 +227,8 @@ class AppSettings {
         'themeColor': themeColor,
         'backgroundColor': backgroundColor,
         'darkMode': darkMode,
+        'placeAlerts': placeAlerts,
+        'placeAlertChoices': placeAlertChoices,
       };
 
   @override
@@ -195,7 +245,12 @@ class AppSettings {
       other.detailTextPercent == detailTextPercent &&
       other.themeColor == themeColor &&
       other.backgroundColor == backgroundColor &&
-      other.darkMode == darkMode;
+      other.darkMode == darkMode &&
+      other.placeAlerts == placeAlerts &&
+      _sameChoices(other.placeAlertChoices, placeAlertChoices);
+
+  static bool _sameChoices(Map<String, bool> a, Map<String, bool> b) =>
+      a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
 
   @override
   int get hashCode => Object.hash(
@@ -211,5 +266,9 @@ class AppSettings {
         themeColor,
         backgroundColor,
         darkMode,
+        placeAlerts,
+        Object.hashAllUnordered(
+          placeAlertChoices.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
       );
 }

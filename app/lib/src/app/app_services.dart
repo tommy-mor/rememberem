@@ -5,6 +5,7 @@ import '../about/link_opener.dart';
 import '../capture/photo_picker.dart';
 import '../contacts/contacts_service.dart';
 import '../location/device_location.dart';
+import '../place_alerts/place_alert_coordinator.dart';
 import '../practice/game_feedback.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../settings/app_settings_controller.dart';
@@ -22,6 +23,7 @@ class AppServices {
     this.photoPicker,
     this.feedback,
     this.contacts,
+    this.placeAlerts,
     LinkOpener? links,
   }) : settings = settings ?? AppSettingsController(),
        links = links ?? BrowserLinkOpener();
@@ -46,6 +48,9 @@ class AppServices {
 
   /// Linking people to phone contacts; null hides it (iOS, tests).
   final ContactsService? contacts;
+
+  /// Notices on arriving at a known place; null hides them (iOS, tests).
+  final PlaceAlertCoordinator? placeAlerts;
 
   /// Opens the About page's links in the browser.
   final LinkOpener links;

@@ -94,4 +94,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Geofencing for place notifications: the same library and version
+    // geolocator already ships, so nothing new goes into the app.
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 }

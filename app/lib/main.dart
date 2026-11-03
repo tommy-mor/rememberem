@@ -13,6 +13,8 @@ import 'src/capture/gallery_photo_picker.dart';
 import 'src/capture/ml_kit_face_locator.dart';
 import 'src/contacts/android_contacts_service.dart';
 import 'src/location/device_location.dart';
+import 'src/place_alerts/android_place_fencer.dart';
+import 'src/place_alerts/place_alert_coordinator.dart';
 import 'src/practice/device_game_feedback.dart';
 import 'src/reminders/file_reminder_settings_store.dart';
 import 'src/reminders/local_notifications_scheduler.dart';
@@ -47,6 +49,14 @@ Future<void> main() async {
     await settingsStore.load(),
     settingsStore,
   );
+  // Android only for now: iOS would need its own region monitoring.
+  final placeAlerts = Platform.isAndroid
+      ? PlaceAlertCoordinator(
+          fencer: AndroidPlaceFencer(),
+          settings: settings,
+          repository: repository,
+        )
+      : null;
   final sounds = DeviceSounds(settings);
   final services = AppServices(
     repository: repository,
@@ -69,6 +79,7 @@ Future<void> main() async {
     ),
     // Not built for iOS yet (no contact picker there).
     contacts: Platform.isAndroid ? AndroidContactsService() : null,
+    placeAlerts: placeAlerts,
   );
   runApp(RememberemApp(services: services, shortcut: MeetShortcut()));
   // Re-assert the reminder on every open (time zone, reboot, new people).
@@ -76,6 +87,14 @@ Future<void> main() async {
     (_) => unawaited(
       reminders.sync().catchError(
         (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+      ),
+    ),
+  );
+  // And the watched places (reboot, location turned off, new places).
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => unawaited(
+      placeAlerts?.sync().catchError(
+        (Object e) => debugPrint('Rememberem: place sync failed: $e'),
       ),
     ),
   );

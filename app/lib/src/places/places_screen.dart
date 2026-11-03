@@ -147,7 +147,8 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
       }
     }
     if (!mounted) return;
-    final newName = await RenamePlaceDialog.show(
+    final alerts = widget.services.placeAlerts;
+    final result = await RenamePlaceDialog.show(
       context,
       group: group,
       otherNames: [
@@ -155,11 +156,18 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
           if (g != group && g.name != null) g.name!,
       ],
       peopleAffected: affected,
+      alertSettings: alerts?.settings.value,
     );
-    if (newName == null || !mounted) return;
+    if (result == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final unchanged =
+        name != null && MeetingFinder.samePlace(name, result.name);
     try {
-      await PlaceRenamer(_repository).rename(group, newName);
+      if (!unchanged) {
+        await PlaceRenamer(_repository).rename(group, result.name);
+      }
+      // Only once the rename has worked, so a failure keeps the old choice.
+      await alerts?.renamed(name ?? result.name, result.name, result.notify);
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not rename the place. Try again.')),

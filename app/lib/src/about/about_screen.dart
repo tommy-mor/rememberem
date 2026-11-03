@@ -35,6 +35,11 @@ class AboutScreen extends StatelessWidget {
         'be recognised.',
     'Street maps load from OpenStreetMap, which sees your internet address '
         'and the area shown. You can turn maps off in Settings.',
+    'Place notifications are off unless you turn them on. Then Android\'s '
+        'location service uses your location in the background, even when '
+        'the app is closed, to notice you arriving at your places. '
+        'Rememberem sends nothing; the notice shows the place name, never '
+        "anyone's name.",
   ];
 
   Future<void> _open(BuildContext context, Uri url) async {

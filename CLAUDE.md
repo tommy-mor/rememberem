@@ -96,7 +96,8 @@ has already been tried and fallen short.
   (`FaceLocator`, `MemoryRepository`), so all of this is unit-testable.
 - `app/` is the Flutter app. Under `lib/src/`: `app/` holds the shell, services,
   theme and the "Meet someone" shortcut; `maps/` the street map and location
-  picker; `settings/` the Settings page and store; `capture/` the camera and ML Kit face
+  picker; `settings/` the Settings page and store; `place_alerts/` arrival
+  notices (the `PlaceFencer` interface over `PlaceFences.kt` geofencing); `capture/` the camera and ML Kit face
   detection; `memories/` the list, the notes screen and the autosaving
   `MemoryEditor`; `speech/` the `Dictation` interface and mic text fields;
   `location/` the GPS lookup.
@@ -144,6 +145,13 @@ has already been tried and fallen short.
   within the window set in Settings.
 - `settings.json` (`AppSettings`) holds Fred's settings; `reminders.json`
   holds the reminder. Damage in either never stops the app.
+- Place notifications: `placeAlerts` and `placeAlertChoices` (exact trimmed
+  place name → on/off) live in `settings.json`. A place with no choice is
+  on, unless its name is home, work or church in any case. The watched
+  list and the last-notified times live natively in
+  `shared_prefs/place_fences.xml`, which is excluded from backup
+  (`res/xml/backup_rules.xml`, `data_extraction_rules.xml`). The app
+  re-sends that list on every open and resume.
 - `contactKey` (top level, optional) links a person to a phone contact by
   Android lookup key only; no contact data is copied. It changes only through
   `setContactKey`, so autosave never undoes it.
@@ -177,6 +185,13 @@ Check these before any public release. `sally` and `lena` own them.
   cloud app (Google Photos) that sees the choice.
 - **Contacts:** linking uses only the system contact picker, which grants
   access to the one contact chosen. There is no READ_CONTACTS permission.
+- **Place notifications:** off by default, Android only. Turning them on
+  asks for `ACCESS_BACKGROUND_LOCATION` ("all the time"). Play services
+  geofencing then watches Fred's named places on the device, and the notice
+  names the place, never a person (generic on the lock screen, not sent to
+  watches). Play needs a background-location declaration and a video before
+  release, and Google may refuse it. That decision is Eric's. The Data
+  safety form must say so.
 - **Faces:** face detection runs on-device through ML Kit. Laws on biometric
   data, such as BIPA, may still apply to storing faces of people who are not
   users.

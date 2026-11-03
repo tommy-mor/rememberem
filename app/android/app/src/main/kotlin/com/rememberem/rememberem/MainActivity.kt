@@ -8,6 +8,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var photoPicker: OriginalPhotoPicker? = null
     private var contacts: ContactsChannel? = null
+    private var placeFences: PlaceFences? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -19,6 +20,17 @@ class MainActivity : FlutterActivity() {
         contacts = contactsChannel
         MethodChannel(messenger, ContactsChannel.CHANNEL).setMethodCallHandler(contactsChannel)
         MethodChannel(messenger, Haptics.CHANNEL).setMethodCallHandler(Haptics(this))
+        val placeChannel = MethodChannel(messenger, PlaceFences.CHANNEL)
+        val places = PlaceFences(this, placeChannel)
+        places.onLaunch(intent)
+        placeFences = places
+        placeChannel.setMethodCallHandler(places)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        // super first: the shortcut plugin reads its own intents there.
+        super.onNewIntent(intent)
+        placeFences?.onNewIntent(intent)
     }
 
     @Deprecated("Needed for the pickers' results")
@@ -33,7 +45,8 @@ class MainActivity : FlutterActivity() {
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
-        val handled = photoPicker?.onRequestPermissionsResult(requestCode) == true
+        val handled = photoPicker?.onRequestPermissionsResult(requestCode) == true ||
+            placeFences?.onRequestPermissionsResult(requestCode) == true
         if (!handled) super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../capture/capture_screen.dart';
+import '../memories/filter_list_screen.dart';
 import '../memories/memory_list_screen.dart';
 import '../practice/practice_screens.dart';
 import 'app_routes.dart';
@@ -28,6 +29,7 @@ class _RememberemAppState extends State<RememberemApp>
   final _navigator = GlobalKey<NavigatorState>();
   final _routeObserver = RouteObserver<ModalRoute<void>>();
   StreamSubscription<PracticeGame?>? _taps;
+  StreamSubscription<String>? _placeTaps;
 
   @override
   void initState() {
@@ -42,12 +44,20 @@ class _RememberemAppState extends State<RememberemApp>
         _openReminder(await scheduler.launchGame());
       });
     }
+    final fencer = widget.services.placeAlerts?.fencer;
+    if (fencer != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        _placeTaps = fencer.taps.listen(_openPlaceAlert);
+        _openPlaceAlert(await fencer.launchPlace());
+      });
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _taps?.cancel();
+    _placeTaps?.cancel();
     super.dispose();
   }
 
@@ -59,6 +69,11 @@ class _RememberemAppState extends State<RememberemApp>
       unawaited(
         widget.services.reminders?.sync().catchError(
           (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+        ),
+      );
+      unawaited(
+        widget.services.placeAlerts?.sync().catchError(
+          (Object e) => debugPrint('Rememberem: place sync failed: $e'),
         ),
       );
     }
@@ -92,6 +107,27 @@ class _RememberemAppState extends State<RememberemApp>
       );
     } catch (_) {
       // A reminder must never break the app; the list stays.
+    }
+  }
+
+  /// An arrival notice was tapped: the list filtered to that place, over
+  /// the list. Never over the camera or a game. The name is untrusted
+  /// (null or blank does nothing); a name matching no place shows no one.
+  void _openPlaceAlert(String? place) {
+    final name = place?.trim() ?? '';
+    if (name.isEmpty) return;
+    try {
+      _openOnRoot(
+        AppRoutes.placeAlert,
+        (_) => FilterListScreen(
+          services: widget.services,
+          routeObserver: _routeObserver,
+          initialFilters: [PlaceFilter(name)],
+        ),
+        blockedBy: {AppRoutes.capture, AppRoutes.practice},
+      );
+    } catch (_) {
+      // A notice must never break the app; the list stays.
     }
   }
 

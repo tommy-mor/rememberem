@@ -3,6 +3,8 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../about/about_screen.dart';
 import '../about/link_opener.dart';
+import '../place_alerts/place_alert_coordinator.dart';
+import '../place_alerts/place_alerts_section.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../reminders/reminders_section.dart';
 import 'app_settings_controller.dart';
@@ -18,11 +20,13 @@ class SettingsScreen extends StatelessWidget {
     required this.settings,
     required this.links,
     this.reminders,
+    this.placeAlerts,
   });
 
   final AppSettingsController settings;
   final LinkOpener links;
   final ReminderCoordinator? reminders;
+  final PlaceAlertCoordinator? placeAlerts;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +40,10 @@ class SettingsScreen extends StatelessWidget {
             if (reminders case final reminders?) ...[
               const SettingsHeading('Reminders'),
               RemindersSection(coordinator: reminders),
+            ],
+            if (placeAlerts case final placeAlerts?) ...[
+              const SettingsHeading('Place notifications'),
+              PlaceAlertsSection(coordinator: placeAlerts),
             ],
             const SettingsHeading('Display'),
             SwitchListTile(

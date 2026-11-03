@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. Everything is backed up (Eric's call) except the
+     watched-places list and when each last notified: the app rebuilds the
+     list on the next open, and arrival times are not needed on a new phone. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="place_fences.xml" />
+</full-backup-content>
