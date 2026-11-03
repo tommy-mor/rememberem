@@ -24,7 +24,6 @@ void main() {
     expect(links.opened, [AboutScreen.privacy]);
     expect(find.textContaining('people you photograph'), findsOneWidget);
 
-
     await tester.scrollUntilVisible(find.text('Licences'), 200);
     await tester.tap(find.text('Licences'));
     await tester.pumpAndSettle();

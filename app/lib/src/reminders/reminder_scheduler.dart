@@ -7,15 +7,23 @@ abstract interface class ReminderScheduler {
 
   Future<bool> hasPermission();
 
-  /// One reminder a day at local [hour]:[minute], replacing any earlier.
+  /// One practice reminder a day at local [hour]:[minute], replacing any
+  /// earlier.
   Future<void> scheduleDaily(int hour, int minute);
 
+  /// Cancels the practice reminder only; anniversary notices stay.
   Future<void> cancel();
 
-  /// The game a tapped reminder asked for if it launched the app; given
-  /// once only.
-  Future<PracticeGame?> launchGame();
+  /// One anniversary notice on each of [days], at
+  /// [AnniversaryNotice.hour], replacing every earlier notice. Days already
+  /// past that hour are skipped; an empty list cancels them all.
+  Future<void> scheduleAnniversaries(List<LocalDay> days);
 
-  /// Reminders tapped while the app runs; null for an unreadable payload.
-  Stream<PracticeGame?> get taps;
+  /// The payload of the notification that launched the app, if one did;
+  /// given once only.
+  Future<String?> launchPayload();
+
+  /// Payloads of notifications tapped while the app runs. Untrusted: the
+  /// app decodes them.
+  Stream<String?> get taps;
 }

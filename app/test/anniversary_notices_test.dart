@@ -1,0 +1,393 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:rememberem/src/app/app_services.dart';
+import 'package:rememberem/src/app/meet_shortcut.dart';
+import 'package:rememberem/src/app/rememberem_app.dart';
+import 'package:rememberem/src/capture/capture_screen.dart';
+import 'package:rememberem/src/location/device_location.dart';
+import 'package:rememberem/src/memories/filter_list_screen.dart';
+import 'package:rememberem/src/reminders/local_notifications_scheduler.dart';
+import 'package:rememberem/src/reminders/reminder_coordinator.dart';
+import 'package:rememberem/src/reminders/reminder_settings_store.dart';
+import 'package:rememberem/src/reminders/reminders_section.dart';
+import 'package:rememberem_core/rememberem_core.dart';
+
+import 'fakes/fake_dictation.dart';
+import 'fakes/fake_memory_repository.dart';
+import 'fakes/fake_reminder_scheduler.dart';
+
+class _NoFaces implements FaceLocator {
+  @override
+  Future<List<PixelRect>> findFaces(File photo) async => [];
+}
+
+class _MemoryStore implements ReminderSettingsStore {
+  ReminderSettings? value;
+
+  @override
+  Future<ReminderSettings> load() async =>
+      value ?? const ReminderSettings.defaults();
+
+  @override
+  Future<bool> hasSaved() async => value != null;
+
+  @override
+  Future<void> save(ReminderSettings settings) async => value = settings;
+}
+
+class _FakeShortcut extends MeetShortcut {
+  void Function()? trigger;
+
+  @override
+  Future<void> install(void Function() onMeet) async => trigger = onMeet;
+}
+
+void main() {
+  late FakeMemoryRepository repository;
+  late FakeReminderScheduler scheduler;
+  late _MemoryStore store;
+  late ReminderCoordinator coordinator;
+
+  /// 1 November 2026, before the morning notice.
+  DateTime today() => DateTime(2026, 11, 1, 8);
+
+  Future<void> person(String name, {DateTime? anniversary}) async {
+    final m = await repository.add(
+      photoJpeg: [],
+      capturedAt: DateTime(2026, 1, 1),
+      place: 'Stake Center',
+      meeting: 'Sunday',
+    );
+    await repository.save(
+      m.withField('name', name).withDetails([
+        if (anniversary != null)
+          Detail(
+            id: '${m.id}-a',
+            text: 'Loves cake',
+            at: DateTime.utc(2026),
+            type: DetailKind.anniversary,
+            label: 'birthday',
+            eventDate: anniversary,
+          ),
+      ]),
+    );
+  }
+
+  /// Built in the calling zone, as in reminders_test.dart.
+  void makeCoordinator() => coordinator = ReminderCoordinator(
+    scheduler: scheduler,
+    store: store,
+    repository: repository,
+    clock: today,
+  );
+
+  setUp(() {
+    repository = FakeMemoryRepository();
+    scheduler = FakeReminderScheduler();
+    store = _MemoryStore();
+    makeCoordinator();
+  });
+
+  final week = [for (var d = 13; d <= 20; d++) LocalDay(2026, 11, d)];
+
+  group('coordinator', () {
+    test('a notice on each day whose week has an anniversary', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      await person('Bo');
+
+      await coordinator.sync();
+
+      expect(scheduler.notices, week);
+    });
+
+    test('no anniversaries, no notices', () async {
+      await person('Ann');
+      scheduler.notices = [const LocalDay(2026, 11, 2)];
+
+      await coordinator.sync();
+
+      expect(scheduler.notices, isEmpty);
+    });
+
+    test('notices off: none, and the practice reminder is untouched', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      for (final n in ['Bo', 'Cy', 'Di']) {
+        await person(n);
+      }
+      store.value = const ReminderSettings(
+        enabled: true,
+        hour: 19,
+        minute: 0,
+        anniversaries: false,
+      );
+
+      await coordinator.sync();
+
+      expect(scheduler.notices, isEmpty);
+      expect(scheduler.scheduled, (19, 0));
+    });
+
+    test('practice off: notices still come', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      store.value = const ReminderSettings(
+        enabled: false,
+        hour: 19,
+        minute: 0,
+        anniversaries: true,
+      );
+
+      await coordinator.sync();
+
+      expect(scheduler.notices, week);
+      expect(scheduler.scheduled, isNull);
+    });
+
+    test('a permission taken away turns both off', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      store.value = const ReminderSettings.defaults();
+      await coordinator.sync();
+      expect(scheduler.notices, week);
+      scheduler.granted = false;
+
+      await coordinator.sync();
+
+      expect(store.value!.enabled, isFalse);
+      expect(store.value!.anniversaries, isFalse);
+      expect(scheduler.notices, isEmpty);
+    });
+
+    test('one ask answers both; a no turns both off', () async {
+      scheduler.granted = false;
+
+      await coordinator.askOnce();
+
+      expect(scheduler.calls.where((c) => c == 'request'), hasLength(1));
+      expect(store.value!.enabled, isFalse);
+      expect(store.value!.anniversaries, isFalse);
+    });
+
+    test('refused when turning notices on: only notices stay off', () async {
+      store.value = const ReminderSettings(
+        enabled: true,
+        hour: 19,
+        minute: 0,
+        anniversaries: false,
+      );
+      scheduler.granted = false;
+
+      expect(await coordinator.setAnniversaries(true), EnableResult.denied);
+
+      expect(store.value!.anniversaries, isFalse);
+      expect(store.value!.enabled, isTrue);
+    });
+
+    test('turning notices on and off reschedules', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      store.value = const ReminderSettings(
+        enabled: false,
+        hour: 19,
+        minute: 0,
+        anniversaries: false,
+      );
+
+      await coordinator.setAnniversaries(true);
+      expect(scheduler.notices, week);
+
+      await coordinator.setAnniversaries(false);
+      expect(scheduler.notices, isEmpty);
+    });
+  });
+
+  test('the notice text is fixed and names no one', () {
+    expect(LocalNotificationsScheduler.noticeTitle, 'Anniversaries coming up');
+    expect(
+      LocalNotificationsScheduler.noticeBody,
+      'Someone you know has an anniversary this week.',
+    );
+    expect(
+      AnniversaryNotice.wireId(const LocalDay(2026, 11, 13)),
+      'anniversaries:2026-11-13',
+    );
+  });
+
+  testWidgets('the switch turns notices off and on', (tester) async {
+    await person('Ann', anniversary: DateTime(1990, 11, 20));
+    store.value = const ReminderSettings.defaults();
+    makeCoordinator();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RemindersSection(coordinator: coordinator),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final toggle = find.widgetWithText(SwitchListTile, 'Anniversary notices');
+    expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+    expect(store.value!.anniversaries, isFalse);
+    expect(scheduler.notices, isEmpty);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(store.value!.anniversaries, isTrue);
+    expect(scheduler.notices, week);
+  });
+
+  group('tapping a notice', () {
+    late _FakeShortcut shortcut;
+
+    Future<void> boot(WidgetTester tester) async {
+      makeCoordinator();
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      shortcut = _FakeShortcut();
+      await tester.pumpWidget(
+        RememberemApp(
+          services: AppServices(
+            repository: repository,
+            capture: PortraitCapture(
+              repository: repository,
+              faceLocator: _NoFaces(),
+              workFolder: Directory.systemTemp,
+            ),
+            dictation: FakeDictation(),
+            location: DeviceLocation(),
+            reminders: coordinator,
+          ),
+          shortcut: shortcut,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    final notice = AnniversaryNotice.wireId(const LocalDay(2026, 11, 15));
+
+    Finder inFilterList(String text) => find.descendant(
+      of: find.byType(FilterListScreen),
+      matching: find.text(text),
+    );
+
+    Future<void> twoPeople() async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      await person('Bo', anniversary: DateTime(1990, 12, 25));
+    }
+
+    testWidgets('opens the Filter List set to that week', (tester) async {
+      await twoPeople();
+      await boot(tester);
+
+      scheduler.emitPayload(notice);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FilterListScreen), findsOneWidget);
+      expect(inFilterList('Anniversary'), findsOneWidget);
+      expect(inFilterList('Ann'), findsOneWidget);
+      expect(inFilterList('Bo'), findsNothing);
+      expect(inFilterList('1 person'), findsOneWidget);
+
+      // A second tap does not stack another list.
+      scheduler.emitPayload(notice);
+      await tester.pumpAndSettle();
+      expect(find.byType(FilterListScreen), findsOneWidget);
+    });
+
+    testWidgets('a newer notice replaces the open list', (tester) async {
+      await twoPeople();
+      await boot(tester);
+      scheduler.emitPayload(notice);
+      await tester.pumpAndSettle();
+
+      scheduler.emitPayload(
+        AnniversaryNotice.wireId(const LocalDay(2026, 12, 20)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FilterListScreen), findsOneWidget);
+      expect(inFilterList('Bo'), findsOneWidget);
+      expect(inFilterList('Ann'), findsNothing);
+    });
+
+    testWidgets('coming back to the list counts a new anniversary', (
+      tester,
+    ) async {
+      await person('Ann');
+      await boot(tester);
+      await tester.tap(find.text('Ann'));
+      await tester.pumpAndSettle();
+      final ann = repository.stored.values.single;
+      await repository.save(
+        ann.withDetails([
+          Detail(
+            id: 'a',
+            text: '',
+            at: DateTime.utc(2026),
+            type: DetailKind.anniversary,
+            label: 'birthday',
+            eventDate: DateTime(1990, 11, 20),
+          ),
+        ]),
+      );
+      expect(scheduler.notices, isEmpty);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(scheduler.notices, week);
+    });
+
+    testWidgets('from a cold start too; Back is the list', (tester) async {
+      await twoPeople();
+      scheduler.launch = notice;
+
+      await boot(tester);
+
+      expect(inFilterList('Ann'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(FilterListScreen), findsNothing);
+      expect(find.text('Bo'), findsOneWidget);
+    });
+
+    testWidgets('a stale notice, with no one in its week, leaves the list', (
+      tester,
+    ) async {
+      await person('Bo', anniversary: DateTime(1990, 12, 25));
+      await boot(tester);
+
+      scheduler.emitPayload(notice);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FilterListScreen), findsNothing);
+    });
+
+    testWidgets('ignored for junk, and while the camera is open', (
+      tester,
+    ) async {
+      await twoPeople();
+      await boot(tester);
+      scheduler.emitPayload('anniversaries:2026-13-01');
+      await tester.pumpAndSettle();
+      expect(find.byType(FilterListScreen), findsNothing);
+
+      shortcut.trigger!();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      scheduler.emitPayload(notice);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expect(find.byType(FilterListScreen), findsNothing);
+    });
+  });
+}

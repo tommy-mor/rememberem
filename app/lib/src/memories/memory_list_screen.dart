@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -87,7 +88,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   }
 
   @override
-  void didPopNext() => _reload();
+  void didPopNext() {
+    _reload();
+    // An anniversary may have been added or changed.
+    unawaited(
+      widget.services.reminders?.sync().catchError(
+        (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+      ),
+    );
+  }
 
   Future<void> _reload() async {
     final gen = ++_reloadGen;

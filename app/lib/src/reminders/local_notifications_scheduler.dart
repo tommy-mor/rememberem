@@ -12,17 +12,24 @@ import 'package:timezone/timezone.dart' as tz;
 import 'reminder_scheduler.dart';
 
 /// [ReminderScheduler] on the phone's own notifications. Nothing leaves
-/// the device: the time zone data is bundled, and the reminder names no one.
+/// the device: the time zone data is bundled, and no notification names
+/// anyone.
 class LocalNotificationsScheduler implements ReminderScheduler {
   static const _id = 1;
 
   /// Fixed, generic text: never a name, place or detail (lock screens).
   static const title = 'Time to practice';
   static const body = 'A minute to practice remembering people';
+  static const noticeTitle = 'Anniversaries coming up';
+  static const noticeBody = 'Someone you know has an anniversary this week.';
 
   final _plugin = FlutterLocalNotificationsPlugin();
-  final _taps = StreamController<PracticeGame?>.broadcast();
+  final _taps = StreamController<String?>.broadcast();
   Future<void>? _ready;
+
+  /// The last anniversary plan fully carried out, so an unchanged one is
+  /// not redone.
+  String? _lastNotices;
   bool _launchTaken = false;
 
   Future<void> _init() => _ready ??= _initialise();
@@ -45,22 +52,22 @@ class LocalNotificationsScheduler implements ReminderScheduler {
         ),
       ),
       onDidReceiveNotificationResponse: (response) =>
-          _taps.add(PracticeGame.fromWireId(response.payload)),
+          _taps.add(response.payload),
     );
   }
 
   @override
-  Stream<PracticeGame?> get taps => _taps.stream;
+  Stream<String?> get taps => _taps.stream;
 
   @override
-  Future<PracticeGame?> launchGame() async {
+  Future<String?> launchPayload() async {
     try {
       await _init();
       if (_launchTaken) return null;
       _launchTaken = true;
       final details = await _plugin.getNotificationAppLaunchDetails();
       if (details == null || !details.didNotificationLaunchApp) return null;
-      return PracticeGame.fromWireId(details.notificationResponse?.payload);
+      return details.notificationResponse?.payload;
     } catch (_) {
       return null;
     }
@@ -140,6 +147,64 @@ class LocalNotificationsScheduler implements ReminderScheduler {
       // Never block the app over a reminder, but leave a trace (no data
       // about anyone is involved here).
       debugPrint('Rememberem: scheduling the reminder failed: $error');
+    }
+  }
+
+  @override
+  Future<void> scheduleAnniversaries(List<LocalDay> days) async {
+    try {
+      await _init();
+      final now = tz.TZDateTime.now(tz.local);
+      final plan = AnniversaryNotice.plan(days, now);
+      final key = '${plan.schedule}|${plan.cancel}';
+      // Every return to the list syncs; skip the work if nothing changed.
+      if (key == _lastNotices) return;
+      var done = true;
+      // The new set first, then cancel what it no longer uses, so a sync
+      // cut short still leaves working notices. One failure never stops
+      // the rest.
+      for (final MapEntry(key: id, value: day) in plan.schedule.entries) {
+        try {
+          await _plugin.zonedSchedule(
+            id: id,
+            scheduledDate: tz.TZDateTime(
+              tz.local,
+              day.year,
+              day.month,
+              day.day,
+              AnniversaryNotice.hour,
+            ),
+            title: noticeTitle,
+            body: noticeBody,
+            payload: AnniversaryNotice.wireId(day),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            notificationDetails: const NotificationDetails(
+              android: AndroidNotificationDetails(
+                'anniversaries',
+                'Anniversary notices',
+                channelDescription:
+                    'When an anniversary is a week away or less',
+                visibility: NotificationVisibility.private,
+              ),
+              iOS: DarwinNotificationDetails(),
+            ),
+          );
+        } catch (error) {
+          done = false;
+          debugPrint('Rememberem: scheduling a notice failed: $error');
+        }
+      }
+      for (final id in plan.cancel) {
+        try {
+          await _plugin.cancel(id: id);
+        } catch (error) {
+          done = false;
+          debugPrint('Rememberem: cancelling a notice failed: $error');
+        }
+      }
+      _lastNotices = done ? key : null;
+    } catch (error) {
+      debugPrint('Rememberem: scheduling anniversary notices failed: $error');
     }
   }
 

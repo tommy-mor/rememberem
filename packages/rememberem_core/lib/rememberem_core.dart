@@ -2,6 +2,8 @@
 /// depend on Flutter.
 library;
 
+export 'src/anniversary_filter.dart';
+export 'src/anniversary_notice.dart';
 export 'src/date_range_filter.dart';
 export 'src/detail.dart';
 export 'src/details_filter.dart';

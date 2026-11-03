@@ -279,13 +279,13 @@ void main() {
     testWidgets('on by default at 7 PM; off hides the time', (tester) async {
       await people(['Ann', 'Bo', 'Cy', 'Di']);
       await show(tester);
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
       expect(find.text('Around 7:00 PM'), findsOneWidget);
 
-      await tester.tap(find.byType(Switch));
+      await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
 
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
       expect(find.textContaining('Around'), findsNothing);
     });
 
@@ -294,10 +294,10 @@ void main() {
       store.value = const ReminderSettings.off();
       await show(tester);
 
-      await tester.tap(find.byType(Switch));
+      await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
 
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
       expect(
         find.textContaining('Notifications are turned off'),
         findsOneWidget,
@@ -361,7 +361,7 @@ void main() {
       tester,
     ) async {
       await people(['Ann', 'Bo', 'Cy', 'Di']);
-      scheduler.launch = PracticeGame.faces;
+      scheduler.launch = PracticeGame.faces.wireId;
 
       await boot(tester);
 

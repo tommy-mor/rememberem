@@ -8,18 +8,20 @@ import 'reminder_settings_store.dart';
 /// What happened when Fred turned reminders on.
 enum EnableResult { enabled, denied }
 
-/// Keeps the daily reminder in step with Fred's setting and with whether
-/// there is anything to practise. Every change runs one at a time.
+/// Keeps the daily reminder and the anniversary notices in step with
+/// Fred's settings and his people. Every change runs one at a time.
 class ReminderCoordinator {
   ReminderCoordinator({
     required this.scheduler,
     required this.store,
     required this.repository,
+    this.clock = DateTime.now,
   });
 
   final ReminderScheduler scheduler;
   final ReminderSettingsStore store;
   final MemoryRepository repository;
+  final DateTime Function() clock;
 
   Future<void> _tail = Future.value();
 
@@ -35,22 +37,25 @@ class ReminderCoordinator {
 
   Future<ReminderSettings> settings() => store.load();
 
-  /// Brings the schedule up to date; run on every app open.
+  /// Brings the schedule up to date; run on every app open and return to
+  /// the list.
   Future<void> sync() => _serial(_sync);
 
   Future<void> _sync() async {
     var settings = await store.load();
-    if (!settings.enabled) {
-      await scheduler.cancel();
+    if (!settings.enabled && !settings.anniversaries) {
+      await _cancelAll();
       return;
     }
     if (!await scheduler.hasPermission()) {
       // Permission was taken away in Settings: switch off, never re-ask.
       // Before the first ask (see [askOnce]) there is nothing to take away.
       if (await store.hasSaved()) {
-        await store.save(settings.copyWith(enabled: false));
+        await store.save(
+          settings.copyWith(enabled: false, anniversaries: false),
+        );
       }
-      await scheduler.cancel();
+      await _cancelAll();
       return;
     }
     final List<Memory> people;
@@ -59,8 +64,24 @@ class ReminderCoordinator {
     } catch (_) {
       return; // can't tell: leave whatever is scheduled
     }
-    // The switch may have changed while we read.
+    // A switch may have changed while we read.
     settings = await store.load();
+    await _syncPractice(settings, people);
+    await scheduler.scheduleAnniversaries(
+      settings.anniversaries
+          ? AnniversaryNotice.days(
+              people,
+              LocalDay.of(clock()),
+              AnniversaryNotice.ahead,
+            )
+          : const [],
+    );
+  }
+
+  Future<void> _syncPractice(
+    ReminderSettings settings,
+    List<Memory> people,
+  ) async {
     if (!settings.enabled) {
       await scheduler.cancel();
       return;
@@ -74,15 +95,25 @@ class ReminderCoordinator {
     await scheduler.scheduleDaily(settings.hour, settings.minute);
   }
 
-  /// Reminders start on, but the permission is asked for only here, once,
-  /// at a calm moment the list chooses. The answer is saved either way, so
-  /// Fred is never asked twice.
+  Future<void> _cancelAll() async {
+    await scheduler.cancel();
+    await scheduler.scheduleAnniversaries(const []);
+  }
+
+  /// Reminders and notices start on, but the permission is asked for only
+  /// here, once, at a calm moment the list chooses. The answer is saved
+  /// either way, so Fred is never asked twice.
   Future<void> askOnce() => _serial(() async {
     if (await store.hasSaved()) return;
     final settings = await store.load();
     final granted =
         await scheduler.hasPermission() || await scheduler.requestPermission();
-    await store.save(settings.copyWith(enabled: settings.enabled && granted));
+    await store.save(
+      settings.copyWith(
+        enabled: settings.enabled && granted,
+        anniversaries: settings.anniversaries && granted,
+      ),
+    );
     await _sync();
   });
 
@@ -94,6 +125,19 @@ class ReminderCoordinator {
       return EnableResult.denied;
     }
     await store.save(settings.copyWith(enabled: enabled));
+    await _sync();
+    return EnableResult.enabled;
+  });
+
+  /// Turns anniversary notices on (asking permission) or off. A refusal
+  /// leaves the practice reminder as it was.
+  Future<EnableResult> setAnniversaries(bool enabled) => _serial(() async {
+    final settings = await store.load();
+    if (enabled && !await scheduler.requestPermission()) {
+      await store.save(settings.copyWith(anniversaries: false));
+      return EnableResult.denied;
+    }
+    await store.save(settings.copyWith(anniversaries: enabled));
     await _sync();
     return EnableResult.enabled;
   });

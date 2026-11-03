@@ -72,15 +72,19 @@ class FilterRow extends StatelessWidget {
         decoration: decoration,
         onChanged: (v) => onChanged(DetailsFilter(v)),
       ),
-      DateRangeFilter(:final from, :final to) => Semantics(
-        button: true,
-        child: InkWell(
-          onTap: () => _pickRange(context, from, to),
-          child: InputDecorator(
-            decoration: decoration,
-            child: Text(_rangeText(context, from, to)),
-          ),
-        ),
+      DateRangeFilter(:final from, :final to) => _range(
+        context,
+        decoration,
+        from,
+        to,
+        (start, end) => onChanged(DateRangeFilter(start, end)),
+      ),
+      AnniversaryFilter(:final from, :final to) => _range(
+        context,
+        decoration,
+        from,
+        to,
+        (start, end) => onChanged(AnniversaryFilter(start, end)),
       ),
       _ => const SizedBox.shrink(),
     };
@@ -110,6 +114,24 @@ class FilterRow extends StatelessWidget {
     );
   }
 
+  /// A field that opens the date range picker.
+  Widget _range(
+    BuildContext context,
+    InputDecoration decoration,
+    DateTime? from,
+    DateTime? to,
+    void Function(DateTime, DateTime) picked,
+  ) => Semantics(
+    button: true,
+    child: InkWell(
+      onTap: () => _pickRange(context, from, to, picked),
+      child: InputDecorator(
+        decoration: decoration,
+        child: Text(_rangeText(context, from, to)),
+      ),
+    ),
+  );
+
   String _rangeText(BuildContext context, DateTime? from, DateTime? to) {
     if (from == null || to == null) return 'Choose dates';
     final l = MaterialLocalizations.of(context);
@@ -120,6 +142,7 @@ class FilterRow extends StatelessWidget {
     BuildContext context,
     DateTime? from,
     DateTime? to,
+    void Function(DateTime, DateTime) picked,
   ) async {
     final range = await showDateRangePicker(
       context: context,
@@ -129,6 +152,6 @@ class FilterRow extends StatelessWidget {
       firstDate: DateTime(1970),
       lastDate: DateTime(2100, 12, 31),
     );
-    if (range != null) onChanged(DateRangeFilter(range.start, range.end));
+    if (range != null) picked(range.start, range.end);
   }
 }

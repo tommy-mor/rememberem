@@ -331,10 +331,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final camera = _camera;
     final problem = _problem;
     final picker = widget.services.photoPicker;
-    return ScaffoldMessenger(key: _messages, child: _scaffold(camera, problem, picker));
+    return ScaffoldMessenger(
+      key: _messages,
+      child: _scaffold(camera, problem, picker),
+    );
   }
 
-  Widget _scaffold(CameraController? camera, String? problem, PhotoPicker? picker) {
+  Widget _scaffold(
+    CameraController? camera,
+    String? problem,
+    PhotoPicker? picker,
+  ) {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

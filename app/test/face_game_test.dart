@@ -136,9 +136,12 @@ void main() {
     await tester.pump();
     expect(find.text(nameOf(person)), findsOneWidget);
 
-    final other = ['Ann', 'Bo', 'Cy', 'Di'].firstWhere(
-      (n) => n != nameOf(person),
-    );
+    final other = [
+      'Ann',
+      'Bo',
+      'Cy',
+      'Di',
+    ].firstWhere((n) => n != nameOf(person));
     await pick(tester, other);
     expect(find.text('Not $other.'), findsOneWidget);
   });

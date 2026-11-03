@@ -198,7 +198,9 @@ void main() {
     expect(find.text('Try again'), findsOneWidget);
 
     Navigator.of(tester.element(find.byType(CaptureScreen))).push(
-      MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('Next'))),
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('Next')),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

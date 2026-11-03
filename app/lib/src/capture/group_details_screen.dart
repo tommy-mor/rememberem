@@ -123,10 +123,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
           children: [
             Text('Added to each of the $count people.'),
             const SizedBox(height: 4),
-            Text(
-              MemoryEditScreen.askedText,
-              style: text.bodySmall,
-            ),
+            Text(MemoryEditScreen.askedText, style: text.bodySmall),
             const SizedBox(height: 12),
             DictatedTextField(
               label: 'Place',

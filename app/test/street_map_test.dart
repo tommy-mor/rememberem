@@ -10,7 +10,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: StreetMap(streetMaps: streetMaps, markers: const [], links: links),
+          body: StreetMap(
+            streetMaps: streetMaps,
+            markers: const [],
+            links: links,
+          ),
         ),
       ),
     );
@@ -27,9 +31,7 @@ void main() {
     expect(links.opened, [StreetMap.copyright]);
   });
 
-  testWidgets('a plain map fetches nothing and credits no one', (
-    tester,
-  ) async {
+  testWidgets('a plain map fetches nothing and credits no one', (tester) async {
     await showMap(tester, false);
 
     expect(find.text('OpenStreetMap contributors'), findsNothing);

@@ -4,29 +4,37 @@ import 'package:rememberem/src/reminders/reminder_scheduler.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 /// Records what the app asks of the notification system, and lets a test
-/// tap reminders.
+/// tap reminders and notices.
 class FakeReminderScheduler implements ReminderScheduler {
-  FakeReminderScheduler({this.granted = true, this.launch});
+  FakeReminderScheduler({this.granted = true, PracticeGame? launch})
+    : launch = launch?.wireId;
 
   bool granted;
 
   /// When set, a permission request grants it from then on.
   bool grantOnRequest = false;
-  PracticeGame? launch;
+
+  /// The payload of the notification that launched the app.
+  String? launch;
   final List<String> calls = [];
   (int, int)? scheduled;
-  final _taps = StreamController<PracticeGame?>.broadcast();
 
-  void emitTap(PracticeGame? game) => _taps.add(game);
+  /// The days with an anniversary notice.
+  List<LocalDay> notices = [];
+  final _taps = StreamController<String?>.broadcast();
+
+  void emitTap(PracticeGame? game) => _taps.add(game?.wireId);
+
+  void emitPayload(String? payload) => _taps.add(payload);
 
   @override
-  Stream<PracticeGame?> get taps => _taps.stream;
+  Stream<String?> get taps => _taps.stream;
 
   @override
-  Future<PracticeGame?> launchGame() async {
-    final game = launch;
+  Future<String?> launchPayload() async {
+    final payload = launch;
     launch = null;
-    return game;
+    return payload;
   }
 
   @override
@@ -49,5 +57,10 @@ class FakeReminderScheduler implements ReminderScheduler {
   Future<void> cancel() async {
     calls.add('cancel');
     scheduled = null;
+  }
+
+  @override
+  Future<void> scheduleAnniversaries(List<LocalDay> days) async {
+    notices = List.of(days);
   }
 }

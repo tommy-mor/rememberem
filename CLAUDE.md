@@ -143,7 +143,13 @@ has already been tried and fallen short.
 - Meetings auto-fill by place plus local time of week (a weekly meeting),
   within the window set in Settings.
 - `settings.json` (`AppSettings`) holds Fred's settings; `reminders.json`
-  holds the reminder. Damage in either never stops the app.
+  holds the reminder and the anniversary-notices switch (missing in older
+  files: it follows the reminder switch). Damage in either never stops the
+  app.
+- Anniversary notices are scheduled 30 days ahead on each sync (app open,
+  resume, back to the list), ids 100–129, at 09:00 on each day whose next
+  week holds an anniversary. They name no one; a tap opens the Filter List
+  with an Anniversary filter for that week.
 - `contactKey` (top level, optional) links a person to a phone contact by
   Android lookup key only; no contact data is copied. It changes only through
   `setContactKey`, so autosave never undoes it.

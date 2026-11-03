@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../capture/capture_screen.dart';
+import '../memories/filter_list_screen.dart';
 import '../memories/memory_list_screen.dart';
 import '../practice/practice_screens.dart';
 import 'app_routes.dart';
@@ -27,7 +28,7 @@ class _RememberemAppState extends State<RememberemApp>
     with WidgetsBindingObserver {
   final _navigator = GlobalKey<NavigatorState>();
   final _routeObserver = RouteObserver<ModalRoute<void>>();
-  StreamSubscription<PracticeGame?>? _taps;
+  StreamSubscription<String?>? _taps;
 
   @override
   void initState() {
@@ -38,8 +39,8 @@ class _RememberemAppState extends State<RememberemApp>
     if (scheduler != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         // Listen first, so a tap during the launch check is not lost.
-        _taps = scheduler.taps.listen(_openReminder);
-        _openReminder(await scheduler.launchGame());
+        _taps = scheduler.taps.listen(_openNotification);
+        _openNotification(await scheduler.launchPayload());
       });
     }
   }
@@ -73,14 +74,45 @@ class _RememberemAppState extends State<RememberemApp>
     blockedBy: {AppRoutes.capture},
   );
 
-  /// A reminder was tapped: open a game Fred can play now, over the list.
-  /// Never while the camera or a game is open; untrusted or unknown
-  /// payloads (null) do nothing.
-  Future<void> _openReminder(PracticeGame? requested) async {
-    if (requested == null ||
-        _topRouteIn({AppRoutes.capture, AppRoutes.practice})) {
-      return;
+  /// A notification was tapped. Its payload is untrusted: anything that is
+  /// not a game or a notice's day does nothing.
+  void _openNotification(String? payload) {
+    if (PracticeGame.fromWireId(payload) case final game?) {
+      _openReminder(game);
+    } else if (AnniversaryNotice.dayFromWire(payload) case final day?) {
+      _openAnniversaries(day);
     }
+  }
+
+  /// An anniversary notice was tapped: the Filter List over the list, set
+  /// to the notice's week. Never over the camera or a game, and not if no
+  /// one matches any more (the list stays).
+  Future<void> _openAnniversaries(LocalDay day) async {
+    // A notice's list on top is replaced, so the newest week shows.
+    const blockedBy = {AppRoutes.capture, AppRoutes.practice};
+    if (_topRouteIn(blockedBy)) return;
+    final filter = AnniversaryNotice.filterFor(day);
+    try {
+      final people = await widget.services.repository.all();
+      if (!people.any(filter.matches) || !mounted) return;
+      _openOnRoot(
+        AppRoutes.anniversaries,
+        (_) => FilterListScreen(
+          services: widget.services,
+          routeObserver: _routeObserver,
+          initialFilters: [filter],
+        ),
+        blockedBy: blockedBy,
+      );
+    } catch (_) {
+      // A notice must never break the app; the list stays.
+    }
+  }
+
+  /// A reminder was tapped: open a game Fred can play now, over the list.
+  /// Never while the camera or a game is open.
+  Future<void> _openReminder(PracticeGame requested) async {
+    if (_topRouteIn({AppRoutes.capture, AppRoutes.practice})) return;
     try {
       final repository = widget.services.repository;
       final game = ReminderTarget.resolve(await repository.all(), requested);

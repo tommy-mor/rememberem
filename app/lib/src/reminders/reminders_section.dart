@@ -3,8 +3,8 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import 'reminder_coordinator.dart';
 
-/// Turn the daily practice reminder on or off and choose its time. Part
-/// of the Settings page.
+/// Turn the daily practice reminder on or off and choose its time, and
+/// turn anniversary notices on or off. Part of the Settings page.
 class RemindersSection extends StatefulWidget {
   const RemindersSection({super.key, required this.coordinator});
 
@@ -16,6 +16,8 @@ class RemindersSection extends StatefulWidget {
 
 class _RemindersSectionState extends State<RemindersSection> {
   ReminderSettings? _settings;
+
+  /// The last switch turned on was refused notification permission.
   bool _denied = false;
   bool _busy = false;
 
@@ -42,6 +44,26 @@ class _RemindersSectionState extends State<RemindersSection> {
     try {
       denied =
           await widget.coordinator.setEnabled(enabled) == EnableResult.denied;
+    } catch (_) {
+      // Could not save; the switch shows what is actually stored.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _denied = denied;
+        });
+      }
+    }
+    await _load();
+  }
+
+  Future<void> _setAnniversaries(bool enabled) async {
+    setState(() => _busy = true);
+    var denied = false;
+    try {
+      denied =
+          await widget.coordinator.setAnniversaries(enabled) ==
+          EnableResult.denied;
     } catch (_) {
       // Could not save; the switch shows what is actually stored.
     } finally {
@@ -92,21 +114,30 @@ class _RemindersSectionState extends State<RemindersSection> {
                   subtitle: const Text('Tap to change'),
                   onTap: _pickTime,
                 ),
-              if (_denied)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Notifications are turned off for Rememberem. To get '
-                    'reminders, allow notifications for it in Settings.',
-                    style: small,
-                  ),
-                ),
               if (settings.enabled && widget.coordinator.waitingForPeople)
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     'Reminders start once there are enough people to '
                     'practice with.',
+                    style: small,
+                  ),
+                ),
+              SwitchListTile(
+                title: const Text('Anniversary notices'),
+                subtitle: const Text(
+                  'A morning note on days when someone has an anniversary '
+                  'in the coming week. It never names anyone.',
+                ),
+                value: settings.anniversaries,
+                onChanged: _busy ? null : _setAnniversaries,
+              ),
+              if (_denied)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Notifications are turned off for Rememberem. To get '
+                    'reminders, allow notifications for it in Settings.',
                     style: small,
                   ),
                 ),
