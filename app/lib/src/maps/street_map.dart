@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../about/link_opener.dart';
+
 /// A pannable map with [markers]. With [streetMaps] on, streets come from
 /// OpenStreetMap, which then sees the device's address and the area being
 /// viewed (never names, photos or notes). Off, nothing is fetched and the
@@ -12,12 +14,18 @@ class StreetMap extends StatefulWidget {
     super.key,
     required this.streetMaps,
     required this.markers,
+    required this.links,
     this.centre,
     this.fitAll = const [],
     this.onCentreChanged,
   });
 
   final bool streetMaps;
+
+  /// Opens OpenStreetMap's copyright page from the credit on the map.
+  final LinkOpener links;
+
+  static final copyright = Uri.parse('https://www.openstreetmap.org/copyright');
   final List<Marker> markers;
 
   /// Where to look; the map moves there whenever this changes.
@@ -98,9 +106,11 @@ class _StreetMapState extends State<StreetMap> {
             userAgentPackageName: StreetMap.userAgentPackageName,
           ),
         MarkerLayer(markers: widget.markers),
+        // Always in view, as OpenStreetMap's licence asks.
         if (widget.streetMaps)
-          const RichAttributionWidget(
-            attributions: [TextSourceAttribution('OpenStreetMap contributors')],
+          SimpleAttributionWidget(
+            source: const Text('OpenStreetMap contributors'),
+            onTap: () => widget.links.open(StreetMap.copyright),
           ),
       ],
     );

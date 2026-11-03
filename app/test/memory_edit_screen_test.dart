@@ -1,4 +1,5 @@
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
+import 'package:rememberem/src/speech/dictated_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem_core/rememberem_core.dart';
@@ -12,7 +13,11 @@ void main() {
   late FakeDictation dictation;
   late Memory memory;
 
-  Future<void> showScreen(WidgetTester tester, {GeoPoint? here}) async {
+  Future<void> showScreen(
+    WidgetTester tester, {
+    GeoPoint? here,
+    bool justMet = false,
+  }) async {
     // A phone-sized screen, so every field is laid out.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
@@ -21,6 +26,7 @@ void main() {
       MaterialApp(
         home: MemoryEditScreen(
           memory: memory,
+          justMet: justMet,
           services: testServices(
             repository,
             dictation: dictation,
@@ -157,10 +163,56 @@ void main() {
     await tester.tap(find.byTooltip('Speak Name'));
     await tester.pump();
 
-    expect(
-      find.textContaining('Speech recognition is not available'),
-      findsOneWidget,
-    );
+    expect(find.textContaining("Dictation isn't available"), findsOneWidget);
+    expect(find.byTooltip('Speak Name'), findsOneWidget);
+  });
+
+  testWidgets('someone just met can be deleted at once, not to the trash', (
+    tester,
+  ) async {
+    await showScreen(tester, justMet: true);
+    expect(find.text(MemoryEditScreen.askedText), findsOneWidget);
+
+    await tester.tap(find.text('Delete now'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.purges, [memory.id]);
+    expect(repository.stored, isEmpty);
+    expect(find.byType(MemoryEditScreen), findsNothing);
+  });
+
+  testWidgets('Delete now asks first; Cancel keeps them', (tester) async {
+    await showScreen(tester, justMet: true);
+
+    await tester.tap(find.text('Delete now'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(repository.purges, isEmpty);
+    expect(saved().trashedAt, isNull);
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
+  });
+
+  testWidgets('someone opened from the list has no Delete now', (tester) async {
+    await showScreen(tester);
+
+    expect(find.text('Delete now'), findsNothing);
+  });
+
+  testWidgets('says so when the phone has no offline speech pack', (
+    tester,
+  ) async {
+    await showScreen(tester);
+
+    await tester.tap(find.byTooltip('Speak Name'));
+    await tester.pump();
+    dictation.lackSpeechPack();
+    await tester.pump();
+
+    expect(find.text(DictatedTextField.noSpeechPack), findsOneWidget);
     expect(find.byTooltip('Speak Name'), findsOneWidget);
   });
 

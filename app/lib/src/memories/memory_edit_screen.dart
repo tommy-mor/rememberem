@@ -9,6 +9,7 @@ import '../contacts/contact_link_button.dart';
 import '../maps/location_choice.dart';
 import '../maps/location_picker_screen.dart';
 import '../speech/dictated_text_field.dart';
+import '../trash/purge_confirm_dialog.dart';
 import 'crop_screen.dart';
 import 'detail_list_editor.dart';
 import 'encounter_edit_screen.dart';
@@ -26,10 +27,17 @@ class MemoryEditScreen extends StatefulWidget {
     super.key,
     required this.memory,
     required this.services,
+    this.justMet = false,
   });
 
   final Memory memory;
   final AppServices services;
+
+  /// Just photographed: offers to delete them at once, in case they would
+  /// rather not be remembered.
+  final bool justMet;
+
+  static const askedText = 'Only keep people who are happy to be remembered.';
 
   MemoryRepository get repository => services.repository;
 
@@ -304,7 +312,6 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             ContactLinkButton(
               memoryId: memory.id,
               initialKey: memory.contactKey,
-              personName: () => _editor.memory.displayName,
               contacts: contacts,
               repository: widget.repository,
             ),
@@ -325,6 +332,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 Expanded(child: _photoGroup(context, memory)),
               ],
             ),
+            if (widget.justMet) _askedRow(context),
             if (memory.encounters.length > 1)
               PicturesSection(
                 encounters: memory.encounters.skip(1).toList(),
@@ -472,6 +480,72 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       ),
     );
     return choice?.place;
+  }
+
+  Widget _askedRow(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            MemoryEditScreen.askedText,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        TextButton(onPressed: _deleteNow, child: const Text('Delete now')),
+      ],
+    ),
+  );
+
+  /// Deletes this person for good, not to the trash, after asking: they
+  /// said no after the photo was taken.
+  Future<void> _deleteNow() async {
+    if (_leaving) return;
+    final memory = _editor.memory;
+    final name = MemoryTile.nameOf(memory);
+    if (!await PurgeConfirmDialog.show(context, name)) return;
+    if (!mounted || _leaving) return;
+    _leaving = true;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final route = ModalRoute.of(context);
+    try {
+      await _editor.flush();
+      _editor.close();
+      await widget.repository.trash(memory.id, _editor.clock());
+    } on Object {
+      _editor.reopen();
+      _leaving = false;
+      messenger.showSnackBar(
+        const SnackBar(content: Text("Couldn't delete. Try again.")),
+      );
+      return;
+    }
+    var deleted = true;
+    try {
+      await widget.repository.purge(memory.id);
+    } on Object {
+      deleted = false;
+    }
+    if (!mounted) return;
+    messenger.clearSnackBars();
+    _keepSnackBars = true;
+    // This page, even if another was opened over it meanwhile.
+    if (route != null && !route.isCurrent) {
+      navigator.removeRoute(route);
+    } else {
+      navigator.pop();
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          deleted
+              ? 'Deleted $name.'
+              : "Moved $name to the trash, but couldn't delete. "
+                    'Empty it from the Trash.',
+        ),
+      ),
+    );
   }
 
   /// Saves, moves this person to the trash and goes back, offering Undo,

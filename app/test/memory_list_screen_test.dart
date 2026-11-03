@@ -59,6 +59,15 @@ void main() {
     await showScreen(tester);
 
     expect(find.textContaining('No one yet'), findsOneWidget);
+    expect(find.textContaining("couldn't be read"), findsNothing);
+  });
+
+  testWidgets('says how many records could not be read', (tester) async {
+    repository.unreadable = ['a.json', 'b.json'];
+    await showScreen(tester);
+
+    expect(find.text(MemoryListScreen.unreadableText(2)), findsOneWidget);
+    expect(find.textContaining('No one yet'), findsOneWidget);
   });
 
   testWidgets('lists people with their place and meeting', (tester) async {

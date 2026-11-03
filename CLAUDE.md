@@ -100,6 +100,9 @@ has already been tried and fallen short.
   detection; `memories/` the list, the notes screen and the autosaving
   `MemoryEditor`; `speech/` the `Dictation` interface and mic text fields;
   `location/` the GPS lookup.
+- `site/` is the website (homepage and privacy policy), published to
+  https://nebosite.github.io/rememberem/ by `.github/workflows/pages.yml` on
+  a push to main that changes it.
 - **Code style:** object-oriented, one class per file, YAGNI. Platform plugins
   stay behind small interfaces so tests can use fakes, as in `app/test/fakes/`.
 
@@ -148,16 +151,22 @@ has already been tried and fallen short.
   people; purge deletes every `<id>.*` file and refuses anyone not in the
   trash.
 - Photos are made upright, cropped to a 4:5 head-and-shoulders portrait around
-  the largest face, and never written to the gallery.
+  the largest face, shrunk to 1000 px on the long side at JPEG quality 75,
+  and never written to the gallery.
+- A record file that can't be read is skipped, not fatal, and left on disk.
+  The list says how many were skipped (`MemoryRepository.unreadable`).
 
 ### Privacy questions still open
 
 Check these before any public release. `sally` and `lena` own them.
 
-- **Speech:** the platform recogniser may send audio to Google or Apple servers
-  unless on-device recognition is used.
-- **Backups:** Android auto-backup and iOS iCloud backup may copy the
-  `memories/` folder off the device.
+- **Speech:** dictation requests on-device recognition (`onDevice: true`).
+  Without an on-device recogniser (before Android 12, or none installed) the
+  phone's speech service may still send audio to Google or Apple servers.
+  About and the privacy policy say so.
+- **Backups:** on, Eric's call: Android auto-backup copies the `memories/`
+  folder to the user's Google backup (25 MB per app, then it stops). About
+  and the empty list say so. iOS iCloud backup is unsettled.
 - **Map tiles:** with Street maps on (the default, Eric's call), OpenStreetMap
   sees the device IP, the user agent and the area being viewed. It never sees
   names, photos or notes. Settings can turn this off.
@@ -166,12 +175,15 @@ Check these before any public release. `sally` and `lena` own them.
   access" choice). It is asked on each gallery tap until allowed or Android
   stops asking. Photos come through the phone's gallery app, which may be a
   cloud app (Google Photos) that sees the choice.
-- **Contacts:** linking asks for READ_CONTACTS and reads only names and
-  lookup keys for the picker dialog; refusing falls back to the system picker.
-  Play requires a sensitive-permission declaration before public release.
+- **Contacts:** linking uses only the system contact picker, which grants
+  access to the one contact chosen. There is no READ_CONTACTS permission.
 - **Faces:** face detection runs on-device through ML Kit. Laws on biometric
   data, such as BIPA, may still apply to storing faces of people who are not
   users.
+- **Privacy policy:** `site/privacy.html`, published by GitHub Pages at
+  the URL in `AboutScreen.privacy`. Privacy questions go to
+  rememberem@niftibits.com. Keep it, About and the Data safety form saying
+  the same thing.
 
 ## Platform gotchas
 
@@ -181,6 +193,9 @@ Check these before any public release. `sally` and `lena` own them.
 - **iOS:** builds need a Mac with Xcode. The minimum is iOS 15.5 because of ML
   Kit (see `app/ios/Podfile`). Permission prompt text is in
   `app/ios/Runner/Info.plist`.
+- **Release signing:** `app/android/key.properties` (git-ignored) names the
+  upload key. Without it a release build stops, unless built with
+  `-PallowDebugSigning=true`, for a release walk on your own devices only. See `docs/release-steps.md`.
 - **Release builds shrink code:** they can break plugins that use reflection,
   and debug builds don't show it. ML Kit face detection crashed, and scheduled
   notifications silently never scheduled, until the keep rules in

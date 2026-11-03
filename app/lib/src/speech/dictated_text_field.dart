@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/allow_in_settings.dart';
 import '../app/rememberem_theme.dart';
 
 import 'dictation.dart';
@@ -44,6 +45,11 @@ class DictatedTextField extends StatefulWidget {
 
   /// Told when listening starts and stops.
   final ValueChanged<bool>? onListeningChanged;
+
+  /// Said when the phone has no offline speech for the language.
+  static const noSpeechPack =
+      "Your phone hasn't downloaded offline speech for this language. "
+      "Download it in your phone's speech or language settings, or type.";
 
   @override
   State<DictatedTextField> createState() => _DictatedTextFieldState();
@@ -106,14 +112,21 @@ class _DictatedTextFieldState extends State<DictatedTextField>
         // Not listening any more means dispose() already stopped us.
         if (mounted && _listening) _setListening(false);
       },
+      onNoSpeechPack: () {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(DictatedTextField.noSpeechPack),
+            duration: Duration(seconds: 8),
+          ),
+        );
+      },
     );
     if (!available && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Speech recognition is not available. '
-            'Check microphone permission in Settings.',
-          ),
+        AllowInSettings.snackBar(
+          "Dictation isn't available. If the microphone is off for "
+          'Rememberem, allow it in Settings. You can always type.',
         ),
       );
     }

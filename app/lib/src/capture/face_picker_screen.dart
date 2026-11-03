@@ -8,6 +8,7 @@ import '../app/app_services.dart';
 import '../memories/memory_edit_screen.dart';
 import 'face_box.dart';
 import 'group_details_screen.dart';
+import 'photo_problems.dart';
 
 /// A photo with several faces: Fred chooses whom to remember. One face is
 /// saved as a person and opens their page; several go on to the details
@@ -76,15 +77,20 @@ class _FacePickerScreenState extends State<FacePickerScreen> {
       if (!mounted) return;
       await navigator.pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              MemoryEditScreen(memory: memory, services: widget.services),
+          builder: (_) => MemoryEditScreen(
+            memory: memory,
+            services: widget.services,
+            justMet: true,
+          ),
         ),
       );
     } catch (e) {
+      debugPrint('Could not save photo: $e');
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not save photo: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text(PhotoProblems.cannotSave)));
     }
   }
 

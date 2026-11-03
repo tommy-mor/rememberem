@@ -1,13 +1,22 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Not required: without a camera (tablets, Chromebooks) Fred can
+         still choose photos, and without a microphone he can type. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <!-- The camera plugin requires any camera; overridden for the same reason. -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false"
+        tools:replace="android:required"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+    <!-- Without location the place is simply left blank. -->
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <!-- Read the GPS in photos Fred chooses from the phone. -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"/>
-    <!-- Find the contact to link a person to: lookup key and name only. -->
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
     <!-- A short buzz for a right answer in practice. Install-time, no prompt,
          no data. -->
     <uses-permission android:name="android.permission.VIBRATE"/>
@@ -15,7 +24,11 @@
          Deliberately no exact-alarm permission (inexact delivery is fine). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Backup stays on (Eric's call): the phone's Google backup includes
+         Fred's people, so a new phone can get them back. About says so.
+         Capture work files are in the cache, which is never backed up. -->
     <application
+        android:allowBackup="true"
         android:label="Rememberem"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

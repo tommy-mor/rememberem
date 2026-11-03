@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../about/link_opener.dart';
 import '../maps/place_marker.dart';
 import '../maps/street_map.dart';
 
@@ -13,12 +14,14 @@ class PlacesMap extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.streetMaps,
+    required this.links,
   });
 
   final List<PlaceGroup> groups;
   final PlaceGroup? selected;
   final ValueChanged<PlaceGroup> onSelect;
   final bool streetMaps;
+  final LinkOpener links;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +35,7 @@ class PlacesMap extends StatelessWidget {
     final selected = this.selected;
     return StreetMap(
       streetMaps: streetMaps,
+      links: links,
       centre: selected?.marker,
       fitAll: [for (final g in located) g.marker!],
       markers: [

@@ -3,27 +3,24 @@ import 'package:flutter/services.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import 'contact_open_result.dart';
-import 'contact_picker_dialog.dart';
 import 'contacts_service.dart';
 
 /// The person card's contact icon. Unlinked, a tap finds the contact to
 /// link. Linked, a tap shows the contact on the phone and a long press
-/// offers Re-assign or Remove link. Only the contact's key is kept.
+/// offers Re-assign or Remove link. Contacts are chosen in the phone's own
+/// picker, so Rememberem never reads the contact list. Only the contact's
+/// key is kept.
 class ContactLinkButton extends StatefulWidget {
   const ContactLinkButton({
     super.key,
     required this.memoryId,
     required this.initialKey,
-    required this.personName,
     required this.contacts,
     required this.repository,
   });
 
   final String memoryId;
   final String? initialKey;
-
-  /// The name as Fred has it now, to start the list at the best match.
-  final String Function() personName;
   final ContactsService contacts;
   final MemoryRepository repository;
 
@@ -102,24 +99,9 @@ class _ContactLinkButtonState extends State<ContactLinkButton> {
     if (choice == 'remove') await _link(null);
   });
 
-  /// Finds a contact: the list at the best match if Fred allows reading
-  /// contacts, else the phone's own picker.
+  /// Finds a contact in the phone's own picker.
   Future<void> _assign() async {
-    final contacts = widget.contacts;
-    final String? key;
-    if (await contacts.ensureAccess()) {
-      final entries = await contacts.list();
-      if (!mounted) return;
-      key = await showDialog<String>(
-        context: context,
-        builder: (_) => ContactPickerDialog(
-          entries: entries,
-          personName: widget.personName(),
-        ),
-      );
-    } else {
-      key = await contacts.pickWithSystemPicker();
-    }
+    final key = await widget.contacts.pick();
     if (key != null) await _link(key);
   }
 

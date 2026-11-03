@@ -59,6 +59,9 @@ class _FaceGameScreenState extends State<FaceGameScreen>
 
   /// The right answer just chosen, shown green during the pause.
   String? _correct;
+
+  /// What the last answer was, spoken by screen readers as it changes.
+  String? _said;
   bool _hidden = false;
   bool _ended = false;
   String _stopReason = '';
@@ -138,13 +141,39 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       _missed = false;
       _advancing = false;
       _correct = null;
+      _said = null;
       _phase = _Phase.reveal;
     });
     if (!_hidden) _startReveal();
   }
 
+  /// With a screen reader on, the reveal waits for [_showChoices], so a
+  /// timer never cuts the prompt off mid-sentence.
+  bool get _paced => MediaQuery.accessibleNavigationOf(context);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A screen reader turned on or off mid-reveal: wait for the button, or
+    // start the timer the button was standing in for.
+    if (_phase == _Phase.reveal && !_hidden) {
+      if (_paced) {
+        _timer?.cancel();
+      } else if (!(_timer?.isActive ?? false)) {
+        _startReveal();
+      }
+    }
+  }
+
+  void _showChoices() {
+    if (_live && _phase == _Phase.reveal) {
+      setState(() => _phase = _Phase.choose);
+    }
+  }
+
   void _startReveal() {
     _timer?.cancel();
+    if (_paced) return;
     _timer = Timer(widget.reveal, () {
       if (_live) setState(() => _phase = _Phase.choose);
     });
@@ -168,7 +197,10 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     final right = name == person.field(MemoryField.name).trim();
     if (!right) {
       widget.feedback?.wrong();
-      setState(() => _wrong.add(name));
+      setState(() {
+        _wrong.add(name);
+        _said = 'Not $name.';
+      });
       if (_missed) return; // one reset per turn is enough
       _missed = true;
       await _record(person, correctFirstTry: false);
@@ -178,6 +210,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     setState(() {
       _advancing = true;
       _correct = name;
+      _said = 'Right: $name.';
     });
     final pause = Future<void>.delayed(widget.pauseAfterRight);
     if (!_missed && await _record(person, correctFirstTry: true)) {
@@ -248,22 +281,44 @@ class _FaceGameScreenState extends State<FaceGameScreen>
                     child: Image.file(
                       widget.repository.photoFile(person),
                       fit: BoxFit.cover,
+                      semanticLabel:
+                          'The face to name. This game needs sight; '
+                          'Practice details works with a screen reader.',
                       errorBuilder: (_, _, _) =>
                           const Center(child: Icon(Icons.person, size: 96)),
                     ),
                   ),
           ),
           const SizedBox(height: 16),
-          if (_phase == _Phase.reveal)
+          if (_phase == _Phase.reveal) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                'Who is this?',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleLarge,
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  'Who is this?',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge,
+                ),
               ),
-            )
-          else
+            ),
+            if (_paced)
+              FilledButton(
+                onPressed: _showChoices,
+                child: const Text('Show names'),
+              ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  _said ?? 'Who is this?',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ),
             for (final name in _choices)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -275,6 +330,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
                   child: Text(name),
                 ),
               ),
+          ],
         ],
       ),
     );

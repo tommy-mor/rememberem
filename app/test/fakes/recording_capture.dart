@@ -35,6 +35,9 @@ class RecordingCapture extends PortraitCapture {
   /// When set, the group save fails on this face (counting from 0).
   int? failGroupAt;
 
+  /// How many single saves fail before one works.
+  int failSaveOne = 0;
+
   /// When set, the group save waits for this before saving anyone.
   Completer<void>? holdGroup;
 
@@ -61,7 +64,11 @@ class RecordingCapture extends PortraitCapture {
   }
 
   @override
-  Future<Memory> saveOne(CaptureDraft draft, {PixelRect? face}) {
+  Future<Memory> saveOne(CaptureDraft draft, {PixelRect? face}) async {
+    if (failSaveOne > 0) {
+      failSaveOne--;
+      throw const FileSystemException('disk full');
+    }
     savedFaces.add(face);
     return repository.add(
       photoJpeg: draft.photo.jpeg,

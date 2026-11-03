@@ -41,7 +41,7 @@ class MemoryTile extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
       leading: CircleAvatar(
-        backgroundImage: FileImage(photo),
+        backgroundImage: ResizeImage(FileImage(photo), width: 120),
         onBackgroundImageError: (_, _) {},
       ),
       title: Text(nameOf(memory)),

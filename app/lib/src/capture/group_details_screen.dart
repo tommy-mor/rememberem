@@ -3,8 +3,10 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../memories/filter_list_screen.dart';
+import '../memories/memory_edit_screen.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
+import 'photo_problems.dart';
 
 /// Several faces from one photo: the place, meeting and details they
 /// share. Saving makes one unnamed person per face, then opens the Filter
@@ -71,9 +73,11 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         onSaved: (_) => saved++,
       );
     } catch (e) {
-      problem =
-          'Saved $saved of ${widget.faces.length} people. '
-          'The rest could not be saved: $e';
+      debugPrint('Group save stopped: $e');
+      problem = saved == 0
+          ? PhotoProblems.cannotSave
+          : 'Saved $saved of ${widget.faces.length} people. The rest '
+                "couldn't be saved. Check that your phone has free space.";
     }
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -117,7 +121,12 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Shared by all $count people.'),
+            Text('Added to each of the $count people.'),
+            const SizedBox(height: 4),
+            Text(
+              MemoryEditScreen.askedText,
+              style: text.bodySmall,
+            ),
             const SizedBox(height: 12),
             DictatedTextField(
               label: 'Place',

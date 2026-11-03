@@ -51,23 +51,45 @@ class RememberemTheme {
     return _themed(scheme, scheme.surfaceContainerHighest, scheme.surface);
   }
 
+  /// Gold on the app bar where it can be read (4.5:1, WCAG AA), else
+  /// white, else deep navy.
+  static Color barText(Color bar) {
+    for (final text in const [gold, Colors.white]) {
+      if (contrast(text, bar) >= 4.5) return text;
+    }
+    return deepNavy;
+  }
+
+  static double contrast(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    return la > lb ? (la + 0.05) / (lb + 0.05) : (lb + 0.05) / (la + 0.05);
+  }
+
   static ThemeData _themed(ColorScheme scheme, Color bar, Color background) =>
-      ThemeData(
-        colorScheme: scheme,
-        scaffoldBackgroundColor: background,
-        inputDecorationTheme: const InputDecorationTheme(
-          contentPadding: fieldPadding,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: bar,
-          foregroundColor: gold,
-          iconTheme: const IconThemeData(color: gold),
-          actionsIconTheme: const IconThemeData(color: gold),
-        ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: gold,
-          foregroundColor: deepNavy,
-        ),
-        listTileTheme: ListTileThemeData(selectedColor: scheme.primary),
-      );
+      _withBar(scheme, bar, background, barText(bar));
+
+  static ThemeData _withBar(
+    ColorScheme scheme,
+    Color bar,
+    Color background,
+    Color text,
+  ) => ThemeData(
+    colorScheme: scheme,
+    scaffoldBackgroundColor: background,
+    inputDecorationTheme: const InputDecorationTheme(
+      contentPadding: fieldPadding,
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: bar,
+      foregroundColor: text,
+      iconTheme: IconThemeData(color: text),
+      actionsIconTheme: IconThemeData(color: text),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: gold,
+      foregroundColor: deepNavy,
+    ),
+    listTileTheme: ListTileThemeData(selectedColor: scheme.primary),
+  );
 }

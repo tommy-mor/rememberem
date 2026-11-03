@@ -120,6 +120,46 @@ void main() {
     expect(find.text(nameOf(person)), findsOneWidget);
   });
 
+  testWidgets('with a screen reader the names wait for Show names, and '
+      'each answer is shown as well as said', (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(accessibleNavigation: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await people(['Ann', 'Bo', 'Cy', 'Di']);
+    await showGame(tester);
+    final person = showing(tester);
+
+    await tester.pump(const Duration(seconds: 10));
+    expect(find.text(nameOf(person)), findsNothing);
+
+    await tester.tap(find.text('Show names'));
+    await tester.pump();
+    expect(find.text(nameOf(person)), findsOneWidget);
+
+    final other = ['Ann', 'Bo', 'Cy', 'Di'].firstWhere(
+      (n) => n != nameOf(person),
+    );
+    await pick(tester, other);
+    expect(find.text('Not $other.'), findsOneWidget);
+  });
+
+  testWidgets('turning the screen reader off mid-reveal starts the timer', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(accessibleNavigation: true);
+    await people(['Ann', 'Bo', 'Cy', 'Di']);
+    await showGame(tester);
+    final person = showing(tester);
+
+    tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
+    await tester.pump();
+    expect(find.text('Show names'), findsNothing);
+    await reveal(tester);
+
+    expect(find.text(nameOf(person)), findsOneWidget);
+  });
+
   testWidgets('first try right adds a point and stamps the time', (
     tester,
   ) async {
@@ -356,6 +396,20 @@ void main() {
         find.text('Name at least 4 different people to practice faces.'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('a screen reader hears that the face game needs sight', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      await showList(tester);
+
+      expect(
+        find.bySemanticsLabel(MemoryListScreen.facesLabel),
+        findsOneWidget,
+      );
+      semantics.dispose();
     });
 
     testWidgets('with four names it opens the game', (tester) async {

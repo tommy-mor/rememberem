@@ -19,12 +19,16 @@ class _NoFaces implements FaceLocator {
 
 /// A [DeviceLocation] that answers [here] without asking the platform.
 class FakeLocation extends DeviceLocation {
-  FakeLocation([this.here]);
+  FakeLocation([this.here, this.isDenied = false]);
 
   GeoPoint? here;
+  bool isDenied;
 
   @override
   Future<GeoPoint?> current() async => here;
+
+  @override
+  Future<bool> denied() async => isDenied;
 }
 
 /// Services for widget tests. Street maps are off, so nothing touches the

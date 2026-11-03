@@ -2,7 +2,10 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'dictation.dart';
 
-/// [Dictation] using the phone's own speech recogniser.
+/// [Dictation] using the phone's own speech recogniser, on the device
+/// where the phone has an on-device recogniser (Android 12+), so the audio
+/// stays on the phone. Without one, the plugin falls back to the phone's
+/// default speech service, which may send the audio to be recognised.
 class DeviceDictation implements Dictation {
   /// How long a silence ends the dictation.
   static const quietPause = Duration(seconds: 3);
@@ -11,11 +14,19 @@ class DeviceDictation implements Dictation {
   final SpeechToText _speech = SpeechToText();
   bool _ready = false;
   void Function()? _onDone;
+  void Function()? _onNoSpeechPack;
+
+  /// The recogniser's errors for a language it has no offline speech for.
+  static const _noSpeechPack = {
+    'error_language_not_supported',
+    'error_language_unavailable',
+  };
 
   @override
   Future<bool> listen({
     required void Function(String words) onWords,
     required void Function() onDone,
+    void Function()? onNoSpeechPack,
   }) async {
     _finish();
     if (!await _initialise()) {
@@ -23,6 +34,7 @@ class DeviceDictation implements Dictation {
       return false;
     }
     _onDone = onDone;
+    _onNoSpeechPack = onNoSpeechPack;
     await _speech.listen(
       onResult: (result) => onWords(result.recognizedWords),
       listenOptions: SpeechListenOptions(
@@ -30,6 +42,7 @@ class DeviceDictation implements Dictation {
         pauseFor: quietPause,
         partialResults: true,
         listenMode: ListenMode.dictation,
+        onDevice: true,
       ),
     );
     return true;
@@ -51,7 +64,13 @@ class DeviceDictation implements Dictation {
               _finish();
             }
           },
-          onError: (_) => _finish(),
+          onError: (error) {
+            // Kept past [_finish]: the error can follow the "done" status.
+            final noSpeechPack = _onNoSpeechPack;
+            _onNoSpeechPack = null;
+            if (_noSpeechPack.contains(error.errorMsg)) noSpeechPack?.call();
+            _finish();
+          },
         );
     return _ready;
   }

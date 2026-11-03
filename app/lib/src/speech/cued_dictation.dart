@@ -29,6 +29,7 @@ class CuedDictation implements Dictation {
   Future<bool> listen({
     required void Function(String words) onWords,
     required void Function() onDone,
+    void Function()? onNoSpeechPack,
   }) async {
     final session = ++_session;
     await _sounds.play(AppSound.listenStart);
@@ -46,7 +47,11 @@ class CuedDictation implements Dictation {
       end(ding: _stopped == session);
       return true;
     }
-    return _inner.listen(onWords: onWords, onDone: end);
+    return _inner.listen(
+      onWords: onWords,
+      onDone: end,
+      onNoSpeechPack: onNoSpeechPack,
+    );
   }
 
   @override

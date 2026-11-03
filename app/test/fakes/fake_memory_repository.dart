@@ -17,6 +17,9 @@ class FakeMemoryRepository implements MemoryRepository {
   /// When true, the next save throws (and clears this flag).
   bool failNextSave = false;
 
+  @override
+  List<String> unreadable = [];
+
   /// The photo bytes given to [add], in order.
   final photos = <List<int>>[];
 

@@ -42,6 +42,7 @@ class RelationshipsSection extends StatelessWidget {
                 width: 32,
                 height: 40,
                 fit: BoxFit.cover,
+                cacheWidth: 100,
                 errorBuilder: (_, _, _) =>
                     const SizedBox(width: 32, child: Icon(Icons.person)),
               ),

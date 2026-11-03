@@ -278,15 +278,31 @@ class JsonFileMemoryRepository implements MemoryRepository {
   File encounterPhoto(Encounter encounter) =>
       File('${folder.path}${Platform.pathSeparator}${encounter.photoFileName}');
 
+  @override
+  List<String> get unreadable => List.unmodifiable(_unreadable);
+  List<String> _unreadable = const [];
+
+  /// Every record that can be read. A damaged file is skipped, named in
+  /// [unreadable] and left on disk untouched, so one bad record never hides
+  /// everyone else.
   Future<List<Memory>> _loadAll() async {
-    if (!await folder.exists()) return [];
+    if (!await folder.exists()) {
+      _unreadable = const [];
+      return [];
+    }
     final memories = <Memory>[];
+    final unreadable = <String>[];
     await for (final entity in folder.list()) {
       if (entity is File && entity.path.endsWith('.json')) {
-        final json = jsonDecode(await entity.readAsString());
-        memories.add(Memory.fromJson(json as Map<String, dynamic>));
+        try {
+          final json = jsonDecode(await entity.readAsString());
+          memories.add(Memory.fromJson(json as Map<String, dynamic>));
+        } catch (_) {
+          unreadable.add(entity.uri.pathSegments.last);
+        }
       }
     }
+    _unreadable = unreadable..sort();
     return memories;
   }
 

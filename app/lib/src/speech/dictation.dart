@@ -5,9 +5,12 @@ abstract interface class Dictation {
   ///
   /// Starting a new session ends any earlier one. Returns false (after
   /// calling [onDone]) if speech recognition is unavailable or not allowed.
+  /// [onNoSpeechPack] is called, around the time of [onDone], if listening
+  /// began but the phone has no offline speech for the language.
   Future<bool> listen({
     required void Function(String words) onWords,
     required void Function() onDone,
+    void Function()? onNoSpeechPack,
   });
 
   Future<void> stop();

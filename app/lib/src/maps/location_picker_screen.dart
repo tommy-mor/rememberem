@@ -107,6 +107,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     children: [
                       StreetMap(
                         streetMaps: widget.services.settings.value.streetMaps,
+                        links: widget.services.links,
                         centre: _start,
                         markers: [
                           for (final g in _places)

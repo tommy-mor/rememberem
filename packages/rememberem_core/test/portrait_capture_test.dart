@@ -81,6 +81,25 @@ void main() {
     return img.encodeJpg(image);
   }
 
+  /// The DQT segments of [jpeg]: the tables its quality setting chose.
+  List<List<int>> quantisationTables(List<int> jpeg) {
+    final tables = <List<int>>[];
+    var i = 2; // after SOI
+    while (i + 4 <= jpeg.length && jpeg[i] == 0xFF) {
+      final marker = jpeg[i + 1];
+      final length = (jpeg[i + 2] << 8) | jpeg[i + 3];
+      if (marker == 0xDB) tables.add(jpeg.sublist(i + 4, i + 2 + length));
+      if (marker == 0xDA) break; // image data follows
+      i += 2 + length;
+    }
+    return tables;
+  }
+
+  /// The tables this encoder writes at [quality].
+  List<List<int>> qualityTables(int quality) => quantisationTables(
+        img.encodeJpg(img.Image(width: 8, height: 8), quality: quality),
+      );
+
   Future<img.Image> storedPhoto(Memory memory) async =>
       img.decodeJpg(await repository.photoFile(memory).readAsBytes())!;
 
@@ -115,6 +134,59 @@ void main() {
 
     final photo = await storedPhoto(memory);
     expect([photo.width, photo.height], [600, 800]);
+  });
+
+  test('a large whole photo is shrunk to 1000 px on its longest side',
+      () async {
+    final memory = await captureWith(_FakeFaceLocator([]))
+        .capture(jpeg(3000, 4000), capturedAt: DateTime.utc(2026, 11, 1));
+
+    final photo = await storedPhoto(memory);
+    expect([photo.width, photo.height], [750, 1000]);
+  });
+
+  test('a large landscape photo is shrunk to 1000 px wide', () async {
+    final memory = await captureWith(_FakeFaceLocator([]))
+        .capture(jpeg(4000, 3000), capturedAt: DateTime.utc(2026, 11, 1));
+
+    final photo = await storedPhoto(memory);
+    expect([photo.width, photo.height], [1000, 750]);
+  });
+
+  test('a small landscape photo keeps its size', () async {
+    final memory = await captureWith(_FakeFaceLocator([]))
+        .capture(jpeg(800, 600), capturedAt: DateTime.utc(2026, 11, 1));
+
+    final photo = await storedPhoto(memory);
+    expect([photo.width, photo.height], [800, 600]);
+  });
+
+  test('a whole photo is kept at JPEG quality 75', () async {
+    final memory = await captureWith(_FakeFaceLocator([]))
+        .capture(jpeg(600, 800), capturedAt: DateTime.utc(2026, 11, 1));
+
+    final bytes = await repository.photoFile(memory).readAsBytes();
+    expect(quantisationTables(bytes), qualityTables(75));
+  });
+
+  test('a large face crop is shrunk and kept at JPEG quality 75', () async {
+    final image = img.Image(width: 3000, height: 4000);
+    for (final pixel in image) {
+      pixel
+        ..r = pixel.x % 256
+        ..g = pixel.y % 256
+        ..b = (pixel.x * pixel.y) % 256;
+    }
+    final memory = await captureWith(
+      _FakeFaceLocator([const PixelRect(1000, 1000, 1000, 1000)]),
+    ).capture(img.encodeJpg(image), capturedAt: DateTime.utc(2026, 11, 1));
+
+    final bytes = await repository.photoFile(memory).readAsBytes();
+    final photo = img.decodeJpg(bytes)!;
+    expect(photo.width > photo.height ? photo.width : photo.height, 1000);
+    // The quantisation tables are what the quality setting chooses.
+    expect(quantisationTables(bytes), qualityTables(75));
+    expect(quantisationTables(bytes), isNot(qualityTables(90)));
   });
 
   test('rotates the photo upright before looking for faces', () async {
@@ -231,14 +303,13 @@ void main() {
       expect((await captureAt(nearby)).latest.place, '');
     });
 
-    test('a record of the wrong shape (a TypeError) still saves the photo',
-        () async {
+    test('a record of the wrong shape (a TypeError) is passed over', () async {
       await knownCafe();
       await File('${temp.path}/memories/odd.json').writeAsString('[]');
 
       final memory = await captureAt(nearby);
 
-      expect(memory.latest.place, '');
+      expect(memory.latest.place, 'Cafe');
       expect(await repository.photoFile(memory).exists(), isTrue);
     });
 

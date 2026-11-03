@@ -34,6 +34,17 @@ class MemoryListScreen extends StatefulWidget {
   final VoidCallback onMeetSomeone;
   final DateTime Function() clock;
 
+  /// What a screen reader says for the Faces practice button.
+  static const facesLabel =
+      'Practice faces. Needs sight; Practice details works with a screen '
+      'reader.';
+
+  /// Said above the list when some records could not be read.
+  static String unreadableText(int count) => count == 1
+      ? "1 record couldn't be read. It is kept on this phone, untouched."
+      : "$count records couldn't be read. They are kept on this phone, "
+            'untouched.';
+
   @override
   State<MemoryListScreen> createState() => _MemoryListScreenState();
 }
@@ -41,6 +52,9 @@ class MemoryListScreen extends StatefulWidget {
 class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   MemoryRepository get _repository => widget.services.repository;
   List<Memory>? _memories;
+
+  /// How many record files the last load could not read.
+  int _unreadable = 0;
 
   /// Only used to decide whether there are enough people to practice.
   final _facePlanner = FaceQuizPlanner(Random(), DateTime.now);
@@ -78,7 +92,16 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   Future<void> _reload() async {
     final gen = ++_reloadGen;
     final memories = await _repository.all();
-    if (mounted && gen == _reloadGen) setState(() => _memories = memories);
+    final unreadable = _repository.unreadable;
+    if (unreadable.isNotEmpty) {
+      debugPrint('Rememberem: could not read ${unreadable.join(', ')}');
+    }
+    if (mounted && gen == _reloadGen) {
+      setState(() {
+        _memories = memories;
+        _unreadable = unreadable.length;
+      });
+    }
     _maybeAskReminders(memories);
   }
 
@@ -256,7 +279,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
                   child: OutlinedButton.icon(
                     onPressed: canPlayFaces ? _practiceFaces : null,
                     icon: const Icon(Icons.face),
-                    label: const Text('Faces'),
+                    label: const Text(
+                      'Faces',
+                      semanticsLabel: MemoryListScreen.facesLabel,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -296,6 +322,23 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     if (memories == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    if (_unreadable == 0) return _people(memories);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text(
+            MemoryListScreen.unreadableText(_unreadable),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+        Expanded(child: _people(memories)),
+      ],
+    );
+  }
+
+  Widget _people(List<Memory> memories) {
     if (memories.isEmpty) {
       return const Center(
         child: Padding(
@@ -303,7 +346,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           child: Text(
             'No one yet.\n\nTap "Meet someone" to take a photo. '
             'Tip: long-press the Rememberem icon and drag '
-            '"Meet someone" to your home screen for a one-tap shortcut.',
+            '"Meet someone" to your home screen for a one-tap shortcut.'
+            '\n\nRememberem will ask to use the camera, the microphone and '
+            'your location. Photos and notes are kept on this phone, and in '
+            'its Google backup if that is on (see About).',
             textAlign: TextAlign.center,
           ),
         ),

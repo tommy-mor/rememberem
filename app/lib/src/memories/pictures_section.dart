@@ -32,6 +32,7 @@ class PicturesSection extends StatelessWidget {
                 width: 48,
                 height: 60,
                 fit: BoxFit.cover,
+                cacheWidth: 160,
                 errorBuilder: (_, _, _) =>
                     const SizedBox(width: 48, child: Icon(Icons.person)),
               ),

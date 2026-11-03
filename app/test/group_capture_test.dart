@@ -339,7 +339,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.stored, isEmpty);
-    expect(find.textContaining('Saved 0 of 3 people'), findsOneWidget);
+    expect(find.textContaining("Couldn't save this photo"), findsOneWidget);
     expect(find.byType(GroupDetailsScreen), findsOneWidget);
     expect(
       tester

@@ -1,7 +1,35 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// The upload key for Play, from android/key.properties (kept out of git).
+// Without it a release build stops, because a debug-signed build in someone's
+// hands can never be updated by a Play build without losing their people.
+// For a release walk on your own devices, sign with the debug key on purpose:
+// flutter build apk --release -PallowDebugSigning=true
+val keyProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val hasUploadKey = keyProperties.getProperty("storeFile")
+    ?.let { file(it).exists() } ?: false
+val allowDebugSigning = providers.gradleProperty("allowDebugSigning").orNull == "true"
+
+gradle.taskGraph.whenReady {
+    val buildsRelease = allTasks.any {
+        it.project == project && it.name.contains("Release")
+    }
+    if (buildsRelease && !hasUploadKey && !allowDebugSigning) {
+        throw GradleException(
+            "No upload key: create android/key.properties (see " +
+                "docs/release-steps.md), or set allowDebugSigning=true " +
+                "for a build that never leaves your own devices."
+        )
+    }
 }
 
 android {
@@ -17,7 +45,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.rememberem.rememberem"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -31,11 +58,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("release") {
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
             // Keep what the reminder plugin needs (see proguard-rules.pro).
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

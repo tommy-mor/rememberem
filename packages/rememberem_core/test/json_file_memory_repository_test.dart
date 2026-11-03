@@ -56,6 +56,31 @@ void main() {
     expect(dates, [DateTime.utc(2026, 6, 1), DateTime.utc(2026, 1, 1)]);
   });
 
+  test('a damaged record is skipped and left on disk, not hiding everyone',
+      () async {
+    final kept = await repository.add(
+      photoJpeg: [1],
+      capturedAt: DateTime.utc(2026, 1, 1),
+    );
+    final trashed = await repository.add(
+      photoJpeg: [2],
+      capturedAt: DateTime.utc(2026, 2, 1),
+    );
+    await repository.trash(trashed.id, DateTime.utc(2026, 3, 1));
+    final damaged = File('${repository.folder.path}/broken.json');
+    await damaged.writeAsString('{');
+    await File('${repository.folder.path}/list.json').writeAsString('[1]');
+
+    expect((await repository.all()).map((m) => m.id), [kept.id]);
+    expect(repository.unreadable, ['broken.json', 'list.json']);
+    expect((await repository.trashed()).map((m) => m.id), [trashed.id]);
+    expect(await damaged.readAsString(), '{');
+
+    await damaged.delete();
+    await repository.all();
+    expect(repository.unreadable, ['list.json']);
+  });
+
   test('all is empty before anything is stored', () async {
     expect(await repository.all(), isEmpty);
   });

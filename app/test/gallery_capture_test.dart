@@ -20,9 +20,11 @@ class _FakePicker implements PhotoPicker {
   final List<int>? photo;
   final bool original;
   int settingsOpened = 0;
+  int picks = 0;
 
   @override
   Future<PickedPhoto?> pick() async {
+    picks++;
     final bytes = photo;
     return bytes == null ? null : PickedPhoto(bytes, original: original);
   }
@@ -65,6 +67,7 @@ void main() {
     WidgetTester tester,
     List<int>? photo, {
     bool original = true,
+    FakeLocation? location,
   }) async {
     picker = _FakePicker(photo, original: original);
     await tester.pumpWidget(
@@ -75,13 +78,22 @@ void main() {
             capture: capture,
             photoPicker: picker,
             // Where the phone is now must not be used for an old photo.
-            location: FakeLocation(const GeoPoint(1, 1)),
+            location: location ?? FakeLocation(const GeoPoint(1, 1)),
           ),
           routeObserver: RouteObserver<ModalRoute<void>>(),
         ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 100));
+  }
+
+  /// Lets the camera plugin's (missing) answer arrive, in real time.
+  Future<void> settleCamera(WidgetTester tester) async {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+    await tester.pump();
   }
 
   testWidgets('a chosen photo is saved with its own GPS and time, then the '
@@ -137,6 +149,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
+    // Shown once the person's page is up, so it stays up there.
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
     expect(find.textContaining('No location came'), findsOneWidget);
     await tester.tap(find.text('Settings'));
     expect(picker.settingsOpened, 1);
@@ -147,5 +162,82 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(capture.calls.last.location, isNotNull);
+  });
+
+  testWidgets('a failed save keeps the photo; Try again saves it without '
+      'choosing it again', (tester) async {
+    capture.failSaveOne = 1;
+    await showCamera(tester, photoWithExif());
+
+    await tester.tap(find.byTooltip('Choose a photo from the phone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.textContaining("Couldn't save this photo"), findsOneWidget);
+    expect(find.textContaining('disk full'), findsNothing);
+    expect(repository.stored, isEmpty);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(picker.picks, 1);
+    expect(capture.calls, hasLength(2));
+    expect(repository.stored, hasLength(1));
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
+  });
+
+  testWidgets('a Try again left behind never shows on the next screen', (
+    tester,
+  ) async {
+    capture.failSaveOne = 1;
+    await showCamera(tester, photoWithExif());
+    await tester.tap(find.byTooltip('Choose a photo from the phone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Try again'), findsOneWidget);
+
+    Navigator.of(tester.element(find.byType(CaptureScreen))).push(
+      MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('Next'))),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
+  });
+
+  testWidgets('without a camera the reason is plain and a photo can still '
+      'be chosen', (tester) async {
+    // No camera plugin in tests, so opening the camera fails.
+    await showCamera(tester, photoWithExif());
+
+    await settleCamera(tester);
+    expect(find.text('The camera could not be opened.'), findsOneWidget);
+    expect(find.textContaining('Exception'), findsNothing);
+    expect(find.textContaining('Ask first'), findsNothing);
+
+    await tester.tap(find.text('Choose a photo instead'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(MemoryEditScreen), findsOneWidget);
+  });
+
+  testWidgets('location turned off says so, with a way to Settings', (
+    tester,
+  ) async {
+    await showCamera(tester, null, location: FakeLocation(null, true));
+    await settleCamera(tester);
+
+    expect(find.textContaining('Location is off'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('location simply unknown says nothing', (tester) async {
+    await showCamera(tester, null, location: FakeLocation());
+    await settleCamera(tester);
+
+    expect(find.textContaining('Location is off'), findsNothing);
   });
 }

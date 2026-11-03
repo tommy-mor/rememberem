@@ -146,7 +146,7 @@ class PortraitCapture {
 
   Future<List<int>> _portrait(CaptureDraft draft, PixelRect? face) async {
     final photo = draft.photo;
-    if (face == null) return photo.jpeg;
+    if (face == null) return PortraitCropper.shrinkInBackground(photo.jpeg);
     final rect = framer.frame(face, photo.width, photo.height);
     return PortraitCropper.cropInBackground(photo.jpeg, rect);
   }

@@ -192,6 +192,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
                     width: 24,
                     height: 30,
                     fit: BoxFit.cover,
+                    cacheWidth: 80,
                     errorBuilder: (_, _, _) =>
                         const SizedBox(width: 24, child: Icon(Icons.person)),
                   ),

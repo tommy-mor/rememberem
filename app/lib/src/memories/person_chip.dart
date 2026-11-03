@@ -20,7 +20,10 @@ class PersonChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return ActionChip(
       avatar: CircleAvatar(
-        backgroundImage: FileImage(repository.photoFile(memory)),
+        backgroundImage: ResizeImage(
+          FileImage(repository.photoFile(memory)),
+          width: 120,
+        ),
         onBackgroundImageError: (_, _) {},
       ),
       label: Text(MemoryTile.nameOf(memory)),

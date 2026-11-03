@@ -62,6 +62,9 @@ class _DetailGameScreenState extends State<DetailGameScreen>
 
   /// The person just picked rightly, shown green during the pause.
   String? _correctId;
+
+  /// What the last answer was, spoken by screen readers as it changes.
+  String? _said;
   bool _hidden = false;
   bool _ended = false;
   String _stopReason = '';
@@ -141,14 +144,40 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       _missed = false;
       _advancing = false;
       _correctId = null;
+      _said = null;
       _prompt = DetailQuizPlanner.promptFor(people)(pair.detail);
       _phase = _Phase.reveal;
     });
     if (!_hidden) _startReveal();
   }
 
+  /// With a screen reader on, the reveal waits for [_showChoices], so a
+  /// timer never cuts the prompt off mid-sentence.
+  bool get _paced => MediaQuery.accessibleNavigationOf(context);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A screen reader turned on or off mid-reveal: wait for the button, or
+    // start the timer the button was standing in for.
+    if (_phase == _Phase.reveal && !_hidden) {
+      if (_paced) {
+        _timer?.cancel();
+      } else if (!(_timer?.isActive ?? false)) {
+        _startReveal();
+      }
+    }
+  }
+
+  void _showChoices() {
+    if (_live && _phase == _Phase.reveal) {
+      setState(() => _phase = _Phase.choose);
+    }
+  }
+
   void _startReveal() {
     _timer?.cancel();
+    if (_paced) return;
     _timer = Timer(widget.reveal, () {
       if (_live) setState(() => _phase = _Phase.choose);
     });
@@ -171,7 +200,10 @@ class _DetailGameScreenState extends State<DetailGameScreen>
     }
     if (picked.id != pair.person.id) {
       widget.feedback?.wrong();
-      setState(() => _wrong.add(picked.id));
+      setState(() {
+        _wrong.add(picked.id);
+        _said = 'Not ${MemoryTile.nameOf(picked)}.';
+      });
       if (_missed) return; // one reset per turn is enough
       _missed = true;
       await _record(pair, correctFirstTry: false);
@@ -181,6 +213,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
     setState(() {
       _advancing = true;
       _correctId = picked.id;
+      _said = 'Right: ${MemoryTile.nameOf(picked)}.';
     });
     final pause = Future<void>.delayed(widget.pauseAfterRight);
     if (!_missed && await _record(pair, correctFirstTry: true)) {
@@ -241,7 +274,25 @@ class _DetailGameScreenState extends State<DetailGameScreen>
             padding: const EdgeInsets.all(32),
             child: _hidden
                 ? const Icon(Icons.visibility_off, size: 64)
-                : _promptView(theme, theme.textTheme.headlineSmall),
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Semantics(
+                        liveRegion: true,
+                        child: _promptView(
+                          theme,
+                          theme.textTheme.headlineSmall,
+                        ),
+                      ),
+                      if (_paced) ...[
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: _showChoices,
+                          child: const Text('Show people'),
+                        ),
+                      ],
+                    ],
+                  ),
           ),
         );
       case _Phase.choose:
@@ -256,7 +307,13 @@ class _DetailGameScreenState extends State<DetailGameScreen>
         children: [
           _promptView(theme, theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          Text('Who is this about?', style: theme.textTheme.bodyMedium),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _said ?? 'Who is this about?',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
           const SizedBox(height: 8),
           Expanded(
             child: GridView.count(
@@ -290,7 +347,13 @@ class _DetailGameScreenState extends State<DetailGameScreen>
     final name = MemoryTile.nameOf(person);
     return Semantics(
       button: true,
-      label: name,
+      enabled: !disabled,
+      label: person.id == _correctId
+          ? '$name, right'
+          : _wrong.contains(person.id)
+          ? '$name, not this one'
+          : name,
+      onTap: disabled ? null : () => _choose(person),
       excludeSemantics: true,
       child: Opacity(
         opacity: _wrong.contains(person.id) ? 0.35 : 1,
@@ -311,6 +374,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
                   child: Image.file(
                     widget.repository.photoFile(person),
                     fit: BoxFit.cover,
+                    cacheWidth: 500,
                     excludeFromSemantics: true,
                     errorBuilder: (_, _, _) =>
                         const Center(child: Icon(Icons.person, size: 48)),

@@ -105,8 +105,11 @@ void main() {
   Finder card(Memory person) => find.byWidgetPredicate(
     (w) =>
         w is Image &&
-        w.image is FileImage &&
-        (w.image as FileImage).file.path.endsWith(person.photoFileName),
+        w.image is ResizeImage &&
+        switch ((w.image as ResizeImage).imageProvider) {
+          final FileImage f => f.file.path.endsWith(person.photoFileName),
+          _ => false,
+        },
   );
 
   Future<void> reveal(WidgetTester tester) =>
@@ -195,6 +198,43 @@ void main() {
       (person.id, person.details.single.id, false),
     ]);
     expect(repository.stored[person.id]!.details.single.points, 0);
+  });
+
+  testWidgets('with a screen reader the cards wait for Show people', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(accessibleNavigation: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await people(['Ann', 'Bo', 'Cy', 'Di']);
+    await showGame(tester);
+    final person = subject(tester);
+
+    await tester.pump(const Duration(seconds: 10));
+    expect(card(person), findsNothing);
+
+    await tester.tap(find.text('Show people'));
+    await tester.pump();
+    expect(card(person), findsOneWidget);
+  });
+
+  testWidgets('a screen reader can choose a card and hears each answer', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await people(['Ann', 'Bo', 'Cy', 'Di']);
+    await showGame(tester);
+    final person = subject(tester);
+    await reveal(tester);
+    final other = repository.stored.values.firstWhere((m) => m.id != person.id);
+
+    // Fails unless the card offers a tap to the screen reader.
+    tester.semantics.tap(find.semantics.byLabel(other.displayName));
+    await tester.pump();
+
+    expect(find.text('Not ${other.displayName}.'), findsOneWidget);
+    expect(repository.detailAnswers.single.$3, isFalse);
+    semantics.dispose();
   });
 
   testWidgets('a second tap while the next turn loads scores nothing', (

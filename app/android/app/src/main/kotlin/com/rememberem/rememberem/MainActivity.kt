@@ -33,8 +33,7 @@ class MainActivity : FlutterActivity() {
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
-        val handled = photoPicker?.onRequestPermissionsResult(requestCode) == true ||
-            contacts?.onRequestPermissionsResult(requestCode) == true
+        val handled = photoPicker?.onRequestPermissionsResult(requestCode) == true
         if (!handled) super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 }

@@ -49,6 +49,10 @@ abstract interface class MemoryRepository {
   /// Active (not trashed) memories, newest first.
   Future<List<Memory>> all();
 
+  /// The record files the last [all] or [trashed] could not read. They are
+  /// left on disk untouched.
+  List<String> get unreadable;
+
   /// Trashed memories, most recently trashed first.
   Future<List<Memory>> trashed();
 

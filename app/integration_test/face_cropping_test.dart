@@ -36,8 +36,9 @@ void main() {
     expect(face.top + face.height / 2, inInclusiveRange(120, 200));
   });
 
-  testWidgets('a capture is saved cropped to head and shoulders',
-      (tester) async {
+  testWidgets('a capture is saved cropped to head and shoulders', (
+    tester,
+  ) async {
     final repository = JsonFileMemoryRepository(Directory('${temp.path}/m'));
     final capture = PortraitCapture(
       repository: repository,
@@ -56,7 +57,9 @@ void main() {
     );
     expect(saved.width, lessThan(500));
     expect(saved.height / saved.width, closeTo(PortraitFramer.aspect, 0.02));
-    expect((await repository.all()).single.location,
-        const GeoPoint(47.61, -122.33));
+    expect(
+      (await repository.all()).single.location,
+      const GeoPoint(47.61, -122.33),
+    );
   });
 }

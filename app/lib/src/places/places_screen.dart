@@ -218,6 +218,7 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
             selected: _selected,
             onSelect: _select,
             streetMaps: widget.services.settings.value.streetMaps,
+            links: widget.services.links,
           ),
         ),
       ],

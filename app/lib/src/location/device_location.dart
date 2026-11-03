@@ -30,6 +30,17 @@ class DeviceLocation {
     }
   }
 
+  /// Whether Fred has turned location off for Rememberem.
+  Future<bool> denied() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      return permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever;
+    } on Exception {
+      return false;
+    }
+  }
+
   GeoPoint? _point(Position? position) =>
       position == null ? null : GeoPoint(position.latitude, position.longitude);
 }
