@@ -27,6 +27,13 @@ class DetailPrompt {
 
   String get caption => detail.kind.label;
 
+  /// A tag's type, place and date, the parts it has, in that order.
+  static List<String> tagParts(Detail tag) => [
+        _capitalised(tag.label?.trim() ?? ''),
+        tag.place?.trim() ?? '',
+        if (tag.eventDate case final day?) date(day),
+      ].where((p) => p.isNotEmpty).toList();
+
   /// The other person's name, or [someoneRemoved].
   String get targetName {
     final id = detail.targetId;
@@ -35,7 +42,8 @@ class DetailPrompt {
 
   /// What goes before the description: "27 Oct 2026, Park" for a
   /// happening, "My boss is Jill" for a relationship, "Wedding, 3 Jun 2010"
-  /// for an anniversary, nothing for a fact.
+  /// for an anniversary, "Book club, Library, 3 Mar 2026" for a tag
+  /// (only the parts there are), nothing for a fact.
   String get prefix {
     final d = detail;
     switch (d.kind) {
@@ -57,6 +65,8 @@ class DetailPrompt {
           if (label.isNotEmpty) _capitalised(label) else 'Anniversary',
           if (when != null) date(when),
         ].join(', ');
+      case DetailKind.tag:
+        return tagParts(d).join(', ');
     }
   }
 

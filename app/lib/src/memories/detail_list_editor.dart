@@ -58,6 +58,7 @@ class DetailListEditor extends StatefulWidget {
   static String addLabel(DetailKind kind) => '+ ${kind.name}';
 
   /// A detail's kind and data on one line: "Relationship · Brother · Ann".
+  /// A tag shows only "Tag"; its data goes before the text ([fieldPrefix]).
   static String rowLabel(Detail detail, String? Function(String id) nameOf) {
     final d = detail;
     final label = _capitalised(d.label?.trim() ?? '');
@@ -76,8 +77,24 @@ class DetailListEditor extends StatefulWidget {
         label,
         if (d.eventDate case final day?) DetailPrompt.date(day),
       ],
+      DetailKind.tag => const <String>[],
     };
     return [d.kind.label, ...parts.where((p) => p.isNotEmpty)].join(' · ');
+  }
+
+  /// What goes before a tag's text: "Relatives · Park · 3 Mar 2026 - ",
+  /// the parts it has; null for other kinds or a tag with none.
+  static String? fieldPrefix(Detail detail) {
+    if (detail.kind != DetailKind.tag) return null;
+    final parts = DetailPrompt.tagParts(detail);
+    return parts.isEmpty ? null : '${parts.join(' · ')} - ';
+  }
+
+  /// How a row's buttons name it: its label, plus a tag's parts, so a
+  /// screen reader can tell tag rows apart.
+  static String spokenName(Detail detail, String label) {
+    if (detail.kind != DetailKind.tag) return label;
+    return [label, ...DetailPrompt.tagParts(detail)].join(' ');
   }
 
   static String _capitalised(String s) =>
@@ -121,8 +138,11 @@ class _DetailListEditorState extends State<DetailListEditor> {
       if (before.contains(d.id) || d.id == _restoring) continue;
       // Added just now (its place may already be filled in).
       _open.add(d.id);
-      // A relationship starts with "Who", so the keyboard waits.
-      _added = d.kind == DetailKind.relationship ? null : d.id;
+      // A relationship starts with "Who" and a tag with its type, so the
+      // keyboard waits.
+      _added = d.kind == DetailKind.relationship || d.kind == DetailKind.tag
+          ? null
+          : d.id;
     }
     _restoring = null;
   }
@@ -189,6 +209,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
   Widget _row(BuildContext context, Detail detail) {
     final id = detail.id;
     final label = DetailListEditor.rowLabel(detail, widget.nameOf);
+    final name = DetailListEditor.spokenName(detail, label);
     final open = _open.contains(id);
     final scheme = Theme.of(context).colorScheme;
     // The same widgets open or closed, so the description field (and any
@@ -220,6 +241,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
                 DictatedTextField(
                   key: ValueKey(id),
                   label: label,
+                  prefix: DetailListEditor.fieldPrefix(detail),
                   initialValue: detail.text,
                   dictation: widget.dictation,
                   multiline: true,
@@ -228,7 +250,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
                   autofocus: _added == id,
                   showMic: open,
                   trailing: IconButton(
-                    tooltip: 'Open $label',
+                    tooltip: 'Open $name',
                     icon: const Icon(Icons.expand_more),
                     onPressed: () => _expand(id),
                   ),
@@ -254,7 +276,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
                     alignment: Alignment.centerRight,
                     child: IconButton(
                       visualDensity: VisualDensity.compact,
-                      tooltip: 'Delete $label',
+                      tooltip: 'Delete $name',
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _delete(detail),
                     ),

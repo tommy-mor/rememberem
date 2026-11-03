@@ -10,7 +10,11 @@ enum DetailKind {
   relationship('Relationship'),
 
   /// The first time something happened: a birthday, a wedding.
-  anniversary('Anniversary');
+  anniversary('Anniversary'),
+
+  /// A group Fred puts people in ("book club"), with an optional place and
+  /// date ([Detail.eventDate]).
+  tag('Tag');
 
   const DetailKind(this.label);
 

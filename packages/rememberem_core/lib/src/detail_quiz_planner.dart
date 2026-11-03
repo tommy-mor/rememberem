@@ -58,6 +58,9 @@ class DetailQuizPlanner {
         DetailKind.anniversary =>
           (d.label?.trim() ?? '').isNotEmpty && d.eventDate != null,
         DetailKind.fact || DetailKind.happening => true,
+        // Many people share a tag, so a question would have several right
+        // answers.
+        DetailKind.tag => false,
       };
 
   /// Enough to play: [choiceCount] people and at least one detail. The one

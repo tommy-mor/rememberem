@@ -129,7 +129,9 @@ has already been tried and fallen short.
   dropped on the next save. A detail's `text` may be blank once it has other
   data (a relationship's person or type, a place, a date); only a detail
   with nothing entered (`Detail.isEmpty`) is left out of a save.
-- Each detail has a `type` (fact, happening, relationship or anniversary).
+- Each detail has a `type` (fact, happening, relationship, anniversary or
+  tag). A tag keeps its tag type in `label` and an optional `place` and
+  `eventDate`; tags are never practice questions.
   Records written before typed details have no `type` and read as facts.
   Relationships keep the other person's id in `targetId`; merge and purge
   repoint or clear it in every record. Relationship and anniversary types
@@ -147,7 +149,7 @@ has already been tried and fallen short.
   files: it follows the reminder switch). Damage in either never stops the
   app.
 - Anniversary notices are scheduled 30 days ahead on each sync (app open,
-  resume, back to the list), ids 100–129, at 09:00 on each day whose next
+  resume, back to the list), ids 100â€“129, at 09:00 on each day whose next
   week holds an anniversary. They name no one; a tap opens the Filter List
   with an Anniversary filter for that week.
 - `contactKey` (top level, optional) links a person to a phone contact by

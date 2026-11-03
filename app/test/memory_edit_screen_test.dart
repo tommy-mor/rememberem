@@ -91,7 +91,7 @@ void main() {
     );
   });
 
-  testWidgets('shows Name, Place and Meeting, and four add buttons with no '
+  testWidgets('shows Name, Place and Meeting, and five add buttons with no '
       'empty detail', (tester) async {
     await showScreen(tester);
 
@@ -99,7 +99,13 @@ void main() {
       expect(find.widgetWithText(TextField, label), findsOneWidget);
       expect(find.byTooltip('Speak $label'), findsOneWidget);
     }
-    for (final kind in ['fact', 'happening', 'relationship', 'anniversary']) {
+    for (final kind in [
+      'fact',
+      'happening',
+      'relationship',
+      'anniversary',
+      'tag',
+    ]) {
       expect(find.text('+ $kind'), findsOneWidget);
     }
     expect(find.textContaining('Fact'), findsNothing);

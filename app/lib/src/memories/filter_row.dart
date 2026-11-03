@@ -11,6 +11,7 @@ class FilterRow extends StatelessWidget {
     required this.condition,
     required this.places,
     required this.meetings,
+    required this.tags,
     required this.onChanged,
     required this.onRemove,
     this.autofocus = false,
@@ -18,9 +19,10 @@ class FilterRow extends StatelessWidget {
 
   final FilterCondition condition;
 
-  /// The known place and meeting names to choose from.
+  /// The known place, meeting and tag names to choose from.
   final List<String> places;
   final List<String> meetings;
+  final List<String> tags;
   final ValueChanged<FilterCondition> onChanged;
   final VoidCallback onRemove;
 
@@ -59,6 +61,12 @@ class FilterRow extends StatelessWidget {
         name,
         meetings,
         (v) => onChanged(MeetingFilter(v)),
+      ),
+      TagFilter(:final name) => _picker(
+        decoration,
+        name,
+        tags,
+        (v) => onChanged(TagFilter(v)),
       ),
       NameFilter(:final text) => TextFormField(
         initialValue: text,

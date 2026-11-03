@@ -119,6 +119,7 @@ class _FilterListScreenState extends State<FilterListScreen> with RouteAware {
         .apply(people);
     final places = MemoryFilter.places(people);
     final meetings = MemoryFilter.meetings(people);
+    final tags = DetailTypeCatalog.labels(DetailKind.tag, people);
     final note = widget.note;
     return CustomScrollView(
       slivers: [
@@ -137,6 +138,7 @@ class _FilterListScreenState extends State<FilterListScreen> with RouteAware {
                   condition: f.condition,
                   places: places,
                   meetings: meetings,
+                  tags: tags,
                   autofocus: f.id == _added,
                   onChanged: (c) => _change(f.id, c),
                   onRemove: () => _remove(f.id),

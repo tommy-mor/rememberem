@@ -45,6 +45,7 @@ export 'src/relationship_link.dart';
 export 'src/remembered_count.dart';
 export 'src/reminder_settings.dart';
 export 'src/reminder_target.dart';
+export 'src/tag_filter.dart';
 export 'src/timeline_builder.dart';
 export 'src/timeline_day.dart';
 export 'src/timeline_group.dart';

@@ -20,6 +20,7 @@ class DictatedTextField extends StatefulWidget {
     this.showMic = true,
     this.trailing,
     this.alwaysFloatLabel = false,
+    this.prefix,
     this.onListeningChanged,
   });
 
@@ -45,6 +46,11 @@ class DictatedTextField extends StatefulWidget {
 
   /// Told when listening starts and stops.
   final ValueChanged<bool>? onListeningChanged;
+
+  /// Fixed text shown before the typed text, never part of it (a tag's
+  /// type, place and date). Shown on an empty field only with
+  /// [alwaysFloatLabel].
+  final String? prefix;
 
   /// Said when the phone has no offline speech for the language.
   static const noSpeechPack =
@@ -145,6 +151,7 @@ class _DictatedTextFieldState extends State<DictatedTextField>
       maxLines: widget.multiline ? 5 : 1,
       decoration: InputDecoration(
         labelText: widget.label,
+        prefixText: widget.prefix,
         hintText: widget.hint,
         isDense: widget.dense,
         contentPadding: widget.dense ? RememberemTheme.denseFieldPadding : null,

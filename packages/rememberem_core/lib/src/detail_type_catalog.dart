@@ -1,7 +1,7 @@
 import 'detail_kind.dart';
 import 'memory.dart';
 
-/// The relationship and anniversary types to suggest: the built-in ones,
+/// The relationship, anniversary and tag types to suggest: the built-in ones,
 /// then any Fred has typed that some person (active or in the trash) still
 /// uses. Nothing is stored, so a type no one uses is simply gone.
 class DetailTypeCatalog {
@@ -26,13 +26,16 @@ class DetailTypeCatalog {
   /// Types that differ only in case or surrounding space are one type.
   static String normalizeKey(String label) => label.trim().toLowerCase();
 
-  /// The types to offer for [kind] (relationship or anniversary): the
-  /// defaults, then custom ones in first-seen spelling.
+  /// The types to offer for [kind] (relationship, anniversary or tag): the
+  /// defaults (tags have none), then custom ones in first-seen spelling.
   static List<String> labels(DetailKind kind, Iterable<Memory> people) {
     final defaults = switch (kind) {
       DetailKind.relationship => relationshipDefaults,
       DetailKind.anniversary => anniversaryDefaults,
-      DetailKind.fact || DetailKind.happening => const <String>[],
+      DetailKind.tag ||
+      DetailKind.fact ||
+      DetailKind.happening =>
+        const <String>[],
     };
     final seen = {for (final d in defaults) normalizeKey(d)};
     final custom = <String>[];

@@ -7,7 +7,8 @@ enum FilterKind {
   name('Name contains'),
   details('Details contain'),
   dateRange('Date range'),
-  anniversary('Anniversary');
+  anniversary('Anniversary'),
+  tag('Tag');
 
   const FilterKind(this.label);
 
@@ -21,6 +22,7 @@ enum FilterKind {
     FilterKind.details => const DetailsFilter(),
     FilterKind.dateRange => const DateRangeFilter(),
     FilterKind.anniversary => const AnniversaryFilter(),
+    FilterKind.tag => const TagFilter(),
   };
 
   static FilterKind of(FilterCondition condition) => switch (condition) {
@@ -30,6 +32,7 @@ enum FilterKind {
     DetailsFilter() => FilterKind.details,
     DateRangeFilter() => FilterKind.dateRange,
     AnniversaryFilter() => FilterKind.anniversary,
+    TagFilter() => FilterKind.tag,
     _ => throw ArgumentError.value(condition, 'condition'),
   };
 }

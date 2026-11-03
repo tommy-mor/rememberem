@@ -8,7 +8,8 @@ import '../app/rememberem_theme.dart';
 /// A detail's extra data, edited in place under its description: a
 /// happening's date and place (from a map); a relationship's person
 /// (first) and type;
-/// an anniversary's type and first date. Every change is passed on at
+/// an anniversary's type and first date; a tag's type, place and date.
+/// Every change is passed on at
 /// once as a copy of [detail] (so its score is kept).
 class DetailExtrasEditor extends StatefulWidget {
   const DetailExtrasEditor({
@@ -37,6 +38,14 @@ class DetailExtrasEditor extends StatefulWidget {
   /// or null if Fred went back.
   final Future<String?> Function(String current) choosePlace;
   final ValueChanged<Detail> onChanged;
+
+  /// Shown on a tag while Fred has made none.
+  static const noTagsYet =
+      'Tags are a way to group people any way you like: relatives, '
+      'celebrities, memberships and so on. Make your own below.';
+
+  static const keepTagsKind =
+      'Keep tags kind: words the person would be happy to read.';
 
   @override
   State<DetailExtrasEditor> createState() => _DetailExtrasEditorState();
@@ -94,7 +103,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
   Future<void> _pickPlace() async {
     final place = await widget.choosePlace(_detail.place?.trim() ?? '');
     if (place != null && mounted) {
-      widget.onChanged(_detail.copyWith(place: place));
+      widget.onChanged(_detail.copyWith(place: () => place));
     }
   }
 
@@ -106,7 +115,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
       lastDate: DateTime(2100, 12, 31),
     );
     if (date != null && mounted) {
-      widget.onChanged(_detail.copyWith(eventDate: date));
+      widget.onChanged(_detail.copyWith(eventDate: () => date));
     }
   }
 
@@ -126,6 +135,23 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
           DetailKind.anniversary => [
             ..._types(context, 'Create a custom anniversary type'),
             _eventDate(context),
+          ],
+          DetailKind.tag => [
+            if (_labels.isEmpty && (_detail.label?.trim() ?? '').isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(DetailExtrasEditor.noTagsYet),
+              ),
+            ..._types(context, 'Create a tag'),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                DetailExtrasEditor.keepTagsKind,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            _placeTile('Where (optional)', clearable: true),
+            _tagDate(context),
           ],
           DetailKind.fact => const [],
         },
@@ -150,21 +176,57 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
         subtitle: const Text('When it happened'),
         onTap: _pickHappeningTime,
       ),
-      ListTile(
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        minVerticalPadding: 0,
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.place_outlined),
-        title: Text(
-          (_detail.place?.trim() ?? '').isEmpty
-              ? 'Choose place'
-              : _detail.place!.trim(),
-        ),
-        subtitle: const Text('Where it happened'),
-        onTap: _pickPlace,
-      ),
+      _placeTile('Where it happened'),
     ];
+  }
+
+  Widget _placeTile(String subtitle, {bool clearable = false}) => ListTile(
+    dense: true,
+    visualDensity: VisualDensity.compact,
+    minVerticalPadding: 0,
+    contentPadding: EdgeInsets.zero,
+    leading: const Icon(Icons.place_outlined),
+    title: Text(
+      (_detail.place?.trim() ?? '').isEmpty
+          ? 'Choose place'
+          : _detail.place!.trim(),
+    ),
+    subtitle: Text(subtitle),
+    trailing: clearable && (_detail.place?.trim() ?? '').isNotEmpty
+        ? IconButton(
+            tooltip: 'Clear the place',
+            icon: const Icon(Icons.clear),
+            onPressed: () =>
+                widget.onChanged(_detail.copyWith(place: () => null)),
+          )
+        : null,
+    onTap: _pickPlace,
+  );
+
+  Widget _tagDate(BuildContext context) {
+    final when = _detail.eventDate;
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      minVerticalPadding: 0,
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.event),
+      title: Text(
+        when == null
+            ? 'Choose a date'
+            : MaterialLocalizations.of(context).formatMediumDate(when),
+      ),
+      subtitle: const Text('When (optional)'),
+      trailing: when == null
+          ? null
+          : IconButton(
+              tooltip: 'Clear the date',
+              icon: const Icon(Icons.clear),
+              onPressed: () =>
+                  widget.onChanged(_detail.copyWith(eventDate: () => null)),
+            ),
+      onTap: _pickEventDate,
+    );
   }
 
   Widget _who(BuildContext context) {

@@ -145,7 +145,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       if (current.text.trim().isEmpty) {
         _suggestedPlaces[detail.id] = place;
       } else {
-        _edit(() => _editor.replaceDetail(current.copyWith(place: place)));
+        _edit(
+          () => _editor.replaceDetail(current.copyWith(place: () => place)),
+        );
       }
     }, onError: (_) {});
   }
@@ -159,7 +161,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     _suggestedPlaces.remove(id);
     final current = _editor.memory.details.where((d) => d.id == id).firstOrNull;
     if (current != null && (current.place?.trim() ?? '').isEmpty) {
-      _editor.replaceDetail(current.copyWith(place: place));
+      _editor.replaceDetail(current.copyWith(place: () => place));
     }
   });
 

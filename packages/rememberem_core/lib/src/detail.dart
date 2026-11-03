@@ -1,7 +1,7 @@
 import 'detail_kind.dart';
 
 /// One thing remembered about a person: a fact, a happening, a
-/// relationship or an anniversary ([kind]), always with a description
+/// relationship, an anniversary or a tag ([kind]), with a description
 /// ([text]).
 class Detail {
   Detail({
@@ -78,18 +78,19 @@ class Detail {
       targetId == null &&
       eventDate == null;
 
-  /// Where a happening happened.
+  /// Where a happening happened, or a tag's place.
   final String? place;
 
   /// The other person in a relationship (their memory id). Names are looked
   /// up when shown, so correcting a name never breaks the link.
   final String? targetId;
 
-  /// The relationship type ("boss": the other person is this one's boss) or
-  /// the anniversary type ("wedding").
+  /// The relationship type ("boss": the other person is this one's boss),
+  /// the anniversary type ("wedding") or the tag ("book club").
   final String? label;
 
-  /// An anniversary's first date: a calendar day (local, no time).
+  /// An anniversary's first date, or a tag's date: a calendar day (local,
+  /// no time).
   final DateTime? eventDate;
 
   /// Details practice: first-try-correct answers in a row (a miss resets
@@ -100,14 +101,15 @@ class Detail {
   final DateTime? lastCorrectDate;
 
   /// A copy with the given parts changed; the kind and score are kept.
-  /// [targetId] uses a function so it can be cleared to null.
+  /// [place], [targetId] and [eventDate] use functions so they can be
+  /// cleared.
   Detail copyWith({
     String? id,
     String? text,
     DateTime? at,
-    String? place,
+    String? Function()? place,
     String? label,
-    DateTime? eventDate,
+    DateTime? Function()? eventDate,
     String? Function()? targetId,
   }) =>
       Detail(
@@ -115,10 +117,10 @@ class Detail {
         text: text ?? this.text,
         at: at ?? this.at,
         type: _type,
-        place: place ?? this.place,
+        place: place == null ? this.place : place(),
         targetId: targetId == null ? this.targetId : targetId(),
         label: label ?? this.label,
-        eventDate: eventDate ?? this.eventDate,
+        eventDate: eventDate == null ? this.eventDate : eventDate(),
         points: points,
         lastCorrectDate: lastCorrectDate,
       );
