@@ -355,24 +355,82 @@ void main() {
     expect(spans.firstWhere((s) => s.text == 'Fact · Sings ').style, isNull);
   });
 
-  testWidgets('more than three reasons show three, then "+N more"', (
-    tester,
-  ) async {
+  testWidgets('every matching detail shows, never folded', (tester) async {
     await person('Alex', 'Cafe', details: ['a1', 'a2', 'a3', 'a4', 'a5']);
     await showMatching(tester, filters: [const DetailsFilter('a')]);
 
-    expect(find.text('Fact · a1', findRichText: true), findsOneWidget);
-    expect(find.text('Fact · a3', findRichText: true), findsOneWidget);
-    expect(find.text('Fact · a4', findRichText: true), findsNothing);
-    expect(find.text('+2 more'), findsOneWidget);
+    for (var i = 1; i <= 5; i++) {
+      expect(find.text('Fact · a$i', findRichText: true), findsOneWidget);
+    }
+    expect(find.textContaining('more'), findsNothing);
   });
 
-  testWidgets('four reasons all show; only five or more fold', (tester) async {
-    await person('Alex', 'Cafe', details: ['a1', 'a2', 'a3', 'a4']);
-    await showMatching(tester, filters: [const DetailsFilter('a')]);
+  testWidgets('a tag filter and an anniversary range show the tags and '
+      'anniversaries that match', (tester) async {
+    final alex = await person('Alex', 'Cafe');
+    await repository.save(
+      alex.withDetails([
+        Detail(
+          id: 't',
+          text: 'alto',
+          at: DateTime.utc(2026),
+          type: DetailKind.tag,
+          label: 'Choir',
+        ),
+        Detail(
+          id: 'w',
+          text: 'at the lake',
+          at: DateTime.utc(2026),
+          type: DetailKind.anniversary,
+          label: 'wedding',
+          eventDate: DateTime(2010, 6, 3),
+        ),
+        Detail(id: 'f', text: 'Sings', at: DateTime.utc(2026)),
+      ]),
+    );
+    await showMatching(
+      tester,
+      filters: [
+        const TagFilter('choir'),
+        AnniversaryFilter(DateTime(2026, 6, 1), DateTime(2026, 6, 10)),
+      ],
+    );
 
-    expect(find.text('Fact · a4', findRichText: true), findsOneWidget);
-    expect(find.textContaining('more'), findsNothing);
+    expect(find.text('Tag · Choir - alto', findRichText: true), findsOneWidget);
+    expect(find.textContaining('Wedding', findRichText: true), findsOneWidget);
+    expect(find.textContaining('Sings', findRichText: true), findsNothing);
+  });
+
+  testWidgets('a detail matching two filters shows once', (tester) async {
+    final alex = await person('Alex', 'Cafe');
+    await repository.save(
+      alex.withDetails([
+        Detail(
+          id: 't',
+          text: 'alto',
+          at: DateTime.utc(2026),
+          type: DetailKind.tag,
+          label: 'Choir',
+        ),
+      ]),
+    );
+    await showMatching(
+      tester,
+      filters: [const TagFilter('choir'), const DetailsFilter('alto')],
+    );
+
+    final line = find.text('Tag · Choir - alto', findRichText: true);
+    expect(line, findsOneWidget);
+    // The words found still show in bold, though the tag filter came first.
+    final spans = <TextSpan>[];
+    tester.widget<RichText>(line).text.visitChildren((span) {
+      if (span is TextSpan && span.text != null) spans.add(span);
+      return true;
+    });
+    expect(
+      spans.singleWhere((s) => s.text == 'alto').style?.fontWeight,
+      FontWeight.bold,
+    );
   });
 
   testWidgets('a relationship reads type, person, then words, with the '
@@ -424,6 +482,18 @@ void main() {
 
     await addFilter(tester, 'Place');
     expect(find.text('Cafe'), findsWidgets); // the list is open
+    // Each choice in its own box.
+    final choice = tester.widget<ListTile>(
+      find.ancestor(
+        of: find.text('Cafe').last,
+        matching: find.byType(ListTile),
+      ),
+    );
+    expect(
+      (choice.shape! as RoundedRectangleBorder).side.style,
+      BorderStyle.solid,
+    );
+    expect(choice.visualDensity, const VisualDensity(vertical: -4));
     await tester.tapAt(const Offset(10, 10)); // dismiss the sheet
     await tester.pumpAndSettle();
 

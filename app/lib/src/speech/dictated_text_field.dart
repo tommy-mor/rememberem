@@ -15,6 +15,7 @@ class DictatedTextField extends StatefulWidget {
     required this.onChanged,
     this.multiline = false,
     this.hint,
+    this.hintStyle,
     this.dense = false,
     this.autofocus = false,
     this.showMic = true,
@@ -29,6 +30,9 @@ class DictatedTextField extends StatefulWidget {
 
   /// Shown greyed out while the field is empty.
   final String? hint;
+
+  /// The placeholder's style, if not the theme's.
+  final TextStyle? hintStyle;
 
   /// Tighter padding, for rows in a list.
   final bool dense;
@@ -146,6 +150,7 @@ class _DictatedTextFieldState extends State<DictatedTextField>
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hint,
+        hintStyle: widget.hintStyle,
         isDense: widget.dense,
         contentPadding: widget.dense ? RememberemTheme.denseFieldPadding : null,
         // Keep the label up so the hint shows while the field is empty.

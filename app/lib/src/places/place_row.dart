@@ -62,6 +62,10 @@ class PlaceRow extends StatefulWidget {
 }
 
 class _PlaceRowState extends State<PlaceRow> {
+  /// How far what sits under the name is set in: past the name box's
+  /// left edge (the pin and its gap are 36).
+  static const _indent = 52.0;
+
   late final _name = TextEditingController(text: widget.group.name ?? '');
   final _focus = FocusNode();
 
@@ -152,7 +156,7 @@ class _PlaceRowState extends State<PlaceRow> {
                 ),
                 if (radius != null || notify != null)
                   Padding(
-                    padding: const EdgeInsets.only(left: 36, top: 4),
+                    padding: const EdgeInsets.only(left: _indent, top: 4),
                     child: Row(
                       // The Notify box keeps to the right.
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -163,8 +167,14 @@ class _PlaceRowState extends State<PlaceRow> {
                           // Flexible, so large text wraps, not overflows.
                           Flexible(
                             child: OutlinedButton(
+                              // Half the usual padding.
                               style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(48, 48),
+                                minimumSize: const Size(48, 32),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                               onPressed: widget.onRadius,
                               child: Text(
@@ -181,30 +191,35 @@ class _PlaceRowState extends State<PlaceRow> {
                       ],
                     ),
                   ),
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: widget.expanded
-                          ? 'Hide the people met at ${group.label}'
-                          : 'Show the people met at ${group.label}',
-                      icon: Icon(
-                        widget.expanded ? Icons.expand_less : Icons.expand_more,
+                Padding(
+                  padding: const EdgeInsets.only(left: _indent - 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: widget.expanded
+                            ? 'Hide the people met at ${group.label}'
+                            : 'Show the people met at ${group.label}',
+                        icon: Icon(
+                          widget.expanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                        ),
+                        onPressed: widget.onExpand,
                       ),
-                      onPressed: widget.onExpand,
-                    ),
-                    Expanded(
-                      child: Text(
-                        '$count · $date',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
+                      Expanded(
+                        child: Text(
+                          '$count · $date',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 if (widget.expanded)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(36, 0, 8, 8),
+                    padding: const EdgeInsets.fromLTRB(_indent, 0, 8, 8),
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 4,
@@ -260,6 +275,8 @@ class _PlaceRowState extends State<PlaceRow> {
       textCapitalization: TextCapitalization.words,
       decoration: InputDecoration(
         isDense: true,
+        // Half the usual padding.
+        contentPadding: const EdgeInsets.fromLTRB(4, 7, 4, 4),
         border: const OutlineInputBorder(),
         // Only an unknown place shows a hint (it has no name yet).
         hintText: group.name == null ? group.label : null,

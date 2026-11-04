@@ -337,7 +337,16 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final memory = _editor.memory;
+    final theme = Theme.of(context);
+    final faintHint = TextStyle(
+      fontStyle: FontStyle.italic,
+      // Fainter than the theme's other hints (180), but still about 5:1
+      // on the default light page.
+      color: theme.colorScheme.onSurface.withAlpha(170),
+    );
     return Scaffold(
+      // Always in reach, however far the card scrolls.
+      bottomNavigationBar: _undoRow(context),
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -396,9 +405,10 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 showMic: widget.justMet,
                 hint: switch (field) {
                   MemoryField.name => MemoryTile.unknownName,
-                  MemoryField.place => 'unknown',
-                  _ => null,
+                  MemoryField.place || MemoryField.meeting => 'unknown',
                 },
+                // Fainter than other placeholders: plainly not filled in.
+                hintStyle: faintHint,
                 onListeningChanged: (listening) =>
                     _setDictating(field.key, listening),
                 onChanged: (value) {
@@ -438,8 +448,6 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               photoOf: widget.repository.photoFile,
               onOpen: _openRelated,
             ),
-            const SizedBox(height: 16),
-            _undoRow(context),
           ],
         ),
       ),
@@ -806,36 +814,38 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     }
   }
 
-  /// Small Undo and Redo buttons either side of "Saved automatically.".
+  /// A bar at the foot of the page: small Undo and Redo buttons either
+  /// side of "Saved automatically.".
   Widget _undoRow(BuildContext context) => ListenableBuilder(
     listenable: _editor,
     builder: (context, _) {
       final idle = _dictating.isEmpty && !_cropping;
-      return Row(
-        children: [
-          IconButton(
-            tooltip: 'Undo',
-            icon: const Icon(Icons.undo),
-            onPressed: idle && _editor.canUndo
-                ? () => _step(_editor.undo)
-                : null,
-          ),
-          Expanded(
-            child: Text(
-              'Saved automatically.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Redo',
-            icon: const Icon(Icons.redo),
-            onPressed: idle && _editor.canRedo
-                ? () => _step(_editor.redo)
-                : null,
-          ),
-        ],
+      return Material(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        child: SafeArea(top: false, child: _undoButtons(context, idle)),
       );
     },
+  );
+
+  Widget _undoButtons(BuildContext context, bool idle) => Row(
+    children: [
+      IconButton(
+        tooltip: 'Undo',
+        icon: const Icon(Icons.undo),
+        onPressed: idle && _editor.canUndo ? () => _step(_editor.undo) : null,
+      ),
+      Expanded(
+        child: Text(
+          'Saved automatically.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ),
+      IconButton(
+        tooltip: 'Redo',
+        icon: const Icon(Icons.redo),
+        onPressed: idle && _editor.canRedo ? () => _step(_editor.redo) : null,
+      ),
+    ],
   );
 }

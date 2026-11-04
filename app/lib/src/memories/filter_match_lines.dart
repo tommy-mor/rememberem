@@ -3,10 +3,11 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 /// Under a person on a filtered list, small lines saying why they match:
 /// for a date range, the details dated in it ("Wedding: 3 Jun 2010 - at
-/// the lake") and the photos taken in it; for "Details contain", each
+/// the lake") and the photos taken in it; for an anniversary range or a
+/// tag, the anniversaries or tags that match; for "Details contain", each
 /// matching detail with the words found in bold. Each reads as on the
 /// person's card ([DetailSummary]), after its kind where that is not
-/// plain. Up to [most] lines show; more fold to [folded] and "+N more".
+/// plain. Every matching line shows.
 class FilterMatchLines extends StatelessWidget {
   const FilterMatchLines({
     super.key,
@@ -21,9 +22,6 @@ class FilterMatchLines extends StatelessWidget {
   /// The shown name of an active person (a relationship's), or null.
   final String? Function(String id) nameOf;
 
-  static const most = 4;
-  static const folded = 3;
-
   /// The lines for [memory], as plain text with the spans to highlight.
   static List<({String text, List<(int, int)> bold})> linesFor(
     Memory memory,
@@ -31,22 +29,37 @@ class FilterMatchLines extends StatelessWidget {
     String? Function(String id) nameOf,
   ) {
     final lines = <({String text, List<(int, int)> bold})>[];
-    for (final filter in filters) {
+    // A detail matching two filters shows once: with its words in bold if
+    // "Details contain" found it, so that filter goes first.
+    final shown = <String>{};
+    void plain(List<Detail> details) {
+      for (final d in details) {
+        if (!shown.add(d.id)) continue;
+        lines.add((
+          text: DetailSummary.kindHead(d) + DetailSummary.lineFor(d, nameOf),
+          bold: const [],
+        ));
+      }
+    }
+
+    for (final filter in [
+      ...filters.whereType<DetailsFilter>(),
+      ...filters.where((f) => f is! DetailsFilter),
+    ]) {
       switch (filter) {
         case DateRangeFilter():
-          for (final d in filter.detailsIn(memory)) {
-            lines.add((
-              text:
-                  DetailSummary.kindHead(d) + DetailSummary.lineFor(d, nameOf),
-              bold: const [],
-            ));
-          }
+          plain(filter.detailsIn(memory));
           for (final e in filter.encountersIn(memory)) {
             final day = DetailPrompt.date(e.capturedAt.toLocal());
             lines.add((text: 'Photo · $day', bold: const []));
           }
+        case AnniversaryFilter():
+          plain(filter.detailsIn(memory));
+        case TagFilter():
+          plain(filter.detailsIn(memory));
         case DetailsFilter():
           for (final d in filter.detailsIn(memory)) {
+            if (!shown.add(d.id)) continue;
             // The kind is never searched, so never highlighted.
             final head = DetailSummary.kindHead(d);
             final rest = DetailSummary.lineFor(d, nameOf);
@@ -78,15 +91,13 @@ class FilterMatchLines extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final line in lines.take(lines.length > most ? folded : most))
+        for (final line in lines)
           Text.rich(
             TextSpan(children: _spans(line.text, line.bold, bold)),
             style: small,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
-        if (lines.length > most)
-          Text('+${lines.length - folded} more', style: small),
       ],
     );
   }

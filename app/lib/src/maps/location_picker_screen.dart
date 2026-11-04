@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -10,7 +12,8 @@ import 'place_name_dialog.dart';
 import 'street_map.dart';
 
 /// Pick a spot by moving the map under the crosshair, or tap a known place's
-/// pin to choose that place. Pops with a [LocationChoice] naming the known
+/// pin to choose that place. Above the map, the known places by name: one
+/// tapped is centred on the map. Pops with a [LocationChoice] naming the known
 /// place at the spot (if any), or nothing if Fred goes back.
 class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({
@@ -48,6 +51,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   /// Where the crosshair is now.
   GeoPoint? _centre;
+
+  /// The place last tapped in the list, and a count of taps, so tapping
+  /// it again looks at it again.
+  String? _picked;
+  int _pickTick = 0;
+
+  /// The known places in alphabetical order.
+  List<PlaceGroup> get _byName => [..._places]
+    ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
 
   @override
   void initState() {
@@ -109,6 +121,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_places.isNotEmpty) _placeList(context),
                 Expanded(
                   child: Stack(
                     alignment: Alignment.center,
@@ -117,6 +130,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         streetMaps: widget.services.settings.value.streetMaps,
                         links: widget.services.links,
                         centre: _start,
+                        centreTick: _pickTick,
                         circles: [
                           for (final g in _places)
                             if (g.name case final name?)
@@ -137,7 +151,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               ),
                             ),
                         ],
-                        onCentreChanged: (c) => _centre = c,
+                        onCentreChanged: _moved,
                       ),
                       IgnorePointer(
                         child: Icon(
@@ -152,6 +166,55 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 _buttons(context),
               ],
             ),
+    );
+  }
+
+  /// The map moved: once it leaves the place picked in the list, that
+  /// place is no longer marked as picked.
+  void _moved(GeoPoint centre) {
+    _centre = centre;
+    final at = _start;
+    if (_picked == null || at == null) return;
+    const near = 1e-6;
+    if ((centre.latitude - at.latitude).abs() > near ||
+        (centre.longitude - at.longitude).abs() > near) {
+      setState(() => _picked = null);
+    }
+  }
+
+  /// The known places, a few lines high; tapping one centres it.
+  Widget _placeList(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      // A few lines, but never most of a short (landscape) screen.
+      height: min(168, MediaQuery.sizeOf(context).height * 0.25),
+      child: Scrollbar(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          children: [
+            for (final g in _byName)
+              ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(vertical: -4),
+                leading: const Icon(Icons.place, size: 20),
+                title: Text(g.label),
+                selected: g.label == _picked,
+                trailing: g.label == _picked
+                    ? const Icon(Icons.check, semanticLabel: 'Chosen')
+                    : null,
+                selectedTileColor: theme.colorScheme.primaryContainer.withAlpha(
+                  90,
+                ),
+                onTap: () => setState(() {
+                  _picked = g.label;
+                  _start = g.marker;
+                  _centre = g.marker;
+                  _pickTick++;
+                }),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

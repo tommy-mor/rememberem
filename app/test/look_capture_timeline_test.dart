@@ -336,6 +336,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Library'), findsNothing);
       expect(find.textContaining('Book club'), findsNothing);
+      // The box sits just before its label, with no explainer.
+      final toggle = tester.widget<CheckboxListTile>(
+        find.byType(CheckboxListTile),
+      );
+      expect(toggle.controlAffinity, ListTileControlAffinity.leading);
+      expect(toggle.subtitle, isNull);
 
       await tester.tap(find.text('Show details'));
       await tester.pumpAndSettle();

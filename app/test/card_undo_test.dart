@@ -191,11 +191,14 @@ void main() {
 
       await editor.undo(); // the second crop
       expect(editor.undo(), isNull); // the name
-      expect([for (final p in repository.replacedPhotos) p.$3], [
-        [2],
-        [3],
-        [9],
-      ]);
+      expect(
+        [for (final p in repository.replacedPhotos) p.$3],
+        [
+          [2],
+          [3],
+          [9],
+        ],
+      );
     });
 
     test('a photo that cannot be written back is still the one Undo and '

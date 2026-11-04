@@ -69,6 +69,14 @@ class RememberemTheme {
     return deepNavy;
   }
 
+  /// [on], a shade darker on a light page or lighter on a dark one, as
+  /// cards sit on the page.
+  static Color shade(ThemeData theme, Color on) => Color.alphaBlend(
+    (theme.brightness == Brightness.dark ? Colors.white : Colors.black)
+        .withAlpha(16),
+    on,
+  );
+
   static double contrast(Color a, Color b) {
     final la = a.computeLuminance();
     final lb = b.computeLuminance();

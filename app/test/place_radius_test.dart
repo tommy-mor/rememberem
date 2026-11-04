@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
+import 'package:rememberem/src/maps/location_choice.dart';
 import 'package:rememberem/src/maps/location_picker_screen.dart';
+import 'package:rememberem/src/maps/street_map.dart';
 import 'package:rememberem/src/places/place_row.dart';
 import 'package:rememberem/src/places/places_screen.dart';
 import 'package:rememberem/src/places/radius_slider.dart';
@@ -208,6 +210,25 @@ void main() {
     expect(radiusButton('555 ft'), findsOneWidget);
   });
 
+  testWidgets('what sits under a place name is set in from it', (tester) async {
+    await person('Alex', 'Cafe', north(0));
+    await showPlaces(tester);
+
+    final name = tester.getTopLeft(
+      find.descendant(
+        of: find.byType(PlaceRow),
+        matching: find.byType(TextField),
+      ),
+    );
+    final radius = tester.getTopLeft(radiusButton('555 ft'));
+    final expander = tester.getTopLeft(
+      find.byTooltip('Show the people met at Cafe'),
+    );
+    expect(radius.dx, greaterThan(name.dx));
+    expect(expander.dx, greaterThan(name.dx));
+    expect(tester.getSize(radiusButton('555 ft')).height, lessThan(48));
+  });
+
   testWidgets('outside the US, metres by default', (tester) async {
     tester.platformDispatcher.localeTestValue = const Locale('de', 'DE');
     addTearDown(tester.platformDispatcher.clearLocaleTestValue);
@@ -215,6 +236,59 @@ void main() {
     await showPlaces(tester);
 
     expect(radiusButton('170 m'), findsOneWidget);
+  });
+
+  testWidgets('the location picker lists known places by name; tapping '
+      'one centres it', (tester) async {
+    await person('Alex', 'Zoo', north(0));
+    await person('Kim', 'cafe', north(5));
+    await person('Lee', 'Park', north(10));
+    phone(tester);
+    LocationChoice? chosen;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () async {
+              chosen = await Navigator.of(context).push<LocationChoice>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      LocationPickerScreen(services: services, initial: null),
+                ),
+              );
+            },
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final listed = find.descendant(
+      of: find.byType(ListTile),
+      matching: find.byType(Text),
+    );
+    expect(tester.widgetList<Text>(listed).map((t) => t.data), [
+      'cafe',
+      'Park',
+      'Zoo',
+    ]);
+    await tester.tap(find.widgetWithText(ListTile, 'Park'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ListTile>(find.widgetWithText(ListTile, 'Park')).selected,
+      isTrue,
+    );
+    expect(chosen, isNull); // still choosing
+    final map = tester.widget<StreetMap>(find.byType(StreetMap));
+    expect(map.centre!.latitude, closeTo(north(10).latitude, 1e-6));
+    expect(map.centreTick, 1);
+
+    await tester.tap(find.text('Use this spot'));
+    await tester.pumpAndSettle();
+    expect(chosen!.point!.latitude, closeTo(north(10).latitude, 1e-6));
+    expect(chosen!.place, 'Park');
   });
 
   testWidgets('the location picker draws known places with their radius', (

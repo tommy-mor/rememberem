@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/rememberem_theme.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
 import 'detail_extras_editor.dart';
@@ -90,11 +91,8 @@ class DetailListEditor extends StatefulWidget {
 
   /// A card's colour: the page's, a shade darker on a light page or
   /// lighter on a dark one.
-  static Color tintOf(ThemeData theme) => Color.alphaBlend(
-    (theme.brightness == Brightness.dark ? Colors.white : Colors.black)
-        .withAlpha(16),
-    theme.scaffoldBackgroundColor,
-  );
+  static Color tintOf(ThemeData theme) =>
+      RememberemTheme.shade(theme, theme.scaffoldBackgroundColor);
 
   @override
   State<DetailListEditor> createState() => _DetailListEditorState();
@@ -214,13 +212,18 @@ class _DetailListEditorState extends State<DetailListEditor> {
           for (final detail in widget.details)
             if (detail.kind == kind) ...[
               _row(context, detail),
-              const SizedBox(height: 6),
+              const SizedBox(height: 3),
             ],
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
         ],
       ],
     );
   }
+
+  /// Icon buttons without the extra space around their 40 dp.
+  static final _small = IconButton.styleFrom(
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
 
   Widget _heading(BuildContext context, DetailKind kind) => Row(
     children: [
@@ -233,6 +236,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
         ),
       ),
       IconButton(
+        style: _small,
         tooltip: DetailListEditor.addLabel(kind),
         icon: const Icon(Icons.add),
         onPressed: () => widget.onAdd(kind),
@@ -340,6 +344,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
                 ),
               ),
               IconButton(
+                style: _small,
                 tooltip: 'Close $name',
                 icon: const Icon(Icons.expand_less),
                 onPressed: () => _collapse(id),
@@ -361,7 +366,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
                     choosePlace: widget.choosePlace,
                     onChanged: widget.onReplace,
                   ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 DictatedTextField(
                   key: ValueKey('$id-${widget.generation}'),
                   label: 'Description',
@@ -380,12 +385,15 @@ class _DetailListEditorState extends State<DetailListEditor> {
           Row(
             children: [
               IconButton(
+                style: _small,
                 tooltip: 'About ${detail.kind.label.toLowerCase()} details',
                 icon: const Icon(Icons.help_outline),
                 onPressed: () => DetailHelpDialog.show(context, detail.kind),
               ),
               const Spacer(),
               IconButton(
+                // Full size: it deletes, so it is never a near miss.
+                visualDensity: VisualDensity.compact,
                 tooltip: 'Delete $name',
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _delete(detail),

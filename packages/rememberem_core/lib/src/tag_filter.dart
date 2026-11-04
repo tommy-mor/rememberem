@@ -1,3 +1,4 @@
+import 'detail.dart';
 import 'detail_kind.dart';
 import 'detail_type_catalog.dart';
 import 'filter_condition.dart';
@@ -13,13 +14,17 @@ class TagFilter implements FilterCondition {
   bool get isBlank => (name?.trim() ?? '').isEmpty;
 
   @override
-  bool matches(Memory memory) {
-    if (isBlank) return true;
+  bool matches(Memory memory) => isBlank || detailsIn(memory).isNotEmpty;
+
+  /// The person's tags of this type.
+  List<Detail> detailsIn(Memory memory) {
+    if (isBlank) return const [];
     final key = DetailTypeCatalog.normalizeKey(name!);
-    return memory.details.any(
-      (d) =>
-          d.kind == DetailKind.tag &&
-          DetailTypeCatalog.normalizeKey(d.label ?? '') == key,
-    );
+    return [
+      for (final d in memory.details)
+        if (d.kind == DetailKind.tag &&
+            DetailTypeCatalog.normalizeKey(d.label ?? '') == key)
+          d,
+    ];
   }
 }

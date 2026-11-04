@@ -174,14 +174,26 @@ class _FilterRowState extends State<FilterRow> {
               ),
             ),
             if (options.isEmpty) const ListTile(title: Text(FilterRow.noneYet)),
+            // Each in its own box, close together.
             for (final option in options)
-              ListTile(
-                title: Text(option),
-                selected: option == current,
-                trailing: option == current
-                    ? const Icon(Icons.check, semanticLabel: 'Chosen')
-                    : null,
-                onTap: () => Navigator.of(sheet).pop(option),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                child: ListTile(
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: Theme.of(sheet).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  title: Text(option),
+                  selected: option == current,
+                  trailing: option == current
+                      ? const Icon(Icons.check, semanticLabel: 'Chosen')
+                      : null,
+                  onTap: () => Navigator.of(sheet).pop(option),
+                ),
               ),
           ],
         ),

@@ -198,10 +198,9 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
   Widget _detailsToggle() => ValueListenableBuilder<bool>(
     valueListenable: widget.services.timelineDetails,
     builder: (context, on, _) => CheckboxListTile(
+      // The box just before its label.
+      controlAffinity: ListTileControlAffinity.leading,
       title: const Text('Show details'),
-      subtitle: const Text(
-        'Adds happenings, dated tags and the latest anniversaries.',
-      ),
       value: on,
       onChanged: (v) => widget.services.timelineDetails.value = v ?? false,
     ),

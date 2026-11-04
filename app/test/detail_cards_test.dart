@@ -204,6 +204,94 @@ void main() {
     expect(tester.hasRunningAnimations, isFalse);
   });
 
+  testWidgets('open happenings and tags say no "When" or "Where"', (
+    tester,
+  ) async {
+    await withDetails([
+      Detail(
+        id: 'h',
+        text: 'Picnic',
+        at: DateTime(2026, 5, 3, 10),
+        type: DetailKind.happening,
+        place: 'Park',
+      ),
+      tag(label: 'choir')
+          .copyWith(place: () => 'Hall', eventDate: () => DateTime(2026, 6, 1)),
+    ]);
+    await showCard(tester);
+    Finder opener(String kind) => find.byWidgetPredicate(
+      (w) => w is Icon && (w.semanticLabel ?? '').startsWith('Open $kind'),
+    );
+    await tester.tap(opener('Happening'));
+    await beat(tester);
+    expect(find.text('Park'), findsOneWidget);
+    for (final text in ['When it happened', 'Where it happened']) {
+      expect(find.text(text), findsNothing);
+    }
+
+    await tester.tap(opener('Tag'));
+    await beat(tester);
+    expect(find.text('Hall'), findsOneWidget);
+    for (final text in ['When', 'Where']) {
+      expect(find.text(text), findsNothing);
+    }
+  });
+
+  testWidgets('"New" for a type is italic, a shade off the card', (
+    tester,
+  ) async {
+    await withDetails([tag(label: 'choir')]);
+    await showCard(tester);
+    await tester.tap(openToggle('Tag Choir'));
+    await beat(tester);
+
+    final chip = tester.widget<ActionChip>(find.byType(ActionChip));
+    expect((chip.label as Text).style?.fontStyle, FontStyle.italic);
+    final theme = Theme.of(tester.element(find.byType(ActionChip)));
+    expect(chip.backgroundColor, isNot(DetailListEditor.tintOf(theme)));
+    expect(
+      chip.backgroundColor!.computeLuminance(),
+      lessThan(DetailListEditor.tintOf(theme).computeLuminance()),
+    );
+  });
+
+  testWidgets('Name, Place and Meeting hint faintly, in italics', (
+    tester,
+  ) async {
+    await showCard(tester);
+
+    var hints = 0;
+    for (final hint in ['Unknown', 'unknown']) {
+      for (final text in tester.widgetList<Text>(find.text(hint))) {
+        if (text.style?.color == null) continue; // the title, not a hint
+        hints++;
+        expect(text.style!.fontStyle, FontStyle.italic);
+        expect(text.style!.color!.a, closeTo(170 / 255, 0.01));
+      }
+    }
+    expect(hints, 3);
+    // Place and Meeting both say "unknown".
+    expect(find.text('unknown'), findsNWidgets(2));
+  });
+
+  testWidgets('Undo and Redo sit in a bar fixed at the foot of the page', (
+    tester,
+  ) async {
+    await showCard(tester);
+
+    final bar = tester
+        .widget<Scaffold>(find.byType(Scaffold))
+        .bottomNavigationBar;
+    expect(bar, isNotNull);
+    expect(
+      find.descendant(
+        of: find.byWidget(bar!),
+        matching: find.byTooltip('Undo'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a happening without a place offers + place', (tester) async {
     await withDetails([
       Detail(

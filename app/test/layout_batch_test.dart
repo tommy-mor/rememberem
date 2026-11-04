@@ -161,7 +161,7 @@ void main() {
       await tester.tap(openToggle('Happening 3 May 2026'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('When it happened'));
+      await tester.tap(find.byIcon(Icons.schedule).last); // the happening's
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();

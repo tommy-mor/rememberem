@@ -75,6 +75,9 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
 
   Detail get _detail => widget.detail;
 
+  /// Lines and chips at about half the usual height.
+  static const _tight = VisualDensity(horizontal: -2, vertical: -4);
+
   /// Asks for a new type's name and chooses it; a name already listed
   /// chooses that one.
   Future<void> _newType(String title) async {
@@ -136,14 +139,14 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: switch (_detail.kind) {
           DetailKind.happening => _happening(context),
           DetailKind.relationship => [
             _who(context),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             ..._types(context, 'New relationship type'),
           ],
           DetailKind.anniversary => [
@@ -155,7 +158,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
             if (_labels.isEmpty && (_detail.label?.trim() ?? '').isEmpty) ...[
               const Text(DetailExtrasEditor.noTagsYet),
               Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                padding: const EdgeInsets.only(top: 2, bottom: 4),
                 child: Text(
                   DetailExtrasEditor.keepTagsKind,
                   style: Theme.of(context).textTheme.bodySmall,
@@ -165,7 +168,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
             ..._types(context, 'New tag'),
             if ((_detail.label?.trim() ?? '').isEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: 2),
                 child: Text(
                   DetailExtrasEditor.needsType,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
@@ -185,15 +188,14 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     return [
       ListTile(
         dense: true,
-        visualDensity: VisualDensity.compact,
+        visualDensity: _tight,
         minVerticalPadding: 0,
         contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.schedule),
+        leading: const Icon(Icons.schedule, semanticLabel: 'When'),
         title: Text(
           '${l.formatMediumDate(at)}, '
           '${l.formatTimeOfDay(TimeOfDay.fromDateTime(at))}',
         ),
-        subtitle: const Text('When it happened'),
         onTap: _pickHappeningTime,
       ),
       if ((_detail.place?.trim() ?? '').isEmpty)
@@ -208,23 +210,23 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
           ),
         )
       else
-        _placeTile('Where it happened', clearable: true),
+        _placeTile(),
     ];
   }
 
-  Widget _placeTile(String subtitle, {bool clearable = false}) => ListTile(
+  /// The place, to change on the map or clear.
+  Widget _placeTile() => ListTile(
     dense: true,
-    visualDensity: VisualDensity.compact,
+    visualDensity: _tight,
     minVerticalPadding: 0,
     contentPadding: EdgeInsets.zero,
-    leading: const Icon(Icons.place_outlined),
+    leading: const Icon(Icons.place_outlined, semanticLabel: 'Where'),
     title: Text(
       (_detail.place?.trim() ?? '').isEmpty
           ? 'Choose place'
           : _detail.place!.trim(),
     ),
-    subtitle: Text(subtitle),
-    trailing: clearable && (_detail.place?.trim() ?? '').isNotEmpty
+    trailing: (_detail.place?.trim() ?? '').isNotEmpty
         ? IconButton(
             tooltip: 'Clear the place',
             icon: const Icon(Icons.clear),
@@ -241,16 +243,15 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     final place = _detail.place?.trim() ?? '';
     final when = _detail.eventDate;
     return [
-      if (place.isNotEmpty) _placeTile('Where', clearable: true),
+      if (place.isNotEmpty) _placeTile(),
       if (when != null)
         ListTile(
           dense: true,
-          visualDensity: VisualDensity.compact,
+          visualDensity: _tight,
           minVerticalPadding: 0,
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.event),
+          leading: const Icon(Icons.event, semanticLabel: 'When'),
           title: Text(MaterialLocalizations.of(context).formatMediumDate(when)),
-          subtitle: const Text('When'),
           trailing: IconButton(
             tooltip: 'Clear the date',
             icon: const Icon(Icons.clear),
@@ -261,7 +262,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
         ),
       if (place.isEmpty || when == null)
         Padding(
-          padding: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.only(top: 2),
           child: Wrap(
             spacing: 8,
             children: [
@@ -332,24 +333,33 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
   /// The type chips, then a "+" that asks for a new type named [title].
   List<Widget> _types(BuildContext context, String title) {
     final chosen = DetailTypeCatalog.normalizeKey(_detail.label ?? '');
+    final theme = Theme.of(context);
     return [
       Wrap(
         spacing: 6,
-        runSpacing: 0,
+        runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           for (final label in _labels)
             ChoiceChip(
-              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               label: Text(label),
               selected: DetailTypeCatalog.normalizeKey(label) == chosen,
               onSelected: (_) =>
                   widget.onChanged(_detail.copyWith(label: label)),
             ),
           ActionChip(
-            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // A shade off the card, like the card off the page.
+            backgroundColor: RememberemTheme.shade(
+              theme,
+              RememberemTheme.shade(theme, theme.scaffoldBackgroundColor),
+            ),
             avatar: const Icon(Icons.add, size: 18),
-            label: const Text('New'),
+            label: const Text(
+              'New',
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
             tooltip: title,
             onPressed: () => _newType(title),
           ),
@@ -369,7 +379,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     }
     return ListTile(
       dense: true,
-      visualDensity: VisualDensity.compact,
+      visualDensity: _tight,
       minVerticalPadding: 0,
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.event),
