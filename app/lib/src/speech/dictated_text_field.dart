@@ -18,9 +18,6 @@ class DictatedTextField extends StatefulWidget {
     this.dense = false,
     this.autofocus = false,
     this.showMic = true,
-    this.trailing,
-    this.alwaysFloatLabel = false,
-    this.prefix,
     this.onListeningChanged,
   });
 
@@ -37,20 +34,11 @@ class DictatedTextField extends StatefulWidget {
   final bool dense;
   final bool autofocus;
 
-  /// Without the mic, [trailing] (if any) takes its place.
   final bool showMic;
-  final Widget? trailing;
 
-  /// Keeps the label on the border even while the field is empty.
-  final bool alwaysFloatLabel;
-
-  /// Told when listening starts and stops.
+  /// Told when listening starts and stops (and that it stopped, if the
+  /// field goes while listening).
   final ValueChanged<bool>? onListeningChanged;
-
-  /// Fixed text shown before the typed text, never part of it (a tag's
-  /// type, place and date). Shown on an empty field only with
-  /// [alwaysFloatLabel].
-  final String? prefix;
 
   /// Said when the phone has no offline speech for the language.
   static const noSpeechPack =
@@ -81,6 +69,10 @@ class _DictatedTextFieldState extends State<DictatedTextField>
     if (_listening) {
       _listening = false;
       widget.dictation.stop();
+      final told = widget.onListeningChanged;
+      if (told != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => told(false));
+      }
     }
     _pulse.dispose();
     _controller.dispose();
@@ -109,8 +101,10 @@ class _DictatedTextFieldState extends State<DictatedTextField>
     final before = _controller.text.trim();
     final available = await widget.dictation.listen(
       onWords: (words) {
-        // dispose() stops dictation without waiting; ignore a late result.
-        if (!mounted) return;
+        // A result after the session ended (dispose() stops dictation
+        // without waiting, and the recogniser can be late) is ignored, so
+        // it never lands on text changed since, such as by Undo.
+        if (!mounted || !_listening) return;
         _controller.text = before.isEmpty ? words : '$before $words';
         widget.onChanged(_controller.text);
       },
@@ -151,17 +145,16 @@ class _DictatedTextFieldState extends State<DictatedTextField>
       maxLines: widget.multiline ? 5 : 1,
       decoration: InputDecoration(
         labelText: widget.label,
-        prefixText: widget.prefix,
         hintText: widget.hint,
         isDense: widget.dense,
         contentPadding: widget.dense ? RememberemTheme.denseFieldPadding : null,
         // Keep the label up so the hint shows while the field is empty.
-        floatingLabelBehavior: widget.hint != null || widget.alwaysFloatLabel
+        floatingLabelBehavior: widget.hint != null
             ? FloatingLabelBehavior.always
             : null,
         border: const OutlineInputBorder(),
         suffixIcon: !widget.showMic && !_listening
-            ? widget.trailing
+            ? null
             : IconButton(
                 tooltip: _listening
                     ? 'Stop listening'

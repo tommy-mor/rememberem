@@ -51,7 +51,7 @@ void main() {
 
   Finder radiusButton(String text) => find.descendant(
     of: find.byType(PlaceRow),
-    matching: find.widgetWithText(TextButton, text),
+    matching: find.widgetWithText(OutlinedButton, '$text radius'),
   );
 
   setUp(() {
@@ -72,7 +72,7 @@ void main() {
 
     expect(radiusButton('555 ft'), findsOneWidget);
     expect(radiusButton('1.0 mi'), findsOneWidget);
-    expect(find.byType(TextButton), findsNWidgets(2)); // not the unknown
+    expect(find.byType(OutlinedButton), findsNWidgets(2)); // not the unknown
     expect(circles(tester).map((c) => c.radius).toList()..sort(), [
       closeTo(169.164, 1e-6),
       closeTo(1609.344, 1e-6),

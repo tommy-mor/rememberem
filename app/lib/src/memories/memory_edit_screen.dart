@@ -60,8 +60,15 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   ScaffoldMessengerState? _messenger;
 
   /// Bumped when a picture screen may have changed the newest encounter,
-  /// so the Place and Meeting fields reload their text.
+  /// or Undo or Redo changed the fields, so the fields reload their text.
   int _fieldsGen = 0;
+
+  /// Bumped by Undo and Redo, so the detail rows reload their text.
+  int _detailsGen = 0;
+
+  /// The fields (by key, or "details") whose dictation is listening;
+  /// Undo and Redo wait until none is, so late words land nowhere stale.
+  final Set<String> _dictating = {};
 
   /// Everyone active and in the trash, read once on opening: names for
   /// relationships, and the types in use.
@@ -180,6 +187,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   /// coming back, everyone is read again (that page may have changed them).
   Future<void> _openRelated(Memory other) async {
     final navigator = Navigator.of(context);
+    // Another page: what could be undone here is left behind.
+    _editor.clearHistory();
     if (_openPages[other.id] case final open?) {
       // Already open further back: return there (pages above it save as
       // they close).
@@ -379,6 +388,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                   MemoryField.place => 'unknown',
                   _ => null,
                 },
+                onListeningChanged: (listening) =>
+                    _setDictating(field.key, listening),
                 onChanged: (value) {
                   _editor.update(field.key, value);
                   // The title shows the name as it is typed.
@@ -404,6 +415,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 onDelete: (id) => _edit(() => _editor.deleteDetail(id)),
                 onRestore: (detail, index) =>
                     _edit(() => _editor.restoreDetail(detail, index)),
+                generation: _detailsGen,
+                onListeningChanged: (listening) =>
+                    _setDictating('details', listening),
               ),
             ),
             const SizedBox(height: 16),
@@ -414,11 +428,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               onOpen: _openRelated,
             ),
             const SizedBox(height: 16),
-            Text(
-              'Saved automatically.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            _undoRow(context),
           ],
         ),
       ),
@@ -633,6 +643,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   }
 
   Future<void> _openPicture(Encounter encounter) async {
+    _editor.clearHistory();
     final removed = await Navigator.of(context).push<Encounter>(
       MaterialPageRoute(
         builder: (_) => EncounterEditScreen(
@@ -679,6 +690,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
 
   /// Folds this person into one Fred picks, then returns to the list.
   Future<void> _merge() async {
+    _editor.clearHistory();
     final target = await Navigator.of(context).push<Memory>(
       MaterialPageRoute(
         builder: (_) => MergePickerScreen(
@@ -721,6 +733,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   /// Changes the picture that represents this person (the newest), saving
   /// at once, and reloads the Place and Meeting fields (Remote sets Place).
   void _changeNewest(Encounter Function(Encounter) change) => setState(() {
+    // Undo covers the fields as typed, not a map or time choice; after
+    // one, older steps would put back a stale place.
+    _editor.clearHistory();
     _editor.updateEncounter(
       _editor.memory.encounters.first.photoFileName,
       change,
@@ -747,4 +762,49 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
 
   /// Applies a detail change and rebuilds so time captions stay current.
   void _edit(VoidCallback change) => setState(change);
+
+  void _setDictating(String key, bool listening) {
+    if (!mounted) return;
+    setState(() => listening ? _dictating.add(key) : _dictating.remove(key));
+  }
+
+  /// Undo or Redo, then every field and row reads its text again.
+  void _step(VoidCallback step) => setState(() {
+    step();
+    _fieldsGen++;
+    _detailsGen++;
+  });
+
+  /// Small Undo and Redo buttons either side of "Saved automatically.".
+  Widget _undoRow(BuildContext context) => ListenableBuilder(
+    listenable: _editor,
+    builder: (context, _) {
+      final idle = _dictating.isEmpty;
+      return Row(
+        children: [
+          IconButton(
+            tooltip: 'Undo',
+            icon: const Icon(Icons.undo),
+            onPressed: idle && _editor.canUndo
+                ? () => _step(_editor.undo)
+                : null,
+          ),
+          Expanded(
+            child: Text(
+              'Saved automatically.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Redo',
+            icon: const Icon(Icons.redo),
+            onPressed: idle && _editor.canRedo
+                ? () => _step(_editor.redo)
+                : null,
+          ),
+        ],
+      );
+    },
+  );
 }

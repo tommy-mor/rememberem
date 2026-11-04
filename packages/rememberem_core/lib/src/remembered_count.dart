@@ -20,7 +20,7 @@ class RememberedCount {
         ].length,
       );
 
-  static const int defaultThreshold = 5;
+  static const int defaultThreshold = 10;
 
   /// The one test of "remembered": a face or detail with at least
   /// [threshold] points.

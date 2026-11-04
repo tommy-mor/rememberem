@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/memories/detail_extras_editor.dart';
-import 'package:rememberem/src/memories/detail_list_editor.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
@@ -54,17 +53,33 @@ void main() {
   }
 
   Future<void> addTag(WidgetTester tester) async {
-    await tester.ensureVisible(find.text('+ tag'));
-    await tester.tap(find.text('+ tag'));
+    await tester.ensureVisible(find.byTooltip('Add a tag'));
+    await tester.tap(find.byTooltip('Add a tag'));
     await tester.pumpAndSettle();
   }
 
-  /// The tag row's description field.
-  TextField tagField(WidgetTester tester) => tester.widget<TextField>(
-    find.byWidgetPredicate(
-      (w) => w is TextField && w.decoration?.labelText == 'Tag',
-    ),
-  );
+  /// Makes a new tag type through the New chip's dialog.
+  Future<void> newTag(WidgetTester tester, String name) async {
+    await tester.tap(find.byTooltip('New tag'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Name').last, name);
+    await tester.pump();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Closes the one open card and returns its one-line summary.
+  Future<String> closedLine(WidgetTester tester) async {
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+    await tester.pumpAndSettle();
+    final text = tester.widget<Text>(
+      find.descendant(
+        of: find.byType(InkWell),
+        matching: find.byWidgetPredicate((w) => w is Text && w.maxLines == 1),
+      ),
+    );
+    return text.data!;
+  }
 
   setUp(() async {
     repository = FakeMemoryRepository();
@@ -81,18 +96,14 @@ void main() {
 
     expect(find.text(DetailExtrasEditor.noTagsYet), findsOneWidget);
     expect(find.text(DetailExtrasEditor.keepTagsKind), findsOneWidget);
-    expect(tagField(tester).decoration?.prefixText, isNull);
 
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Create a tag'),
-      'book club',
-    );
-    await tester.pumpAndSettle();
+    await newTag(tester, 'book club');
     expect(find.text(DetailExtrasEditor.noTagsYet), findsNothing);
     expect(find.text(DetailExtrasEditor.needsType), findsNothing);
-    expect(tagField(tester).decoration?.prefixText, 'Book club - ');
-    expect(find.text('Book club - '), findsOneWidget); // shown, not just set
     expect(find.byTooltip('Delete Tag Book club'), findsOneWidget);
+    expect(await closedLine(tester), 'Book club'); // shown, not just set
+    await tester.tap(find.text('Book club'));
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('+ date'));
     await tester.tap(find.text('+ date'));
@@ -104,10 +115,10 @@ void main() {
     final tag = saved().details.single;
     expect([tag.kind, tag.label], [DetailKind.tag, 'book club']);
     expect(tag.eventDate, isNotNull);
-    expect(
-      tagField(tester).decoration?.prefixText,
-      'Book club · ${DetailPrompt.date(tag.eventDate!)} - ',
-    );
+    final line = 'Book club · ${DetailPrompt.date(tag.eventDate!)}';
+    expect(await closedLine(tester), line);
+    await tester.tap(find.text(line));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Clear the date'));
     await tester.pumpAndSettle();
@@ -184,17 +195,17 @@ void main() {
       eventDate: on,
     );
     expect(
-      DetailListEditor.fieldPrefix(
+      DetailSummary.prefix(
         tag(label: 'relatives', place: 'Park', on: DateTime(2026, 3, 3)),
         noName,
       ),
       'Relatives · Park · 3 Mar 2026 - ',
     );
-    expect(DetailListEditor.fieldPrefix(tag(place: 'Park'), noName), 'Park - ');
-    expect(DetailListEditor.fieldPrefix(tag(), noName), isNull);
-    expect(DetailListEditor.rowLabel(tag(label: 'x')), 'Tag');
+    expect(DetailSummary.prefix(tag(place: 'Park'), noName), 'Park - ');
+    expect(DetailSummary.prefix(tag(), noName), isNull);
+    expect(DetailSummary.spokenName(tag(label: 'x'), noName), 'Tag X');
     expect(
-      DetailListEditor.fieldPrefix(
+      DetailSummary.prefix(
         Detail(id: 'f', text: 'x', at: DateTime.utc(2026)),
         noName,
       ),
@@ -219,9 +230,8 @@ void main() {
 
     await tester.tap(find.byTooltip('Add filter'));
     await tester.pumpAndSettle();
+    // Adding it opens its list of tags at once.
     await tester.tap(find.text('Tag').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Choose'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Book club').last);
     await tester.pumpAndSettle();

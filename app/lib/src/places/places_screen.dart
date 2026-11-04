@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:rememberem_core/rememberem_core.dart';
@@ -13,7 +15,8 @@ import 'places_map.dart';
 import 'radius_slider.dart';
 
 /// Every place Fred has met people: a list on top, a map below. Picking a
-/// place in either selects it, centres the map on it and lists its people.
+/// place in either selects it and centres the map on it; a row's expander
+/// lists its people. Each named place has a Notify box for place notices.
 /// Places are renamed, or named if unknown, in the list itself, and a
 /// named place's radius is slid on its row. On the map, a double tap
 /// zooms to a place and a long press moves a named one.
@@ -36,6 +39,16 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   final _scroll = ScrollController();
   List<PlaceGroup>? _groups;
   PlaceGroup? _selected;
+
+  /// The rows whose people show, by [_keyOf].
+  final Set<String> _expanded = {};
+
+  /// Each row's key, so a selected row can be scrolled fully into view.
+  final Map<String, GlobalKey> _rowKeys = {};
+
+  /// Waits for Notify ticks to stop before the fences follow, so quick
+  /// ticking re-registers them once.
+  Timer? _noticeSync;
 
   /// The place whose radius is being slid, the radius being dragged (null
   /// once let go), and whether the map should fit it exactly.
@@ -74,6 +87,10 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
 
   @override
   void dispose() {
+    if (_noticeSync?.isActive ?? false) {
+      _noticeSync!.cancel();
+      widget.services.placeNotices?.sync().catchError((_) {});
+    }
     widget.routeObserver.unsubscribe(this);
     _scroll.dispose();
     super.dispose();
@@ -136,30 +153,75 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     });
     final index = groups.indexOf(group);
     if (index < 0 || !_scroll.hasClients) return;
-    // Only the selected row is expanded, so every row above it is
-    // collapsed and the offset is exact.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(index));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollTo(index, group),
+    );
   }
 
-  /// The list is lazy, so the scroll limit is only an estimate until the
-  /// selected row has been laid out: scroll, then correct once it has.
-  Future<void> _scrollTo(int index, {bool settled = false}) async {
+  /// The key a row is known by: its name, or its first photo if unknown.
+  static String _keyOf(PlaceGroup group) =>
+      group.name ??
+      'unknown ${group.members.first.$1.id}/'
+          '${group.members.first.$2.photoFileName}';
+
+  /// The list is lazy, so rows above the selected one may not be laid
+  /// out: scroll to an estimate (rows showing their people are taller),
+  /// then, once the row is built, bring it fully into view.
+  Future<void> _scrollTo(int index, PlaceGroup group) async {
     if (!_scroll.hasClients) return;
+    final groups = _groups ?? const <PlaceGroup>[];
+    final scaler = MediaQuery.textScalerOf(context);
+    var estimate = 0.0;
+    for (final above in groups.take(index)) {
+      estimate += scaler.scale(PlaceRow.collapsedExtent);
+      if (_expanded.contains(_keyOf(above))) {
+        estimate += scaler.scale(44) * (above.people.length / 2).ceil();
+      }
+    }
     final position = _scroll.position;
-    final rowHeight = MediaQuery.textScalerOf(context)
-        .scale(PlaceRow.collapsedExtent);
-    final target = (index * rowHeight).clamp(0.0, position.maxScrollExtent);
-    if ((position.pixels - target).abs() < 1) return;
-    await _scroll.animateTo(
-      target,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
-    if (!settled && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _scrollTo(index, settled: true),
+    final target = estimate.clamp(0.0, position.maxScrollExtent);
+    if ((position.pixels - target).abs() >= 1) {
+      await _scroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
       );
     }
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final row = _rowKeys[_keyOf(group)]?.currentContext;
+      if (row == null || !row.mounted) return;
+      Scrollable.ensureVisible(
+        row,
+        duration: const Duration(milliseconds: 150),
+      );
+    });
+  }
+
+  void _toggleExpanded(PlaceGroup group) {
+    final key = _keyOf(group);
+    setState(
+      () =>
+          _expanded.contains(key) ? _expanded.remove(key) : _expanded.add(key),
+    );
+  }
+
+  /// Saves whether arriving at [place] gives a notice; the phone's fences
+  /// follow a moment after the last tick.
+  Future<void> _setNotify(String place, bool on) async {
+    final settings = widget.services.settings;
+    await settings.update(settings.value.withPlaceNotify(place, on));
+    if (!mounted) {
+      // Gone meanwhile: the fences follow now.
+      widget.services.placeNotices?.sync().catchError((_) {});
+      return;
+    }
+    setState(() {});
+    _noticeSync?.cancel();
+    _noticeSync = Timer(
+      const Duration(seconds: 1),
+      () => widget.services.placeNotices?.sync().catchError((_) {}),
+    );
   }
 
   /// Renames [group] to [newName]; true if it was renamed. A known place
@@ -372,16 +434,17 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
             itemBuilder: (context, index) {
               final group = groups[index];
               final name = group.name;
+              final key = _keyOf(group);
               return PlaceRow(
                 // Keyed by place, so a name being typed stays with it.
-                key: ValueKey(
-                  name ??
-                      'unknown ${group.members.first.$1.id}/'
-                          '${group.members.first.$2.photoFileName}',
-                ),
+                key: _rowKeys.putIfAbsent(key, GlobalKey.new),
                 group: group,
-                expanded: group == _selected,
+                selected: group == _selected,
+                expanded: _expanded.contains(key),
                 onTap: () => _select(group),
+                onExpand: () => _toggleExpanded(group),
+                notify: name == null ? null : settings.notifies(name),
+                onNotify: name == null ? null : (on) => _setNotify(name, on),
                 onRename: (newName) => _rename(group, newName),
                 onOpenPerson: _openPerson,
                 repository: _repository,

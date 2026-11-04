@@ -39,6 +39,9 @@ class MemoryListScreen extends StatefulWidget {
   final VoidCallback onMeetSomeone;
   final DateTime Function() clock;
 
+  /// Above the practice buttons.
+  static const quizzesLabel = 'Quizzes to help you remember...';
+
   /// What a screen reader says for the Faces practice button.
   static const facesLabel =
       'Practice faces. Needs sight; Practice details works with a screen '
@@ -57,6 +60,9 @@ class MemoryListScreen extends StatefulWidget {
 class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   MemoryRepository get _repository => widget.services.repository;
   List<Memory>? _memories;
+
+  /// Everyone shown, by id, for relationships in the match lines.
+  Map<String, String> _activeNames = const {};
 
   /// How many record files the last load could not read.
   int _unreadable = 0;
@@ -120,6 +126,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     if (mounted && gen == _reloadGen) {
       setState(() {
         _memories = memories;
+        _activeNames = {for (final m in memories) m.id: m.displayName};
         _unreadable = unreadable.length;
       });
     }
@@ -283,6 +290,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
                 style: small,
               ),
             const SizedBox(height: 4),
+            Text(
+              MemoryListScreen.quizzesLabel,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             Row(
               children: [
                 Expanded(
@@ -428,7 +439,11 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       onTap: () => _open(memory),
       below: active.isEmpty
           ? null
-          : FilterMatchLines(memory: memory, filters: active),
+          : FilterMatchLines(
+              memory: memory,
+              filters: active,
+              nameOf: (id) => _activeNames[id],
+            ),
       // A face's progress toward remembered; nothing until it scores.
       trailing: memory.points == 0
           ? null

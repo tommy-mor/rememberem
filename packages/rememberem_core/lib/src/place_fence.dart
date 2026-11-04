@@ -15,16 +15,21 @@ class PlaceFence {
   static const leastMeters = 100.0;
 
   /// The fences to keep: named places with a location ([PlaceGroup.marker],
-  /// which follows a moved place), each at its radius from [radiusFor] but
-  /// at least [leastMeters], the [most] most recently visited.
+  /// which follows a moved place) that Fred wants notices for
+  /// ([notifies]), each at its radius from [radiusFor] but at least
+  /// [leastMeters], the [most] most recently visited.
   static List<PlaceFence> select(
     List<PlaceGroup> groups,
     double Function(String place) radiusFor, {
+    required bool Function(String place) notifies,
     int most = 90,
   }) {
     final named = [
       for (final g in groups)
-        if (g.name != null && g.marker != null) g,
+        if (g.name != null &&
+            g.marker != null &&
+            notifies(g.name!))
+          g,
     ]..sort((a, b) => b.newest.compareTo(a.newest));
     return [
       for (final g in named.take(most))

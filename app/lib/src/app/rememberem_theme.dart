@@ -86,8 +86,14 @@ class RememberemTheme {
   ) => ThemeData(
     colorScheme: scheme,
     scaffoldBackgroundColor: background,
-    inputDecorationTheme: const InputDecorationTheme(
+    inputDecorationTheme: InputDecorationTheme(
       contentPadding: fieldPadding,
+      // A placeholder reads as one: italic and faint, but still legible
+      // (4.5:1 on the tinted cards).
+      hintStyle: TextStyle(
+        fontStyle: FontStyle.italic,
+        color: scheme.onSurface.withAlpha(180),
+      ),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: bar,

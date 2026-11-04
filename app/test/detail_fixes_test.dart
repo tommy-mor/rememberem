@@ -84,9 +84,15 @@ void main() {
     }
 
     Future<void> add(WidgetTester tester, String kind) async {
-      await tester.ensureVisible(find.text('+ $kind'));
-      await tester.tap(find.text('+ $kind'));
-      await tester.pumpAndSettle();
+      final plus = find.byTooltip(
+        DetailListEditor.addLabel(
+          DetailKind.values.firstWhere((k) => k.label.toLowerCase() == kind),
+        ),
+      );
+      await tester.ensureVisible(plus);
+      await tester.tap(plus);
+      // An anniversary's "+ date" pulses for ever, so never settle.
+      await tester.pump(const Duration(milliseconds: 500));
     }
 
     Memory saved() => repository.stored[memory.id]!;
@@ -104,15 +110,17 @@ void main() {
     ) async {
       await showCard(tester);
       await add(tester, 'tag');
+      await tester.tap(find.byTooltip('New tag'));
+      await tester.pumpAndSettle();
       await tester.enterText(
-        find.widgetWithText(TextField, 'Create a tag'),
+        find.widgetWithText(TextField, 'Name').last,
         'Choir',
       );
+      await tester.pump();
+      await tester.tap(find.text('Add'));
       await tester.pumpAndSettle();
       // Close the first tag, then add another.
-      await tester.tapAt(
-        tester.getCenter(find.widgetWithText(TextField, 'Name')),
-      );
+      await tester.tap(find.byTooltip('Close Tag Choir'));
       await tester.pumpAndSettle();
 
       await add(tester, 'tag');
@@ -145,14 +153,14 @@ void main() {
       await add(tester, 'anniversary');
 
       await tester.tap(find.byTooltip('About anniversary details'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(DetailHelpDialog), findsOneWidget);
       expect(
         find.text(DetailHelpDialog.textFor(DetailKind.anniversary).first),
         findsOneWidget,
       );
       await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(DetailHelpDialog), findsNothing);
     });
 
@@ -166,9 +174,9 @@ void main() {
       await showCard(tester);
       expect(find.byIcon(Icons.mic), findsNothing);
 
-      await tester.tap(find.byTooltip('Open Fact'));
+      await tester.tap(find.text('Tall'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Speak Fact'), findsOneWidget);
+      expect(find.byTooltip('Speak Description'), findsOneWidget);
     });
 
     testWidgets('someone just met has mics on Name, Place and Meeting', (
@@ -210,11 +218,11 @@ void main() {
       label: 'wedding',
       eventDate: DateTime(2010, 6, 3),
     );
-    expect(DetailListEditor.rowLabel(wedding), 'Anniversary');
     expect(
-      DetailListEditor.fieldPrefix(wedding, names),
-      'Wedding: 3 Jun 2010 - ',
+      DetailSummary.spokenName(wedding, names),
+      'Anniversary Wedding 3 Jun 2010',
     );
+    expect(DetailSummary.prefix(wedding, names), 'Wedding: 3 Jun 2010 - ');
     final boss = Detail(
       id: 'r',
       text: '',
@@ -223,12 +231,9 @@ void main() {
       label: 'boss',
       targetId: 'j',
     );
-    expect(DetailListEditor.rowLabel(boss), 'Relationship');
-    expect(DetailListEditor.fieldPrefix(boss, names), 'Boss: Jill - ');
-    expect(
-      DetailListEditor.fieldPrefix(boss.copyWith(label: ''), names),
-      'Jill - ',
-    );
+    expect(DetailSummary.spokenName(boss, names), 'Relationship Boss Jill');
+    expect(DetailSummary.prefix(boss, names), 'Boss: Jill - ');
+    expect(DetailSummary.prefix(boss.copyWith(label: ''), names), 'Jill - ');
     final picnic = Detail(
       id: 'h',
       text: '',
@@ -236,7 +241,10 @@ void main() {
       type: DetailKind.happening,
       place: 'Park',
     );
-    expect(DetailListEditor.rowLabel(picnic), 'Happening · 3 May 2026 · Park');
-    expect(DetailListEditor.fieldPrefix(picnic, names), isNull);
+    expect(
+      DetailSummary.spokenName(picnic, names),
+      'Happening 3 May 2026 Park',
+    );
+    expect(DetailSummary.lineFor(picnic, names), '3 May 2026 · Park');
   });
 }

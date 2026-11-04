@@ -24,6 +24,7 @@ class AppSettings {
     this.darkMode = false,
     this.placeRadii = const {},
     this.placeSpots = const {},
+    this.placeNotify = const {},
     this.metricUnits,
   });
 
@@ -89,6 +90,7 @@ class AppSettings {
       darkMode: flag('darkMode', fallback: false),
       placeRadii: _radii(json['placeRadii']),
       placeSpots: _spots(json['placeSpots']),
+      placeNotify: _notify(json['placeNotify']),
       metricUnits:
           json['metricUnits'] is bool ? json['metricUnits'] as bool : null,
     );
@@ -126,6 +128,16 @@ class AppSettings {
     return spots;
   }
 
+  /// Places' notice choices as written; a bad entry is dropped.
+  static Map<String, bool> _notify(Object? json) {
+    if (json is! Map) return const {};
+    return {
+      for (final MapEntry(:key, :value) in json.entries)
+        if (key is String && key.trim().isNotEmpty && value is bool)
+          key.trim(): value,
+    };
+  }
+
   /// Regions that measure distance in feet and miles.
   static const _imperialRegions = {'US', 'LR', 'MM', 'GB'};
 
@@ -146,7 +158,7 @@ class AppSettings {
   static const meetingWindowRange = (min: 30, max: 240);
   static const gameTurnsRange = (min: 5, max: 20);
   static const revealSecondsRange = (min: 1, max: 10);
-  static const rememberedThresholdRange = (min: 3, max: 10);
+  static const rememberedThresholdRange = (min: 3, max: 20);
   static const detailTextPercentRange = (min: 60, max: 150);
 
   static const _metersPerFoot = 0.3048;
@@ -201,6 +213,25 @@ class AppSettings {
   /// against new photos, at its spot.
   final Map<String, GeoPoint> placeSpots;
 
+  /// Fred's choice, by trimmed name, of whether arriving at a place gives
+  /// a place notice. A place not here uses [notifiesByDefault].
+  final Map<String, bool> placeNotify;
+
+  /// Places that give no notice until Fred ticks them: where he is every
+  /// day, and meets the same people.
+  static const quietByDefault = {'home', 'work', 'church'};
+
+  static bool notifiesByDefault(String place) =>
+      !quietByDefault.contains(place.trim().toLowerCase());
+
+  /// Whether arriving at [place] gives a place notice.
+  bool notifies(String place) =>
+      placeNotify[place.trim()] ?? notifiesByDefault(place);
+
+  /// With [place]'s notice choice set to [on].
+  AppSettings withPlaceNotify(String place, bool on) =>
+      copyWith(placeNotify: {...placeNotify, place.trim(): on});
+
   /// Metres and kilometres (true) or feet and miles; null until Fred
   /// chooses, when the phone's region decides ([metricFor]).
   final bool? metricUnits;
@@ -238,7 +269,14 @@ class AppSettings {
     final spot = placeSpots[from.trim()];
     final spots = {...placeSpots}..remove(from.trim());
     if (spot != null) spots.putIfAbsent(to.trim(), () => spot);
-    return copyWith(placeRadii: radii, placeSpots: spots);
+    final notify = placeNotify[from.trim()];
+    final notices = {...placeNotify}..remove(from.trim());
+    if (notify != null) notices.putIfAbsent(to.trim(), () => notify);
+    return copyWith(
+      placeRadii: radii,
+      placeSpots: spots,
+      placeNotify: notices,
+    );
   }
 
   PlaceFinder get placeFinder => PlaceFinder(
@@ -268,6 +306,7 @@ class AppSettings {
     bool? darkMode,
     Map<String, double>? placeRadii,
     Map<String, GeoPoint>? placeSpots,
+    Map<String, bool>? placeNotify,
     bool? metricUnits,
   }) =>
       AppSettings(
@@ -286,6 +325,7 @@ class AppSettings {
         darkMode: darkMode ?? this.darkMode,
         placeRadii: placeRadii ?? this.placeRadii,
         placeSpots: placeSpots ?? this.placeSpots,
+        placeNotify: placeNotify ?? this.placeNotify,
         metricUnits: metricUnits ?? this.metricUnits,
       );
 
@@ -308,6 +348,7 @@ class AppSettings {
           'placeSpots': {
             for (final e in placeSpots.entries) e.key: e.value.toJson(),
           },
+        if (placeNotify.isNotEmpty) 'placeNotify': placeNotify,
         if (metricUnits != null) 'metricUnits': metricUnits,
       };
 
@@ -331,7 +372,9 @@ class AppSettings {
       other.placeRadii.length == placeRadii.length &&
       placeRadii.entries.every((e) => other.placeRadii[e.key] == e.value) &&
       other.placeSpots.length == placeSpots.length &&
-      placeSpots.entries.every((e) => other.placeSpots[e.key] == e.value);
+      placeSpots.entries.every((e) => other.placeSpots[e.key] == e.value) &&
+      other.placeNotify.length == placeNotify.length &&
+      placeNotify.entries.every((e) => other.placeNotify[e.key] == e.value);
 
   @override
   int get hashCode => Object.hash(
@@ -355,6 +398,9 @@ class AppSettings {
         ),
         Object.hashAllUnordered(
           placeSpots.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
+        Object.hashAllUnordered(
+          placeNotify.entries.map((e) => Object.hash(e.key, e.value)),
         ),
       );
 }

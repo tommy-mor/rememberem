@@ -14,10 +14,10 @@ Memory person(String id, int points,
     ).withScore(points, null);
 
 void main() {
-  test('faces count from five points up', () {
+  test('faces count from the threshold up', () {
     final people = [person('a', 4), person('b', 5), person('c', 6)];
 
-    expect(RememberedCount.of(people).faces, 2);
+    expect(RememberedCount.of(people, threshold: 5).faces, 2);
   });
 
   test('details count by their own points, blank ones never', () {
@@ -26,7 +26,10 @@ void main() {
       person('b', 5, [('Choir', 0)]),
     ];
 
-    expect(RememberedCount.of(people), const RememberedCount(1, 1));
+    expect(
+      RememberedCount.of(people, threshold: 5),
+      const RememberedCount(1, 1),
+    );
   });
 
   test('nobody, nothing; the input is untouched', () {

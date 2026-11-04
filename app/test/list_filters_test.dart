@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/filter_bar.dart';
+import 'package:rememberem/src/memories/filter_row.dart';
 import 'package:rememberem/src/memories/filter_match_lines.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
@@ -92,7 +93,7 @@ void main() {
     await person('Alex', 'Cafe');
     await showMatching(tester);
 
-    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    expect(find.byType(FilterRow), findsNothing);
     expect(find.text('Clear all'), findsNothing);
     await tester.tap(find.byTooltip('Add filter'));
     await tester.pumpAndSettle();
@@ -190,10 +191,9 @@ void main() {
     await showMatching(tester);
     expect(find.text('2 people'), findsOneWidget);
 
+    // Adding it opens the choice at once.
     await addFilter(tester, 'Place');
     expect(find.text('2 people'), findsOneWidget); // not chosen yet
-    await tester.tap(find.text('Choose'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Park').last);
     await tester.pumpAndSettle();
 
@@ -244,8 +244,6 @@ void main() {
     await person('Sam', 'Park');
     await showMatching(tester);
     await addFilter(tester, 'Place');
-    await tester.tap(find.text('Choose'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Cafe').last);
     await tester.pumpAndSettle();
 
@@ -313,10 +311,7 @@ void main() {
 
     expect(find.text('1 person'), findsOneWidget);
     expect(find.text(FilterBar.dateHint), findsOneWidget);
-    expect(
-      find.text('Anniversary · Wedding · every 1 Nov (2010)'),
-      findsOneWidget,
-    );
+    expect(find.text('Wedding: 1 Nov 2010'), findsOneWidget);
     expect(find.text('Photo · 1 Nov 2026'), findsOneWidget);
     expect(find.textContaining('Tall'), findsNothing); // a fact has no date
   });
@@ -341,6 +336,7 @@ void main() {
     final lines = FilterMatchLines.linesFor(
       repository.stored[alex.id]!,
       services.listFilters.active,
+      (_) => null,
     );
     expect(lines.map((l) => l.text), ['Fact · Sings bass', 'Tag · Bass choir']);
     expect(lines.first.bold, [(13, 17)]);
@@ -369,6 +365,114 @@ void main() {
     expect(find.text('Fact · a3', findRichText: true), findsOneWidget);
     expect(find.text('Fact · a4', findRichText: true), findsNothing);
     expect(find.text('+2 more'), findsOneWidget);
+  });
+
+  testWidgets('four reasons all show; only five or more fold', (tester) async {
+    await person('Alex', 'Cafe', details: ['a1', 'a2', 'a3', 'a4']);
+    await showMatching(tester, filters: [const DetailsFilter('a')]);
+
+    expect(find.text('Fact · a4', findRichText: true), findsOneWidget);
+    expect(find.textContaining('more'), findsNothing);
+  });
+
+  testWidgets('a relationship reads type, person, then words, with the '
+      'words found in bold; an anniversary has no "every"', (tester) async {
+    final ann = await person('Ann', 'Cafe');
+    final bo = await person('Bo', 'Cafe');
+    await repository.save(
+      bo.withDetails([
+        Detail(
+          id: 'r',
+          text: 'met at the choir',
+          at: DateTime.utc(2026),
+          type: DetailKind.relationship,
+          label: 'sister',
+          targetId: ann.id,
+        ),
+        Detail(
+          id: 'w',
+          text: 'by the choir loft',
+          at: DateTime.utc(2026),
+          type: DetailKind.anniversary,
+          label: 'wedding',
+          eventDate: DateTime(2010, 6, 3),
+        ),
+      ]),
+    );
+    await showMatching(tester, filters: [const DetailsFilter('choir')]);
+
+    final lines = FilterMatchLines.linesFor(
+      repository.stored[bo.id]!,
+      services.listFilters.active,
+      (id) => id == ann.id ? 'Ann' : null,
+    );
+    expect(lines.map((l) => l.text), [
+      'Sister: Ann - met at the choir',
+      'Wedding: 3 Jun 2010 - by the choir loft',
+    ]);
+    expect(lines.first.bold, [(25, 30)]);
+    expect(
+      find.text('Sister: Ann - met at the choir', findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a choice filter opens its list when added; cancelling '
+      'removes it', (tester) async {
+    await person('Alex', 'Cafe');
+    await showMatching(tester);
+
+    await addFilter(tester, 'Place');
+    expect(find.text('Cafe'), findsWidgets); // the list is open
+    await tester.tapAt(const Offset(10, 10)); // dismiss the sheet
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FilterRow), findsNothing);
+    expect(services.listFilters.filters, isEmpty);
+  });
+
+  testWidgets('a date filter opens its calendar when added; cancelling '
+      'removes it', (tester) async {
+    await person('Alex', 'Cafe');
+    await showMatching(tester);
+
+    await addFilter(tester, 'Date range');
+    expect(find.byType(DateRangePickerDialog), findsOneWidget);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+
+    expect(services.listFilters.filters, isEmpty);
+  });
+
+  testWidgets('a chosen filter does not open again on a rebuild', (
+    tester,
+  ) async {
+    await person('Alex', 'Cafe');
+    await person('Sam', 'Park');
+    await showMatching(tester);
+    await addFilter(tester, 'Place');
+    await tester.tap(find.text('Park').last);
+    await tester.pumpAndSettle();
+
+    services.listFilters.sortBy(PersonSort.firstName); // rebuilds the bar
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(services.listFilters.added, isNull);
+    expect(find.text('Sam'), findsOneWidget);
+  });
+
+  testWidgets('a text filter takes the keyboard when added', (tester) async {
+    await person('Alex', 'Cafe');
+    await showMatching(tester);
+
+    await addFilter(tester, 'Name contains');
+
+    final field = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'Name contains'),
+    );
+    expect(field.autofocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
   });
 
   testWidgets('Clear all shows everyone; changing a filter ends the note', (

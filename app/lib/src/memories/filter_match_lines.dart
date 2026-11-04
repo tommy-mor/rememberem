@@ -2,33 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 /// Under a person on a filtered list, small lines saying why they match:
-/// for a date range, the details dated in it ("Anniversary · Wedding ·
-/// every 3 Jun (2010)") and the photos taken in it; for "Details contain",
-/// each matching detail with the words found in bold. At most [most]
-/// lines, then "+N more".
+/// for a date range, the details dated in it ("Wedding: 3 Jun 2010 - at
+/// the lake") and the photos taken in it; for "Details contain", each
+/// matching detail with the words found in bold. Each reads as on the
+/// person's card ([DetailSummary]), after its kind where that is not
+/// plain. Up to [most] lines show; more fold to [folded] and "+N more".
 class FilterMatchLines extends StatelessWidget {
   const FilterMatchLines({
     super.key,
     required this.memory,
     required this.filters,
+    required this.nameOf,
   });
 
   final Memory memory;
   final List<FilterCondition> filters;
 
-  static const most = 3;
+  /// The shown name of an active person (a relationship's), or null.
+  final String? Function(String id) nameOf;
+
+  static const most = 4;
+  static const folded = 3;
 
   /// The lines for [memory], as plain text with the spans to highlight.
   static List<({String text, List<(int, int)> bold})> linesFor(
     Memory memory,
     List<FilterCondition> filters,
+    String? Function(String id) nameOf,
   ) {
     final lines = <({String text, List<(int, int)> bold})>[];
     for (final filter in filters) {
       switch (filter) {
         case DateRangeFilter():
           for (final d in filter.detailsIn(memory)) {
-            lines.add((text: _dated(d), bold: const []));
+            lines.add((
+              text:
+                  DetailSummary.kindHead(d) + DetailSummary.lineFor(d, nameOf),
+              bold: const [],
+            ));
           }
           for (final e in filter.encountersIn(memory)) {
             final day = DetailPrompt.date(e.capturedAt.toLocal());
@@ -36,14 +47,9 @@ class FilterMatchLines extends StatelessWidget {
           }
         case DetailsFilter():
           for (final d in filter.detailsIn(memory)) {
-            // Only the type and the words are searched, so only they are
-            // highlighted, never the kind.
-            final head = '${d.kind.label} · ';
-            final label = _capitalised(d.label?.trim() ?? '');
-            final rest = [
-              label,
-              d.text.trim(),
-            ].where((s) => s.isNotEmpty).join(': ');
+            // The kind is never searched, so never highlighted.
+            final head = DetailSummary.kindHead(d);
+            final rest = DetailSummary.lineFor(d, nameOf);
             lines.add((
               text: '$head$rest',
               bold: [
@@ -59,29 +65,9 @@ class FilterMatchLines extends StatelessWidget {
     return lines;
   }
 
-  /// A dated detail: its kind, type and date. An anniversary says it
-  /// comes every year, so a match in another year makes sense.
-  static String _dated(Detail d) {
-    final label = _capitalised(d.label?.trim() ?? '');
-    final String when;
-    if (d.kind == DetailKind.anniversary && d.eventDate != null) {
-      final first = DetailPrompt.date(d.eventDate!);
-      final dayMonth = first.substring(0, first.lastIndexOf(' '));
-      when = 'every $dayMonth (${d.eventDate!.year})';
-    } else if (d.kind == DetailKind.happening) {
-      when = DetailPrompt.date(d.at.toLocal());
-    } else {
-      when = d.eventDate == null ? '' : DetailPrompt.date(d.eventDate!);
-    }
-    return [d.kind.label, label, when].where((s) => s.isNotEmpty).join(' · ');
-  }
-
-  static String _capitalised(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-
   @override
   Widget build(BuildContext context) {
-    final lines = linesFor(memory, filters);
+    final lines = linesFor(memory, filters, nameOf);
     if (lines.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final small = theme.textTheme.bodySmall;
@@ -92,7 +78,7 @@ class FilterMatchLines extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final line in lines.take(most))
+        for (final line in lines.take(lines.length > most ? folded : most))
           Text.rich(
             TextSpan(children: _spans(line.text, line.bold, bold)),
             style: small,
@@ -100,7 +86,7 @@ class FilterMatchLines extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         if (lines.length > most)
-          Text('+${lines.length - most} more', style: small),
+          Text('+${lines.length - folded} more', style: small),
       ],
     );
   }

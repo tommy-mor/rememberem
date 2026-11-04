@@ -118,7 +118,12 @@ class PlaceNoticeKeeper {
       spots: settings.value.placeSpots,
     ).groups;
     await fences.sync(
-      PlaceFence.select(groups, settings.value.radiusFor, most: most),
+      PlaceFence.select(
+        groups,
+        settings.value.radiusFor,
+        notifies: settings.value.notifies,
+        most: most,
+      ),
     );
   }
 

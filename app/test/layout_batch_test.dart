@@ -9,6 +9,7 @@ import 'package:rememberem/src/memories/crop_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import 'fakes/detail_finders.dart';
 import 'fakes/fake_dictation.dart';
 import 'fakes/fake_memory_repository.dart';
 import 'fakes/test_services.dart';
@@ -51,8 +52,8 @@ void main() {
       Detail(id: id, text: text, at: DateTime(2026), type: DetailKind.fact);
 
   group('detail box', () {
-    testWidgets('closed: one line with only an expander, its label on the '
-        'border even when empty', (tester) async {
+    testWidgets('closed: one line with only an expander and its summary, '
+        'even when little is entered', (tester) async {
       await withDetails([
         Detail(
           id: 'r',
@@ -65,16 +66,11 @@ void main() {
       await showCard(tester);
 
       const label = 'Relationship Boss';
-      expect(find.byTooltip('Open $label'), findsOneWidget);
-      expect(find.byTooltip('Speak Relationship'), findsNothing);
+      expect(openToggle(label), findsOneWidget);
+      expect(find.text('Boss'), findsOneWidget);
+      expect(find.byTooltip('Speak Description'), findsNothing);
       expect(find.byTooltip('Delete $label'), findsNothing);
-      final field = tester.widget<TextField>(
-        find.widgetWithText(TextField, 'Relationship'),
-      );
-      expect(
-        field.decoration!.floatingLabelBehavior,
-        FloatingLabelBehavior.always,
-      );
+      expect(find.byType(TextField, skipOffstage: false), findsNWidgets(3));
     });
 
     testWidgets('tapping into it opens it with mic and delete; tapping '
@@ -82,23 +78,40 @@ void main() {
       await withDetails([fact('a', 'Tall')]);
       await showCard(tester);
 
-      await tester.tap(find.widgetWithText(TextField, 'Tall'));
+      await tester.tap(find.text('Tall'));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Speak Fact'), findsOneWidget);
+      expect(find.byTooltip('Speak Description'), findsOneWidget);
       expect(find.byTooltip('Delete Fact'), findsOneWidget);
 
+      // Typing in it, then moving to another field, closes it.
+      await tester.tap(descriptionField());
+      await tester.pumpAndSettle();
       await tester.tapAt(
         tester.getCenter(find.widgetWithText(TextField, 'Meeting')),
       );
       await tester.pumpAndSettle();
       expect(find.byTooltip('Delete Fact'), findsNothing);
-      expect(find.byTooltip('Open Fact'), findsOneWidget);
+      expect(openToggle('Fact'), findsOneWidget);
+    });
+
+    testWidgets('opened with nothing focused, tapping another field still '
+        'closes it', (tester) async {
+      await withDetails([fact('a', 'Tall')]);
+      await showCard(tester);
+      await tester.tap(find.text('Tall'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Delete Fact'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextField, 'Meeting'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Delete Fact'), findsNothing);
     });
 
     testWidgets('the text selection toolbar does not close it', (tester) async {
       await withDetails([fact('a', 'Tall person')]);
       await showCard(tester);
-      await tester.tap(find.byTooltip('Open Fact'));
+      await tester.tap(openToggle('Fact'));
       await tester.pumpAndSettle();
 
       await tester.longPress(find.widgetWithText(TextField, 'Tall person'));
@@ -113,9 +126,9 @@ void main() {
     testWidgets('stays open while dictating', (tester) async {
       await withDetails([fact('a', 'Tall')]);
       await showCard(tester);
-      await tester.tap(find.byTooltip('Open Fact'));
+      await tester.tap(openToggle('Fact'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Speak Fact'));
+      await tester.tap(find.byTooltip('Speak Description'));
       await tester.pump();
 
       await tester.tapAt(
@@ -145,7 +158,7 @@ void main() {
         ),
       ]);
       await showCard(tester);
-      await tester.tap(find.byTooltip('Open Happening · 3 May 2026'));
+      await tester.tap(openToggle('Happening 3 May 2026'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('When it happened'));
@@ -153,7 +166,7 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      expect(find.byTooltip('Delete Happening · 3 May 2026'), findsOneWidget);
+      expect(find.byTooltip('Delete Happening 3 May 2026'), findsOneWidget);
     });
   });
 
@@ -175,7 +188,7 @@ void main() {
       ),
     ]);
     await showCard(tester);
-    await tester.tap(find.byTooltip('Open Relationship'));
+    await tester.tap(openToggle('Relationship'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -231,9 +244,9 @@ void main() {
         ),
       ]);
       await showCard(tester);
-      await tester.tap(find.byTooltip('Open Happening · 3 May 2026'));
+      await tester.tap(openToggle('Happening 3 May 2026'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Choose place'));
+      await tester.tap(find.text('+ place'));
       await tester.pumpAndSettle();
     }
 
@@ -248,7 +261,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.stored[memory.id]!.details.single.place, 'Cafe');
-      expect(find.text('Happening · 3 May 2026 · Cafe'), findsOneWidget);
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+      await tester.pumpAndSettle();
+      expect(find.text('3 May 2026 · Cafe - Picnic'), findsOneWidget);
     });
 
     testWidgets('a spot is named by Fred, starting from the known place '

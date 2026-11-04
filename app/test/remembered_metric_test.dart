@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
+import 'package:rememberem/src/settings/app_settings_controller.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem/src/memories/progress_badge.dart';
@@ -77,6 +78,10 @@ void main() {
             ),
             dictation: FakeDictation(),
             location: DeviceLocation(),
+            // Set, not the default, so these tests keep their meaning.
+            settings: AppSettingsController(
+              const AppSettings(rememberedThreshold: 5),
+            ),
           ),
           routeObserver: observer,
           onMeetSomeone: () {},

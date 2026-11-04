@@ -89,6 +89,18 @@ void main() {
   Finder inList(String name) =>
       find.descendant(of: find.byType(PlaceRow), matching: find.text(name));
 
+  /// The list row's name box for [name] (not the map label).
+  Finder rowOf(String name) => find.descendant(
+    of: find.byType(PlaceRow),
+    matching: find.widgetWithText(TextField, name),
+  );
+
+  /// Shows the people met at [place] with its expander.
+  Future<void> expand(WidgetTester tester, String place) async {
+    await tester.tap(find.byTooltip('Show the people met at $place'));
+    await tester.pumpAndSettle();
+  }
+
   /// Types [to] into the name of the place called [from] and presses Done.
   Future<void> renameInList(WidgetTester tester, String from, String to) async {
     await tester.enterText(
@@ -105,7 +117,7 @@ void main() {
   setUp(() => repository = FakeMemoryRepository());
 
   testWidgets(
-    'lists named places and unknown ones; a row tap shows its people',
+    'lists named places and unknown ones; only the expander shows people',
     (tester) async {
       await person('Alex', 'Cafe', north(0));
       await person('Sam', 'Cafe', north(0.01));
@@ -116,8 +128,12 @@ void main() {
       expect(find.text('unknown'), findsWidgets);
       expect(find.text('Alex'), findsNothing);
 
+      // Tapping the row selects it but does not show its people.
       await tester.tap(find.textContaining('2 people'));
       await tester.pumpAndSettle();
+      expect(inList('Alex'), findsNothing);
+
+      await expand(tester, 'Cafe');
 
       expect(inList('Alex'), findsOneWidget);
       expect(inList('Sam'), findsOneWidget);
@@ -132,6 +148,21 @@ void main() {
 
     await tapMarker(tester, 'Park');
 
+    // Selected, not expanded.
+    expect(inList('Kim'), findsNothing);
+    final row = tester.widget<PlaceRow>(
+      find.ancestor(of: rowOf('Park'), matching: find.byType(PlaceRow)),
+    );
+    expect(row.selected, isTrue);
+    expect(
+      tester
+          .widget<PlaceRow>(
+            find.ancestor(of: rowOf('Cafe'), matching: find.byType(PlaceRow)),
+          )
+          .selected,
+      isFalse,
+    );
+    await expand(tester, 'Park');
     expect(inList('Kim'), findsOneWidget);
     expect(find.text('Alex'), findsNothing);
   });
@@ -194,7 +225,27 @@ void main() {
 
     await tapMarker(tester, 'Place 29');
 
-    expect(inList('P29').hitTestable(), findsOneWidget);
+    expect(rowOf('Place 29').hitTestable(), findsOneWidget);
+    await expand(tester, 'Place 29');
+    expect(inList('P29'), findsOneWidget);
+  });
+
+  testWidgets('with an expanded row above, the last place still comes into '
+      'view', (tester) async {
+    for (var i = 0; i < 30; i++) {
+      await person(
+        'P$i',
+        'Place ${i.toString().padLeft(2, '0')}',
+        north(i * 1.0),
+      );
+    }
+    await showPlaces(tester);
+    await expand(tester, 'Place 00');
+    expect(inList('P0'), findsOneWidget);
+
+    await tapMarker(tester, 'Place 29');
+
+    expect(rowOf('Place 29').hitTestable(), findsOneWidget);
   });
 
   testWidgets('the main list has a Places entry that opens the page', (
@@ -268,6 +319,8 @@ void main() {
     await showPlaces(tester);
     await tester.tap(inList('unknown'));
     await tester.pumpAndSettle();
+    expect(inList('Kim'), findsNothing); // a tap alone shows no one
+    await expand(tester, 'unknown');
     expect(inList('Kim'), findsOneWidget);
 
     await tester.enterText(
@@ -329,7 +382,7 @@ void main() {
 
     await tapMarker(tester, 'Place 29');
 
-    expect(inList('P29').hitTestable(), findsOneWidget);
+    expect(rowOf('Place 29').hitTestable(), findsOneWidget);
   });
 
   testWidgets('a selected place lists its people with photos, only in the '
@@ -339,6 +392,8 @@ void main() {
     await showPlaces(tester);
 
     await tapMarker(tester, 'Cafe');
+    expect(find.widgetWithText(ActionChip, 'Alex'), findsNothing);
+    await expand(tester, 'Cafe');
     expect(find.widgetWithText(ActionChip, 'Alex'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(ActionChip, 'Alex'));

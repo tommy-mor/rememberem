@@ -13,12 +13,20 @@ class FakeDictation implements Dictation {
 
   bool get isListening => _onDone != null;
 
+  /// How many times [stop] was called.
+  int stops = 0;
+
+  /// How many sessions [listen] started over one still listening; the
+  /// real recogniser cannot, so callers must [stop] first.
+  int startedOverLive = 0;
+
   @override
   Future<bool> listen({
     required void Function(String words) onWords,
     required void Function() onDone,
     void Function()? onNoSpeechPack,
   }) async {
+    if (isListening) startedOverLive++;
     goQuiet();
     if (!available) {
       onDone();
@@ -32,7 +40,10 @@ class FakeDictation implements Dictation {
   }
 
   @override
-  Future<void> stop() async => goQuiet();
+  Future<void> stop() async {
+    stops++;
+    goQuiet();
+  }
 
   void say(String words) => _onWords!(words);
 

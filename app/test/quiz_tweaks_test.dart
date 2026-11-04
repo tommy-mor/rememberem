@@ -302,7 +302,7 @@ void main() {
         await tester.pump(Duration.zero);
         await tester.pump();
       }
-      expect(find.textContaining('Done: 4 of 4'), findsOneWidget);
+      expect(find.textContaining('4 of 4 right first try'), findsOneWidget);
     });
 
     testWidgets('details: the dialog counts their details, and a pool '

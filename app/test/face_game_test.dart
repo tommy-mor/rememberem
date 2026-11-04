@@ -120,8 +120,10 @@ void main() {
     expect(find.text(nameOf(person)), findsOneWidget);
   });
 
-  testWidgets('with a screen reader the names wait for Show names, and '
-      'each answer is shown as well as said', (tester) async {
+  testWidgets('with any accessibility service on (Flutter then reports '
+      'accessible navigation), Show names still presses itself', (
+    tester,
+  ) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(accessibleNavigation: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
@@ -129,8 +131,16 @@ void main() {
     await showGame(tester);
     final person = showing(tester);
 
-    await tester.pump(const Duration(seconds: 10));
-    expect(find.text(nameOf(person)), findsNothing);
+    await reveal(tester);
+
+    expect(find.text(nameOf(person)), findsOneWidget);
+  });
+
+  testWidgets('Show names can be tapped before it runs out, and each '
+      'answer is shown as well as said', (tester) async {
+    await people(['Ann', 'Bo', 'Cy', 'Di']);
+    await showGame(tester);
+    final person = showing(tester);
 
     await tester.tap(find.text('Show names'));
     await tester.pump();
@@ -144,23 +154,6 @@ void main() {
     ].firstWhere((n) => n != nameOf(person));
     await pick(tester, other);
     expect(find.text('Not $other.'), findsOneWidget);
-  });
-
-  testWidgets('turning the screen reader off mid-reveal starts the countdown', (
-    tester,
-  ) async {
-    tester.platformDispatcher.accessibilityFeaturesTestValue =
-        const FakeAccessibilityFeatures(accessibleNavigation: true);
-    await people(['Ann', 'Bo', 'Cy', 'Di']);
-    await showGame(tester);
-    final person = showing(tester);
-
-    tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
-    await tester.pump();
-    expect(find.text('Show names'), findsOneWidget);
-    await reveal(tester);
-
-    expect(find.text(nameOf(person)), findsOneWidget);
   });
 
   testWidgets('first try right adds a point and stamps the time', (
@@ -245,7 +238,7 @@ void main() {
     }
 
     expect(asked.toSet(), hasLength(5));
-    expect(find.text('Done: 5 of 5 right first try.'), findsOneWidget);
+    expect(find.text('5 of 5 right first try'), findsOneWidget);
     expect(repository.answers, hasLength(5));
   });
 
@@ -261,7 +254,7 @@ void main() {
       await pick(tester, nameOf(showing(tester)));
     }
 
-    expect(find.text('Done: 5 of 5 right first try.'), findsOneWidget);
+    expect(find.text('5 of 5 right first try'), findsOneWidget);
   });
 
   testWidgets('right: a chime, then a one-second pause; wrong: a nope', (
@@ -304,7 +297,11 @@ void main() {
       await pick(tester, nameOf(person));
     }
 
-    expect(find.text('Done: 0 of 2 right first try.'), findsOneWidget);
+    // Right answers, but no points were saved: nothing became
+    // remembered.
+    expect(find.text('2 of 2 right first try'), findsOneWidget);
+    expect(find.textContaining('You remember'), findsNothing);
+    expect(find.byIcon(Icons.star), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

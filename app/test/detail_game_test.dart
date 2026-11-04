@@ -200,9 +200,8 @@ void main() {
     expect(repository.stored[person.id]!.details.single.points, 0);
   });
 
-  testWidgets('with a screen reader the cards wait for Show people', (
-    tester,
-  ) async {
+  testWidgets('with accessible navigation reported, Show people still '
+      'presses itself', (tester) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(accessibleNavigation: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
@@ -210,11 +209,7 @@ void main() {
     await showGame(tester);
     final person = subject(tester);
 
-    await tester.pump(const Duration(seconds: 10));
-    expect(card(person), findsNothing);
-
-    await tester.tap(find.text('Show people'));
-    await tester.pump();
+    await reveal(tester);
     expect(card(person), findsOneWidget);
   });
 
@@ -276,7 +271,7 @@ void main() {
     }
 
     expect(asked, hasLength(5));
-    expect(find.text('Done: 0 of 5 right first try.'), findsOneWidget);
+    expect(find.text('5 of 5 right first try'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

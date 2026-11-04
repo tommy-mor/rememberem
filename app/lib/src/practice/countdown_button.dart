@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// A button whose background fills from left to right over [duration] and
-/// presses itself when full. A tap presses it at once. While [running] is
-/// false (a screen reader is on, or the app is hidden) it stands empty and
+/// A button whose background fills from left to right over [duration],
+/// like a progress bar, and presses itself when full. A tap presses it at
+/// once. While [running] is false (the app is hidden) it stands empty and
 /// waits; when it runs again it starts from empty. It presses once only.
 class CountdownButton extends StatefulWidget {
   const CountdownButton({
@@ -113,14 +113,14 @@ class _CountdownButtonState extends State<CountdownButton>
               Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _fill,
-                  // A faint fill, and a solid bar along the bottom edge that
-                  // stays visible whatever colour Fred chose.
+                  // A solid fill, and a bar along the bottom edge that stays
+                  // visible whatever colour Fred chose.
                   builder: (context, _) => FractionallySizedBox(
                     alignment: AlignmentDirectional.centerStart,
                     widthFactor: _fill.value,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: scheme.primary.withAlpha(50),
+                        color: scheme.primaryContainer,
                         border: Border(
                           bottom: BorderSide(color: scheme.primary, width: 4),
                         ),

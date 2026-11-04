@@ -17,8 +17,14 @@ class ListFilters extends ChangeNotifier {
   String? _note;
   PeopleOrder _order = const PeopleOrder();
 
-  /// The filter just added, whose text field takes the keyboard.
+  /// The filter just added, which goes straight to being filled in.
   int? added;
+
+  /// The row for filter [id] has opened itself; a later rebuild (or a
+  /// return to the list) must not open it again. Changes nothing shown.
+  void consumeAdded(int id) {
+    if (added == id) added = null;
+  }
 
   List<ListFilter> get filters => List.unmodifiable(_filters);
   String? get note => _note;

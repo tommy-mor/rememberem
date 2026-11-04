@@ -6,6 +6,8 @@ import '../settings/app_settings_controller.dart';
 import 'countdown_button.dart';
 import 'game_feedback.dart';
 import 'mute_button.dart';
+import 'quiz_result.dart';
+import 'quiz_results_view.dart';
 
 enum _Phase { loading, reveal, choose, finished, stopped }
 
@@ -62,12 +64,17 @@ class _FaceGameScreenState extends State<FaceGameScreen>
   /// fewer when there are fewer people.
   int? _total;
   final Set<String> _asked = {};
-  int _rightFirstTry = 0;
   Memory? _person;
   List<String> _choices = [];
   final Set<String> _wrong = {};
   bool _missed = false;
+
+  /// Whether this turn's miss was saved (it reset the points).
+  bool _missSaved = false;
   bool _writing = false;
+
+  /// One per finished turn, for the results.
+  final List<QuizResult> _results = [];
 
   /// Set from a right answer until the next turn shows, so a second tap
   /// cannot score again or skip a turn.
@@ -161,16 +168,13 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       _choices = planner.choicesFor(person, eligible);
       _wrong.clear();
       _missed = false;
+      _missSaved = false;
       _advancing = false;
       _correct = null;
       _said = null;
       _phase = widget.showDelay ? _Phase.reveal : _Phase.choose;
     });
   }
-
-  /// With a screen reader on, Show does not count down; it waits for a
-  /// tap, so the prompt is never cut off mid-sentence.
-  bool get _paced => MediaQuery.accessibleNavigationOf(context);
 
   void _showChoices() {
     if (_live && _phase == _Phase.reveal) {
@@ -202,7 +206,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       });
       if (_missed) return; // one reset per turn is enough
       _missed = true;
-      await _record(person, correctFirstTry: false);
+      _missSaved = await _record(person, correctFirstTry: false);
       return;
     }
     widget.feedback?.right();
@@ -212,9 +216,16 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       _said = 'Right: $name.';
     });
     final pause = Future<void>.delayed(widget.pauseAfterRight);
-    if (!_missed && await _record(person, correctFirstTry: true)) {
-      _rightFirstTry++;
-    }
+    final saved = _missed
+        ? _missSaved
+        : await _record(person, correctFirstTry: true);
+    _results.add(
+      QuizResult.answered(
+        person: person,
+        rightFirstTry: !_missed,
+        saved: saved,
+      ),
+    );
     await pause;
     if (_live) await _nextTurn();
   }
@@ -261,9 +272,14 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       case _Phase.loading:
         return const Center(child: CircularProgressIndicator());
       case _Phase.finished:
-        return _message(
-          context,
-          'Done: $_rightFirstTry of $_turns right first try.',
+        return QuizResultsView(
+          results: _results,
+          threshold:
+              widget.settings?.value.rememberedThreshold ??
+              RememberedCount.defaultThreshold,
+          photoOf: (r) => widget.repository.photoFile(r.person),
+          feedback: widget.feedback,
+          onDone: () => Navigator.of(context).maybePop(),
         );
       case _Phase.stopped:
         return _message(context, _stopReason);
@@ -309,7 +325,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
               key: ValueKey(_turn),
               label: 'Show names',
               duration: widget.reveal,
-              running: !_paced && !_hidden,
+              running: !_hidden,
               onPressed: _showChoices,
             ),
           ] else ...[

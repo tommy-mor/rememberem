@@ -65,6 +65,61 @@ void main() {
     });
   });
 
+  test('a second mic while the first listens ends the first, with its '
+      'last words, before the second starts', () async {
+    final sounds = _FakeSounds();
+    final inner = FakeDictation();
+    final dictation = CuedDictation(inner, sounds, settle: Duration.zero);
+    final first = <String>[];
+    final second = <String>[];
+    final events = <String>[];
+
+    await dictation.listen(
+      onWords: first.add,
+      onDone: () => events.add('first done'),
+    );
+    inner.say('Ann likes');
+    await dictation.listen(
+      onWords: second.add,
+      onDone: () => events.add('second done'),
+    );
+    inner.say('jazz');
+
+    expect(first, ['Ann likes']);
+    expect(second, ['jazz']);
+    expect(events, ['first done']);
+    // The first was stopped, not started over (the recogniser can't).
+    expect(inner.stops, 1);
+    expect(inner.startedOverLive, 0);
+    expect(sounds.played, [
+      AppSound.listenStart,
+      AppSound.listenStop,
+      AppSound.listenStart,
+    ]);
+    expect(inner.isListening, isTrue);
+  });
+
+  test('three mics tapped quickly leave only the last one listening, and '
+      'each earlier one ends once', () async {
+    final sounds = _FakeSounds();
+    final inner = FakeDictation();
+    final dictation = CuedDictation(inner, sounds, settle: Duration.zero);
+    final done = <String>[];
+    final third = <String>[];
+
+    await dictation.listen(onWords: (_) {}, onDone: () => done.add('a'));
+    final b = dictation.listen(onWords: (_) {}, onDone: () => done.add('b'));
+    final c = dictation.listen(onWords: third.add, onDone: () => done.add('c'));
+    await b;
+    await c;
+    inner.say('Bo');
+
+    expect(done, ['a', 'b']);
+    expect(third, ['Bo']);
+    expect(inner.startedOverLive, 0);
+    expect(inner.isListening, isTrue);
+  });
+
   test(
     'a listen replaced during its start ding ends without a stop ding',
     () async {

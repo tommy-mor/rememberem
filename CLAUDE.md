@@ -155,9 +155,12 @@ has already been tried and fallen short.
   metres, keyed by its trimmed name; a rename carries it), `placeSpots`
   (where Fred moved a named place on the Places map, keyed the same way;
   photos keep their own GPS, and the place is drawn and matched at its
-  spot), and
+  spot), `placeNotify` (Fred's Notify box per place, keyed the same way;
+  missing: on, except home, work and church; a rename carries it), and
   `metricUnits` (missing: by the phone's region; feet and miles in the US,
   Liberia, Myanmar and the UK).
+- `rememberedThreshold` defaults to 10 (range 3–20); a stored value is
+  kept.
 - Anniversary notices are scheduled 30 days ahead on each sync (app open,
   resume, back to the list), ids 100–129, at 09:00 on each day whose next
   week holds an anniversary. They name who (`AnniversaryNotice.textFor`:
@@ -172,7 +175,8 @@ has already been tried and fallen short.
 - Place notices (`ReminderSettings.places`, off by default and never on
   without the `PlaceNoticeConsent` page) watch the named places with the
   phone's geofencing (`native_geofence`, behind `PlaceFences`), at least
-  100 m, the 90 newest. Fences carry only an opaque id
+  100 m, the 90 newest of those whose Notify box is ticked (arrival
+  checks the box again). Fences carry only an opaque id
   (`PlaceNotice.fenceId`, a hash of the name), so no name reaches the
   plugin's store or logs. On arrival (Android: a 3-minute stay; iOS:
   entering), `placeArrived` runs in the background, builds what it needs

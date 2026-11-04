@@ -25,19 +25,28 @@ class CuedDictation implements Dictation {
   /// session replaced by a newer [listen] ends silently.
   int? _stopped;
 
+  /// The session the recogniser is listening for, until it ends; null
+  /// when none is (a session still in its start ding is not live).
+  int? _live;
+
   @override
   Future<bool> listen({
     required void Function(String words) onWords,
     required void Function() onDone,
     void Function()? onNoSpeechPack,
   }) async {
+    // The newest tap wins, so the session is claimed before any wait.
     final session = ++_session;
+    // Another field's mic is still on: end it first, so its last words
+    // land there, then start this one.
+    if (_live != null) await _inner.stop();
     await _sounds.play(AppSound.listenStart);
     await Future<void>.delayed(settle);
     var ended = false;
     void end({bool ding = true}) {
       if (ended) return;
       ended = true;
+      if (_live == session) _live = null;
       if (ding) _sounds.play(AppSound.listenStop).ignore();
       onDone();
     }
@@ -47,6 +56,7 @@ class CuedDictation implements Dictation {
       end(ding: _stopped == session);
       return true;
     }
+    _live = session;
     return _inner.listen(
       onWords: onWords,
       onDone: end,

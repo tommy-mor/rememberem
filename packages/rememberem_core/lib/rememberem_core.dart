@@ -10,6 +10,7 @@ export 'src/distance.dart';
 export 'src/details_filter.dart';
 export 'src/detail_kind.dart';
 export 'src/detail_prompt.dart';
+export 'src/detail_summary.dart';
 export 'src/detail_type_catalog.dart';
 export 'src/detail_quiz_planner.dart';
 export 'src/app_palette.dart';

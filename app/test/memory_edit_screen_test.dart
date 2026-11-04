@@ -1,9 +1,11 @@
+import 'package:rememberem/src/memories/detail_list_editor.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/speech/dictated_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import 'fakes/detail_finders.dart';
 import 'fakes/fake_dictation.dart';
 import 'fakes/fake_memory_repository.dart';
 import 'fakes/test_services.dart';
@@ -42,21 +44,17 @@ void main() {
 
   /// Adds an empty row of [kind] on the card.
   Future<void> addRow(WidgetTester tester, String kind) async {
-    await tester.ensureVisible(find.text('+ $kind'));
-    await tester.tap(find.text('+ $kind'));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(addDetailButtonNamed(kind));
+    await tester.tap(addDetailButtonNamed(kind));
+    // Not pumpAndSettle: a dateless anniversary's "+ date" pulses for ever.
+    await tester.pump(const Duration(milliseconds: 500));
   }
 
-  /// The detail row whose label starts with [kind] (its data follows).
-  Finder rowField(String kind) => find.byWidgetPredicate(
-    (w) => w is TextField && (w.decoration?.labelText ?? '').startsWith(kind),
-  );
-
-  /// Opens the detail row labelled [label] with its expander.
+  /// Opens the detail card named [label] with its expander.
   Future<void> openRow(WidgetTester tester, String label) async {
-    await tester.ensureVisible(find.byTooltip('Open $label'));
-    await tester.tap(find.byTooltip('Open $label'));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(openToggle(label));
+    await tester.tap(openToggle(label));
+    await tester.pump(const Duration(milliseconds: 500));
   }
 
   Future<Memory> named(String name) async {
@@ -107,9 +105,11 @@ void main() {
       'anniversary',
       'tag',
     ]) {
-      expect(find.text('+ $kind'), findsOneWidget);
+      expect(addDetailButtonNamed(kind), findsOneWidget);
     }
-    expect(find.textContaining('Fact'), findsNothing);
+    // No detail card, so nothing to open.
+    expect(find.byIcon(Icons.expand_more), findsNothing);
+    expect(find.text(DetailListEditor.nothingYet), findsNothing);
     expect(find.textContaining('47.61, -122.33'), findsOneWidget);
   });
 
@@ -229,9 +229,9 @@ void main() {
     await showScreen(tester);
 
     await addRow(tester, 'fact');
-    // The new row has the keyboard, and the screen did not change.
+    // The new card is open, and the screen did not change.
     expect(find.byType(MemoryEditScreen), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextField, 'Fact'), 'Tall');
+    await tester.enterText(descriptionField(), 'Tall');
     await tester.pumpWidget(const SizedBox());
 
     final fact = saved().details.single;
@@ -242,7 +242,7 @@ void main() {
     await showScreen(tester);
 
     await addRow(tester, 'fact');
-    await speakInto(tester, 'Fact', 'Sings in the choir');
+    await speakInto(tester, 'Description', 'Sings in the choir');
     await tester.pump(const Duration(seconds: 1));
 
     expect(saved().details.single.text, 'Sings in the choir');
@@ -269,7 +269,7 @@ void main() {
     await showScreen(tester, here: const GeoPoint(47.0, -122.0));
 
     await addRow(tester, 'happening');
-    await tester.enterText(rowField('Happening'), 'Picnic');
+    await tester.enterText(descriptionField(), 'Picnic');
     await tester.pump(const Duration(seconds: 1));
 
     final happening = saved().details.single;
@@ -278,7 +278,9 @@ void main() {
       [DetailKind.happening, 'Park', 'Picnic'],
     );
     expect(find.text('Park'), findsOneWidget);
-    expect(find.textContaining('· Park'), findsOneWidget);
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('· Park - Picnic'), findsOneWidget);
   });
 
   testWidgets('a happening left empty is not saved, even once its place '
@@ -298,30 +300,68 @@ void main() {
     expect(saved().details, isEmpty);
   });
 
-  testWidgets('emptying the custom type box keeps the chosen type', (
-    tester,
-  ) async {
+  /// Makes a type through the New chip's dialog.
+  Future<void> newType(WidgetTester tester, String tip, String name) async {
+    await tester.tap(find.byTooltip(tip));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Name').last, name);
+    await tester.pump();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('the New chip asks for a name: Add chooses it, Cancel changes '
+      'nothing, and a name already listed chooses that one', (tester) async {
     await named('Jill');
     await showScreen(tester);
     await addRow(tester, 'relationship');
     await tester.tap(find.text('boss'));
     await tester.pumpAndSettle();
-    final custom = find.widgetWithText(
-      TextField,
-      'Create a custom relationship type',
+
+    // Cancel keeps the chosen type.
+    await tester.tap(find.byTooltip('New relationship type'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name').last,
+      'cousin',
     );
-
-    await tester.enterText(custom, 'b');
-    await tester.pump();
-    await tester.enterText(custom, '');
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(saved().details.single.label, 'b');
-    await tester.tap(find.text('boss'));
-    await tester.pump(const Duration(seconds: 1));
-    await tester.enterText(custom, '');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 1));
     expect(saved().details.single.label, 'boss');
+    expect(find.widgetWithText(ChoiceChip, 'cousin'), findsNothing);
+
+    // A blank name cannot be added.
+    await tester.tap(find.byTooltip('New relationship type'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Name').last, '  ');
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Add'))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Add makes a new chip and chooses it.
+    await newType(tester, 'New relationship type', 'cousin');
+    await tester.pump(const Duration(seconds: 1));
+    expect(saved().details.single.label, 'cousin');
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'cousin'))
+          .selected,
+      isTrue,
+    );
+
+    // A name matching a listed chip (by normalised key) chooses that chip.
+    await newType(tester, 'New relationship type', ' Boss ');
+    await tester.pump(const Duration(seconds: 1));
+    expect(saved().details.single.label, 'boss');
+    expect(find.widgetWithText(ChoiceChip, 'boss'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Boss'), findsNothing);
   });
 
   testWidgets('a relationship asks Who first, shows faces, and is kept '
@@ -331,11 +371,8 @@ void main() {
 
     await addRow(tester, 'relationship');
     final who = find.byType(DropdownButtonFormField<String>);
-    final custom = find.widgetWithText(
-      TextField,
-      'Create a custom relationship type',
-    );
-    expect(tester.getTopLeft(who).dy, lessThan(tester.getTopLeft(custom).dy));
+    final newChip = find.byType(ActionChip);
+    expect(tester.getTopLeft(who).dy, lessThan(tester.getTopLeft(newChip).dy));
     await tester.tap(who);
     await tester.pumpAndSettle();
     expect(
@@ -374,14 +411,14 @@ void main() {
     await repository.save(memory);
     await showScreen(tester);
     await tester.pump();
-    expect(find.text('Boss: Jill - '), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Relationship'), findsOneWidget);
+    expect(find.text('Boss: Jill - Since 2020'), findsOneWidget);
+    expect(openToggle('Relationship Boss Jill'), findsOneWidget);
 
     await repository.save(jill.withField('name', 'Jillian'));
     await tester.pumpWidget(const SizedBox());
     await showScreen(tester);
     await tester.pump();
-    expect(find.text('Boss: Jillian - '), findsOneWidget);
+    expect(find.text('Boss: Jillian - Since 2020'), findsOneWidget);
   });
 
   testWidgets('a relationship to someone in the trash reads "someone '
@@ -403,8 +440,8 @@ void main() {
     await tester.pump();
 
     const label = 'Relationship Boss someone removed';
-    expect(find.text('Boss: someone removed - '), findsOneWidget);
-    await tester.tap(find.byTooltip('Open $label'));
+    expect(find.text('Boss: someone removed - Kind'), findsOneWidget);
+    await tester.tap(openToggle(label));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -413,7 +450,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().details.single.targetId, bo.id);
-    expect(find.text('Boss: Bo - '), findsOneWidget);
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+    await tester.pumpAndSettle();
+    expect(find.text('Boss: Bo - Kind'), findsOneWidget);
   });
 
   testWidgets('a custom anniversary type is offered while it is in use', (
@@ -422,14 +461,23 @@ void main() {
     await showScreen(tester);
 
     await addRow(tester, 'anniversary');
+    await tester.tap(find.byTooltip('New anniversary type'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.enterText(
-      find.widgetWithText(TextField, 'Create a custom anniversary type'),
+      find.widgetWithText(TextField, 'Name').last,
       'Baptism',
     );
-    await tester.tap(find.text('Choose the first date'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.tap(find.text('Add'));
+    await tester.pump(const Duration(milliseconds: 500));
+    // "+ date" pulses for ever: pump, never settle.
+    await tester.tap(find.text('+ date'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
     final a = saved().details.single;
     expect([a.kind, a.label], [DetailKind.anniversary, 'Baptism']);
     expect(a.eventDate, isNotNull);
@@ -454,7 +502,7 @@ void main() {
     await showScreen(tester);
 
     expect(find.text('Likes hiking'), findsOneWidget);
-    expect(find.text('Fact'), findsOneWidget);
+    expect(openToggle('Fact'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
 
     expect(repository.saves, isEmpty);
@@ -484,7 +532,9 @@ void main() {
       expect(crop.center.dy, greaterThan(photo.center.dy));
       expect(find.text('Crop'), findsNothing); // an icon only
 
-      final merge = tester.getRect(find.text('Merge with existing person record'));
+      final merge = tester.getRect(
+        find.text('Merge with existing person record'),
+      );
       final clock = tester.getRect(find.byTooltip('Change date and time'));
       final pin = tester.getRect(find.byTooltip('Change location'));
       for (final r in [merge, clock, pin]) {
@@ -494,7 +544,9 @@ void main() {
       expect(merge.top, lessThan(clock.top));
       expect(clock.top, lessThan(pin.top));
       expect(
-        tester.widget<Text>(find.text('Merge with existing person record')).style,
+        tester
+            .widget<Text>(find.text('Merge with existing person record'))
+            .style,
         isNull, // sized by the button's own text style (60 %)
       );
     },
@@ -520,6 +572,10 @@ void main() {
         ),
       );
       await tester.pump();
+      // The second time, the card is still open.
+      if (openToggle('Fact').evaluate().isNotEmpty) {
+        await openRow(tester, 'Fact');
+      }
       final field = tester.element(
         find.byWidgetPredicate(
           (w) => w is EditableText && w.controller.text == 'From Seattle',
@@ -585,7 +641,8 @@ void main() {
     ) async {
       await showRelated(tester);
 
-      expect(find.text('Relationships'), findsOneWidget);
+      // Once for the details' heading, once for this list of people.
+      expect(find.text('Relationships'), findsNWidgets(2));
       expect(find.widgetWithText(ListTile, 'Boss'), findsOneWidget);
       expect(
         find.widgetWithText(ListTile, 'Bo is their brother'),
@@ -657,26 +714,35 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('each row is one field labelled with its kind and data', (
+    testWidgets('each detail is a closed card with its kind and data', (
       tester,
     ) async {
       await showWithDetails(tester);
 
-      expect(find.widgetWithText(TextField, 'Fact'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Relationship'), findsOneWidget);
-      expect(find.text('Boss: Jill - '), findsOneWidget);
-      expect(find.text('Description'), findsNothing);
+      expect(find.text('From Seattle'), findsOneWidget);
+      expect(find.text('Boss: Jill - Sings'), findsOneWidget);
+      expect(openToggle('Fact'), findsOneWidget);
+      expect(openToggle(relLabel), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(DetailListEditor),
+          matching: find.byType(DictatedTextField),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('changing the type in place keeps the score', (tester) async {
       await showWithDetails(tester);
 
-      await tester.tap(find.byTooltip('Open $relLabel'));
+      await tester.tap(openToggle(relLabel));
       await tester.pumpAndSettle();
       await tester.tap(find.text('friend'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Friend: Jill - '), findsOneWidget);
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less).last);
+      await tester.pumpAndSettle();
+      expect(find.text('Friend: Jill - Sings'), findsOneWidget);
       final b = repository.saves.last.details.last;
       expect([b.id, b.label, b.text, b.points], ['b', 'friend', 'Sings', 3]);
     });
@@ -698,10 +764,9 @@ void main() {
       expect(find.text('From Seattle'), findsOneWidget);
       expect(repository.saves.last.details.map((d) => d.id), ['a', 'b']);
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'From Seattle'),
-        'From Tacoma',
-      );
+      // Back it comes closed; open it and edit.
+      await openRow(tester, 'Fact');
+      await tester.enterText(descriptionField(), 'From Tacoma');
       await tester.pump(const Duration(seconds: 1));
       expect(repository.saves.last.details.first.text, 'From Tacoma');
     });
@@ -712,7 +777,7 @@ void main() {
       await showWithDetails(tester);
 
       await openRow(tester, 'Fact');
-      await tester.tap(find.byTooltip('Speak Fact'));
+      await tester.tap(find.byTooltip('Speak Description'));
       await tester.pump();
       await tester.tap(find.byTooltip('Delete Fact'));
       await tester.pump();
@@ -748,7 +813,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Open Fact').first);
+      await tester.tap(openToggle('Fact').first);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Delete Fact').first);
       await tester.pump();

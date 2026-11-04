@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import 'edit_history.dart';
+
 /// Holds a memory being edited and saves every change shortly after it is
-/// made, so nothing needs a Save button.
-class MemoryEditor {
+/// made, so nothing needs a Save button. Changes to the fields and details
+/// can be undone and redone; listeners hear when that becomes possible.
+class MemoryEditor extends ChangeNotifier {
   MemoryEditor(
     this._repository,
     this._memory, {
@@ -28,12 +32,58 @@ class MemoryEditor {
   /// While closed (during a merge) every change and save is ignored.
   bool _closed = false;
 
+  final EditHistory _history = EditHistory();
+
+  bool get canUndo => _history.canUndo;
+  bool get canRedo => _history.canRedo;
+
+  CardState get _state => (
+    fields: {for (final f in MemoryField.values) f.key: _memory.field(f)},
+    details: _memory.details,
+  );
+
+  /// Notes the state before a change, for Undo.
+  void _record({String? key}) {
+    final could = (canUndo, canRedo);
+    _history.record(_state, key: key);
+    if ((canUndo, canRedo) != could) notifyListeners();
+  }
+
+  /// Puts back the fields and details before the last change, and saves.
+  /// Pictures, the contact and practice scores are never touched.
+  void undo() => _restore(_history.undo(_state));
+
+  /// Puts back what [undo] took away, and saves.
+  void redo() => _restore(_history.redo(_state));
+
+  /// Forgets every Undo step, e.g. on going to another page.
+  void clearHistory() {
+    if (!canUndo && !canRedo) return;
+    _history.clear();
+    notifyListeners();
+  }
+
+  void _restore(CardState? state) {
+    if (_closed || state == null) return;
+    var memory = _memory;
+    for (final MapEntry(:key, :value) in state.fields.entries) {
+      memory = memory.withField(key, value);
+    }
+    _memory = memory.withDetails(state.details);
+    // Details back again take edits again; ones gone ignore late ones.
+    final present = {for (final d in state.details) d.id};
+    _deleted.removeAll(present);
+    _flushNow();
+    notifyListeners();
+  }
+
   /// The memory as edited, including empty details (just added, or
   /// cleared), which [flush] leaves out of what is saved.
   Memory get memory => _memory;
 
   void update(String key, String value) {
     if (_closed || _memory.field(_fieldFor(key)) == value) return;
+    _record(key: 'field:$key');
     _memory = _memory.withField(key, value);
     _scheduleSave();
   }
@@ -43,6 +93,7 @@ class MemoryEditor {
   void addDetail(Detail detail) {
     if (_closed) return;
     if (_memory.details.any((d) => d.id == detail.id)) return;
+    _record();
     _memory = _memory.withDetails([..._memory.details, detail]);
     _flushNow();
   }
@@ -54,7 +105,8 @@ class MemoryEditor {
     if (_closed || _deleted.contains(detail.id)) return;
     final details = _memory.details;
     final index = details.indexWhere((d) => d.id == detail.id);
-    if (index == -1) return;
+    if (index == -1 || details[index] == detail) return;
+    _record();
     _memory = _memory.withDetails([...details]..[index] = detail);
     _flushNow();
   }
@@ -66,6 +118,7 @@ class MemoryEditor {
     final index = details.indexWhere((d) => d.id == id);
     if (index == -1) return;
     if (details[index].text == text) return;
+    _record(key: 'detail:$id');
     _memory = _memory.withDetails(
       [...details]..[index] = details[index].copyWith(text: text),
     );
@@ -79,6 +132,7 @@ class MemoryEditor {
     _deleted.add(id);
     final details = _memory.details;
     if (!details.any((d) => d.id == id)) return;
+    _record();
     _memory = _memory.withDetails([
       for (final detail in details)
         if (detail.id != id) detail,
@@ -90,6 +144,8 @@ class MemoryEditor {
   void restoreDetail(Detail detail, int index) {
     if (_closed) return;
     _deleted.remove(detail.id);
+    if (_memory.details.any((d) => d.id == detail.id)) return;
+    _record();
     final details = [..._memory.details];
     details.insert(index.clamp(0, details.length), detail);
     _memory = _memory.withDetails(details);

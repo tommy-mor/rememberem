@@ -157,9 +157,7 @@ class _RemindersSectionState extends State<RemindersSection> {
             children: [
               SwitchListTile(
                 title: const Text('Daily practice reminder'),
-                subtitle: const Text(
-                  'One gentle nudge a day.',
-                ),
+                subtitle: const Text('One gentle nudge a day.'),
                 value: settings.enabled,
                 onChanged: _busy ? null : _setEnabled,
               ),
@@ -195,7 +193,7 @@ class _RemindersSectionState extends State<RemindersSection> {
                   title: const Text('Place notices'),
                   subtitle: const Text(
                     'Tell me when I arrive somewhere significant for '
-                    'someone I know. ' ,
+                    'someone I know. ',
                   ),
                   value: settings.places,
                   onChanged: _busy ? null : (on) => _setPlaces(keeper, on),

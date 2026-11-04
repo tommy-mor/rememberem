@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:rememberem_core/rememberem_core.dart';
 import 'package:test/test.dart';
 
@@ -90,6 +92,7 @@ void main() {
       final fences = PlaceFence.select(
         groups,
         (place) => place == 'Park' ? 50 : 300,
+        notifies: (_) => true,
       );
       expect(fences.map((f) => f.id), [
         PlaceNotice.fenceId('Park'),
@@ -98,7 +101,64 @@ void main() {
       expect(fences.first.meters, PlaceFence.leastMeters);
       expect(fences.last.at, moved);
       expect(fences.last.meters, 300);
-      expect(PlaceFence.select(groups, (_) => 200, most: 1), hasLength(1));
+      expect(
+        PlaceFence.select(groups, (_) => 200, notifies: (_) => true, most: 1),
+        hasLength(1),
+      );
+    });
+
+    test('places Fred wants no notice for get no fence', () {
+      const here = GeoPoint(47, -122);
+      final groups = PlaceBook.from([
+        metAt('a', 'A', 'Home', location: here),
+        metAt('b', 'B', 'Park', location: here),
+      ]).groups;
+      final settings = const AppSettings();
+      final fences = PlaceFence.select(
+        groups,
+        (_) => 300,
+        notifies: settings.notifies,
+      );
+      expect(fences.map((f) => f.id), [PlaceNotice.fenceId('Park')]);
+    });
+  });
+
+  group('notify choices', () {
+    test(
+        'home, work and church are quiet by default, whatever their case; '
+        'other places notify', () {
+      const s = AppSettings();
+      for (final quiet in ['home', 'Work', 'CHURCH', ' Home ']) {
+        expect(s.notifies(quiet), isFalse, reason: quiet);
+      }
+      expect(s.notifies('Cafe'), isTrue);
+      expect(s.notifies('Homestead'), isTrue);
+    });
+
+    test("Fred's choice wins, survives JSON and follows a rename", () {
+      final s = const AppSettings()
+          .withPlaceNotify('Home', true)
+          .withPlaceNotify(' Cafe ', false);
+      expect(s.notifies('Home'), isTrue);
+      expect(s.notifies('Cafe'), isFalse);
+
+      final back = AppSettings.fromJson(jsonDecode(jsonEncode(s)));
+      expect(back, s);
+      expect(back.notifies('Cafe'), isFalse);
+
+      final renamed = back.withPlaceRenamed('Cafe', 'Corner Cafe');
+      expect(renamed.notifies('Corner Cafe'), isFalse);
+      expect(renamed.placeNotify.containsKey('Cafe'), isFalse);
+    });
+
+    test('a missing or damaged map reads as no choices', () {
+      expect(AppSettings.fromJson({}).placeNotify, isEmpty);
+      expect(
+        AppSettings.fromJson({
+          'placeNotify': {'Cafe': 'yes', '': true, 'Park': false},
+        }).placeNotify,
+        {'Park': false},
+      );
     });
   });
 

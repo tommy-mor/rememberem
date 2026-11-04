@@ -29,19 +29,22 @@ class PlaceArrival {
   /// The notification id; a newer arrival replaces an older notice.
   static const noticeId = 950;
 
-  /// Shows the notice for the first of [fenceIds] that is due; true if
-  /// one showed. One that could not show leaves the place due.
+  /// Shows the notice for the first of [fenceIds] that is due and that
+  /// Fred wants notices for; true if one showed. One that could not show
+  /// leaves the place due.
   Future<bool> handle(List<String> fenceIds) async {
     if (!(await reminders.load()).places) return false;
     final people = await repository.all();
-    final spots = (await settings.load()).placeSpots;
+    final chosen = await settings.load();
     final places = [
-      for (final g in PlaceBook.from(people, spots: spots).groups) ?g.name,
+      for (final g in PlaceBook.from(people, spots: chosen.placeSpots).groups)
+        ?g.name,
     ];
     final now = clock();
     for (final id in fenceIds) {
       final place = PlaceNotice.placeFor(id, places);
-      if (place == null) continue;
+      // A fence left from before Fred unticked the place says nothing.
+      if (place == null || !chosen.notifies(place)) continue;
       if (!PlaceNotice.due(await log.lastShown(id), now)) continue;
       final text = PlaceNotice.textFor(people, place);
       if (text == null) continue;
