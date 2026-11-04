@@ -484,7 +484,7 @@ void main() {
       expect(crop.center.dy, greaterThan(photo.center.dy));
       expect(find.text('Crop'), findsNothing); // an icon only
 
-      final merge = tester.getRect(find.text('Merge with existing person'));
+      final merge = tester.getRect(find.text('Merge with existing person record'));
       final clock = tester.getRect(find.byTooltip('Change date and time'));
       final pin = tester.getRect(find.byTooltip('Change location'));
       for (final r in [merge, clock, pin]) {
@@ -494,7 +494,7 @@ void main() {
       expect(merge.top, lessThan(clock.top));
       expect(clock.top, lessThan(pin.top));
       expect(
-        tester.widget<Text>(find.text('Merge with existing person')).style,
+        tester.widget<Text>(find.text('Merge with existing person record')).style,
         isNull, // sized by the button's own text style (60 %)
       );
     },

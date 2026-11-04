@@ -43,8 +43,8 @@ void main() {
   }
 
   Future<void> mergeInto(WidgetTester tester, String name) async {
-    await tester.ensureVisible(find.text('Merge with existing person'));
-    await tester.tap(find.text('Merge with existing person'));
+    await tester.ensureVisible(find.text('Merge with existing person record'));
+    await tester.tap(find.text('Merge with existing person record'));
     await tester.pumpAndSettle();
     await tester.tap(find.text(name));
     await tester.pumpAndSettle();

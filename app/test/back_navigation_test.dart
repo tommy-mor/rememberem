@@ -185,7 +185,7 @@ void main() {
   testWidgets('the merge picker goes back to the card', (tester) async {
     await boot(tester);
     await open(tester, find.text('Ann'));
-    await open(tester, find.text('Merge with existing person'));
+    await open(tester, find.text('Merge with existing person record'));
     expect(find.byType(MergePickerScreen), findsOneWidget);
 
     await back(tester);

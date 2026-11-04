@@ -82,7 +82,7 @@ it from the page's `_people` and the editor's current details.
 ## 6. Photo at the top: left, with Crop and Merge beside it
 
 AC: the person photo sits at the left; to its right, a "Crop" and a "Merge
-with existing person" button. The old Merge button at the bottom goes.
+with existing person record" button. The old Merge button at the bottom goes.
 
 ## 7. Colours and dark mode
 

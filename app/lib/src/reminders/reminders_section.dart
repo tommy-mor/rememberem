@@ -158,7 +158,7 @@ class _RemindersSectionState extends State<RemindersSection> {
               SwitchListTile(
                 title: const Text('Daily practice reminder'),
                 subtitle: const Text(
-                  'One gentle nudge a day. It never names anyone.',
+                  'One gentle nudge a day.',
                 ),
                 value: settings.enabled,
                 onChanged: _busy ? null : _setEnabled,
@@ -184,9 +184,8 @@ class _RemindersSectionState extends State<RemindersSection> {
               SwitchListTile(
                 title: const Text('Anniversary notices'),
                 subtitle: const Text(
-                  'A morning note naming who has an anniversary in the '
-                  'coming week. A locked Android phone hides it; on an '
-                  'iPhone, your preview setting decides.',
+                  'A daily reminder of who has an anniversary in the '
+                  'coming week.',
                 ),
                 value: settings.anniversaries,
                 onChanged: _busy ? null : _setAnniversaries,
@@ -195,9 +194,8 @@ class _RemindersSectionState extends State<RemindersSection> {
                 SwitchListTile(
                   title: const Text('Place notices'),
                   subtitle: const Text(
-                    'When you arrive somewhere you have met people, a note '
-                    'says who. Uses your location in the background; it '
-                    'stays on this phone. Off until you turn it on.',
+                    'Tell me when I arrive somewhere significant for '
+                    'someone I know. ' ,
                   ),
                   value: settings.places,
                   onChanged: _busy ? null : (on) => _setPlaces(keeper, on),

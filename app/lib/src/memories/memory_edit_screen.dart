@@ -478,7 +478,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
           onPressed: _merge,
           icon: const Icon(Icons.merge, size: 16),
           label: const Text(
-            'Merge with existing person',
+            'Merge with existing person record',
             textAlign: TextAlign.center,
           ),
         ),
