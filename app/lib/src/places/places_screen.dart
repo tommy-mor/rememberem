@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
@@ -9,12 +10,13 @@ import '../settings/units.dart';
 import 'confirm_rename_dialog.dart';
 import 'place_row.dart';
 import 'places_map.dart';
-import 'radius_panel.dart';
+import 'radius_slider.dart';
 
 /// Every place Fred has met people: a list on top, a map below. Picking a
 /// place in either selects it, centres the map on it and lists its people.
 /// Places are renamed, or named if unknown, in the list itself, and a
-/// named place's radius is adjusted on a slider over the map.
+/// named place's radius is slid on its row. On the map, a double tap
+/// zooms to a place and a long press moves a named one.
 class PlacesScreen extends StatefulWidget {
   const PlacesScreen({
     super.key,
@@ -35,11 +37,25 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   List<PlaceGroup>? _groups;
   PlaceGroup? _selected;
 
-  /// The place whose radius panel is open, the radius being dragged (null
+  /// The place whose radius is being slid, the radius being dragged (null
   /// once let go), and whether the map should fit it exactly.
   PlaceGroup? _adjusting;
   double? _draft;
   bool _settled = true;
+
+  /// Bumped to centre the map on the selected place again.
+  int _centreTick = 0;
+
+  /// A double-tapped place to fit, its radius a fifth of the map.
+  ({GeoPoint at, double meters, int tick})? _zoom;
+  int _zoomTick = 0;
+
+  /// The place being moved, and where the map's middle is.
+  PlaceGroup? _moving;
+  GeoPoint? _moveTo;
+
+  /// Set while a move is being saved, so a second tap does nothing.
+  bool _savingMove = false;
   Object? _error;
   int _reloadGen = 0;
 
@@ -69,13 +85,17 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   Future<void> _reload() async {
     final gen = ++_reloadGen;
     try {
-      final groups = PlaceBook.from(await _repository.all()).groups;
+      final groups = PlaceBook.from(
+        await _repository.all(),
+        spots: widget.services.settings.value.placeSpots,
+      ).groups;
       if (!mounted || gen != _reloadGen) return;
       setState(() {
         _groups = groups;
         _error = null;
         _selected = _sameGroup(_selected, groups);
         _adjusting = _sameGroup(_adjusting, groups);
+        _moving = _sameGroup(_moving, groups);
       });
     } catch (error) {
       if (mounted && gen == _reloadGen) setState(() => _error = error);
@@ -108,8 +128,12 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
 
   void _select(PlaceGroup group) {
     final groups = _groups;
-    if (groups == null) return;
-    setState(() => _selected = group);
+    // While a place is being moved, the map is Fred's to drag.
+    if (groups == null || _moving != null) return;
+    setState(() {
+      _selected = group;
+      _centreTick++;
+    });
     final index = groups.indexOf(group);
     if (index < 0 || !_scroll.hasClients) return;
     // Only the selected row is expanded, so every row above it is
@@ -188,16 +212,75 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     // A radius left under the new name by a place now gone is dropped; a
     // place merged into keeps its own.
     var updated = settings.value;
-    if (!merges) updated = updated.withPlaceRadius(newName, null);
+    if (!merges) {
+      updated = updated
+          .withPlaceRadius(newName, null)
+          .withPlaceSpot(newName, null);
+    }
     if (name != null) updated = updated.withPlaceRenamed(name, newName);
     if (updated != settings.value) await settings.update(updated);
     _selected = null;
     _adjusting = null;
+    _moving = null;
     await _reload();
     return true;
   }
 
-  /// Opens the radius panel for [group] (selecting it).
+  /// Zooms the map to [group] (selecting it), so its radius is a fifth
+  /// of the map: the fitted square is 2.5 radii each side of it.
+  void _zoomTo(PlaceGroup group) {
+    final at = group.marker;
+    if (at == null || _moving != null) return;
+    _select(group);
+    final meters = group.name == null
+        ? widget.services.settings.value.placeFinder.radiusMeters
+        : _radiusFor(group.name!);
+    setState(() => _zoom = (at: at, meters: meters * 2.5, tick: ++_zoomTick));
+  }
+
+  /// Starts moving [group]: the map centres on it and Fred drags the map
+  /// under a fixed pin.
+  void _startMove(PlaceGroup group) {
+    final name = group.name;
+    if (name == null || group.marker == null) return;
+    _select(group);
+    setState(() {
+      _adjusting = null;
+      _moving = group;
+      _moveTo = group.marker;
+    });
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      'Moving $name. Drag the map, then choose Move here.',
+      Directionality.of(context),
+    );
+  }
+
+  /// Ends moving; with [save], the place's spot is kept, and moving mode
+  /// stays until the list shows it there (no flash of the old spot).
+  Future<void> _finishMove({required bool save}) async {
+    if (_savingMove) return;
+    final name = _moving?.name;
+    final at = _moveTo;
+    // Not dragged: nothing to keep.
+    if (save && name != null && at != null && at != _moving?.marker) {
+      _savingMove = true;
+      try {
+        final settings = widget.services.settings;
+        await settings.update(settings.value.withPlaceSpot(name, at));
+        await _reload();
+      } finally {
+        _savingMove = false;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _moving = null;
+      _moveTo = null;
+    });
+  }
+
+  /// Opens the radius slider for [group] (selecting it).
   void _adjust(PlaceGroup group) {
     _select(group);
     setState(() {
@@ -220,18 +303,22 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     _settled = false;
   });
 
-  void _settle(double? meters) {
+  /// Saves the radius chosen. One within 3% of the default is the
+  /// default, so sliding back to it ends the place's own radius.
+  void _settle(double meters) {
     final name = _adjusting?.name;
     if (name == null) return;
     final settings = widget.services.settings;
-    settings.update(settings.value.withPlaceRadius(name, meters));
+    final standard = settings.value.placeFinder.radiusMeters;
+    final own = (meters - standard).abs() <= standard * 0.03 ? null : meters;
+    settings.update(settings.value.withPlaceRadius(name, own));
     setState(() {
       _draft = null;
       _settled = true;
     });
   }
 
-  /// The radius being adjusted, for the map to keep in view.
+  /// The radius being slid, for the map to keep in view.
   ({GeoPoint at, double meters, bool settled})? get _focus {
     final group = _adjusting;
     final at = group?.marker;
@@ -239,6 +326,11 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     if (at == null || name == null) return null;
     return (at: at, meters: _radiusFor(name), settled: _settled);
   }
+
+  void _stopSliding() => setState(() {
+    _adjusting = null;
+    _draft = null;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -297,6 +389,16 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
                     ? null
                     : Units.distance(settings, _radiusFor(name)),
                 onRadius: name == null ? null : () => _adjust(group),
+                slider: name == null || group != _adjusting
+                    ? null
+                    : RadiusSlider(
+                        place: name,
+                        meters: _radiusFor(name),
+                        format: (m) => Units.distance(settings, m),
+                        onChanged: _drag,
+                        onSettled: _settle,
+                        onDone: _stopSliding,
+                      ),
               );
             },
           ),
@@ -310,27 +412,54 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
                   groups: groups,
                   selected: _selected,
                   onSelect: _select,
+                  onZoom: _zoomTo,
+                  onMove: _startMove,
                   streetMaps: settings.streetMaps,
                   links: widget.services.links,
                   radiusFor: _radiusFor,
                   focus: _focus,
+                  zoomTo: _zoom,
+                  centreTick: _centreTick,
+                  hidden: _moving,
+                  onCentreChanged: _moving == null
+                      ? null
+                      : (at) => _moveTo = at,
                 ),
               ),
-              if (_adjusting case PlaceGroup(:final name?))
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: RadiusPanel(
-                    place: name,
-                    meters: _radiusFor(name),
-                    format: (m) => Units.distance(settings, m),
-                    onChanged: _drag,
-                    onSettled: _settle,
-                    onUseDefault: () => _settle(null),
-                    onDone: () => setState(() => _adjusting = null),
+              if (_moving case PlaceGroup(:final name?)) ...[
+                // A pin fixed over the map's middle, its tip on the spot.
+                const IgnorePointer(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 40),
+                      child: Icon(Icons.place, size: 40),
+                    ),
                   ),
                 ),
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text('Drag the map to move $name')),
+                          TextButton(
+                            onPressed: () => _finishMove(save: false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => _finishMove(save: true),
+                            child: const Text('Move here'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

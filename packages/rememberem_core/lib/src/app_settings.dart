@@ -1,4 +1,5 @@
 import 'app_palette.dart';
+import 'geo_point.dart';
 import 'meeting_finder.dart';
 import 'place_finder.dart';
 import 'radius_scale.dart';
@@ -22,6 +23,7 @@ class AppSettings {
     this.backgroundColor = defaultBackgroundColor,
     this.darkMode = false,
     this.placeRadii = const {},
+    this.placeSpots = const {},
     this.metricUnits,
   });
 
@@ -80,6 +82,7 @@ class AppSettings {
       backgroundColor: colour('backgroundColor', AppPalette.backgrounds),
       darkMode: flag('darkMode', fallback: false),
       placeRadii: _radii(json['placeRadii']),
+      placeSpots: _spots(json['placeSpots']),
       metricUnits:
           json['metricUnits'] is bool ? json['metricUnits'] as bool : null,
     );
@@ -99,6 +102,22 @@ class AppSettings {
               .toDouble()
               .clamp(RadiusScale.minMeters, RadiusScale.maxMeters),
     };
+  }
+
+  /// Places' spots as written; a bad entry is dropped.
+  static Map<String, GeoPoint> _spots(Object? json) {
+    if (json is! Map) return const {};
+    final spots = <String, GeoPoint>{};
+    for (final MapEntry(:key, :value) in json.entries) {
+      if (key is! String || key.trim().isEmpty || value is! Map) continue;
+      final lat = value['latitude'];
+      final lng = value['longitude'];
+      if (lat is! num || lng is! num) continue;
+      if (!lat.isFinite || !lng.isFinite) continue;
+      if (lat.abs() > 90 || lng.abs() > 180) continue;
+      spots[key.trim()] = GeoPoint(lat.toDouble(), lng.toDouble());
+    }
+    return spots;
   }
 
   /// Regions that measure distance in feet and miles.
@@ -168,6 +187,11 @@ class AppSettings {
   /// [placeRadiusFeet].
   final Map<String, double> placeRadii;
 
+  /// Where Fred moved named places on the Places map, by trimmed name.
+  /// Photos keep their own locations; a place is drawn, and matched
+  /// against new photos, at its spot.
+  final Map<String, GeoPoint> placeSpots;
+
   /// Metres and kilometres (true) or feet and miles; null until Fred
   /// chooses, when the phone's region decides ([metricFor]).
   final bool? metricUnits;
@@ -188,18 +212,30 @@ class AppSettings {
     return copyWith(placeRadii: radii);
   }
 
-  /// After [from] is renamed [to]: its radius moves with it, unless [to]
-  /// already has one (the two places merged; the one kept wins).
+  /// With [place] moved to [at], or back to its photos if null.
+  AppSettings withPlaceSpot(String place, GeoPoint? at) {
+    final spots = {...placeSpots}..remove(place.trim());
+    if (at != null) spots[place.trim()] = at;
+    return copyWith(placeSpots: spots);
+  }
+
+  /// After [from] is renamed [to]: its radius and spot move with it,
+  /// unless [to] already has one (the two places merged; the one kept
+  /// wins).
   AppSettings withPlaceRenamed(String from, String to) {
     final radius = placeRadii[from.trim()];
     final radii = {...placeRadii}..remove(from.trim());
     if (radius != null) radii.putIfAbsent(to.trim(), () => radius);
-    return copyWith(placeRadii: radii);
+    final spot = placeSpots[from.trim()];
+    final spots = {...placeSpots}..remove(from.trim());
+    if (spot != null) spots.putIfAbsent(to.trim(), () => spot);
+    return copyWith(placeRadii: radii, placeSpots: spots);
   }
 
   PlaceFinder get placeFinder => PlaceFinder(
         radiusMeters: placeRadiusFeet * _metersPerFoot,
         radii: placeRadii,
+        spots: placeSpots,
       );
 
   MeetingFinder get meetingFinder =>
@@ -222,6 +258,7 @@ class AppSettings {
     int? backgroundColor,
     bool? darkMode,
     Map<String, double>? placeRadii,
+    Map<String, GeoPoint>? placeSpots,
     bool? metricUnits,
   }) =>
       AppSettings(
@@ -239,6 +276,7 @@ class AppSettings {
         backgroundColor: backgroundColor ?? this.backgroundColor,
         darkMode: darkMode ?? this.darkMode,
         placeRadii: placeRadii ?? this.placeRadii,
+        placeSpots: placeSpots ?? this.placeSpots,
         metricUnits: metricUnits ?? this.metricUnits,
       );
 
@@ -257,6 +295,10 @@ class AppSettings {
         'backgroundColor': backgroundColor,
         'darkMode': darkMode,
         if (placeRadii.isNotEmpty) 'placeRadii': placeRadii,
+        if (placeSpots.isNotEmpty)
+          'placeSpots': {
+            for (final e in placeSpots.entries) e.key: e.value.toJson(),
+          },
         if (metricUnits != null) 'metricUnits': metricUnits,
       };
 
@@ -278,7 +320,9 @@ class AppSettings {
       other.darkMode == darkMode &&
       other.metricUnits == metricUnits &&
       other.placeRadii.length == placeRadii.length &&
-      placeRadii.entries.every((e) => other.placeRadii[e.key] == e.value);
+      placeRadii.entries.every((e) => other.placeRadii[e.key] == e.value) &&
+      other.placeSpots.length == placeSpots.length &&
+      placeSpots.entries.every((e) => other.placeSpots[e.key] == e.value);
 
   @override
   int get hashCode => Object.hash(
@@ -299,6 +343,9 @@ class AppSettings {
         // Order-independent, as == is.
         Object.hashAllUnordered(
           placeRadii.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
+        Object.hashAllUnordered(
+          placeSpots.entries.map((e) => Object.hash(e.key, e.value)),
         ),
       );
 }

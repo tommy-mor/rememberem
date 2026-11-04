@@ -6,7 +6,7 @@ import 'memory.dart';
 /// met. Unnamed places are a cluster of nearby spots (or the spots with no
 /// location at all).
 class PlaceGroup {
-  PlaceGroup({required this.name, required this.members});
+  PlaceGroup({required this.name, required this.members, this.spot});
 
   /// Trimmed name, or null for an unnamed ("unknown") place.
   final String? name;
@@ -14,10 +14,15 @@ class PlaceGroup {
   /// Newest first.
   final List<(Memory, Encounter)> members;
 
+  /// Where Fred moved the place to on the map, if he did.
+  final GeoPoint? spot;
+
   String get label => name ?? 'unknown';
 
-  /// Where to draw it: the newest member that has a location, or null.
+  /// Where to draw it: where Fred moved it, else the newest member that
+  /// has a location, or null.
   GeoPoint? get marker {
+    if (spot case final spot?) return spot;
     for (final (_, encounter) in members) {
       final location = encounter.location;
       if (location != null) return location;

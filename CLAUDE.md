@@ -150,7 +150,10 @@ has already been tried and fallen short.
   files: it follows the reminder switch). Damage in either never stops the
   app.
 - `settings.json` may also hold `placeRadii` (a place's own radius in
-  metres, keyed by its trimmed name; a rename carries it) and
+  metres, keyed by its trimmed name; a rename carries it), `placeSpots`
+  (where Fred moved a named place on the Places map, keyed the same way;
+  photos keep their own GPS, and the place is drawn and matched at its
+  spot), and
   `metricUnits` (missing: by the phone's region; feet and miles in the US,
   Liberia, Myanmar and the UK).
 - Anniversary notices are scheduled 30 days ahead on each sync (app open,

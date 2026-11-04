@@ -24,6 +24,8 @@ class StreetMap extends StatefulWidget {
     this.onCentreChanged,
     this.circles = const [],
     this.focus,
+    this.centreTick = 0,
+    this.zoomTo,
   });
 
   final bool streetMaps;
@@ -42,8 +44,16 @@ class StreetMap extends StatefulWidget {
   /// settled it fits the circle exactly.
   final ({GeoPoint at, double meters, bool settled})? focus;
 
-  /// Where to look; the map moves there whenever this changes.
+  /// Where to look; the map moves there whenever this, or
+  /// [centreTick], changes.
   final GeoPoint? centre;
+
+  /// Bumped to look at [centre] again, though it has not changed.
+  final int centreTick;
+
+  /// Fits a circle of [meters] at [at] edge to edge, with no margin;
+  /// each new [tick] fits again, though nothing else changed.
+  final ({GeoPoint at, double meters, int tick})? zoomTo;
 
   /// With no [centre], the first view fits all of these.
   final List<GeoPoint> fitAll;
@@ -68,11 +78,18 @@ class _StreetMapState extends State<StreetMap> {
   void didUpdateWidget(StreetMap old) {
     super.didUpdateWidget(old);
     final centre = widget.centre;
-    if (_ready && centre != null && centre != old.centre) {
+    final moved = centre != old.centre || widget.centreTick != old.centreTick;
+    if (_ready && centre != null && moved) {
       _controller.move(StreetMap.latLng(centre), _controller.camera.zoom);
     }
     final focus = widget.focus;
     if (_ready && focus != null && focus != old.focus) _keepInView(focus);
+    final zoom = widget.zoomTo;
+    if (_ready && zoom != null && zoom != old.zoomTo) {
+      _controller.fitCamera(
+        CameraFit.bounds(bounds: _boundsOf(zoom.at, zoom.meters)),
+      );
+    }
   }
 
   /// While sliding, at most one refit per [_refitGap], so a long slide

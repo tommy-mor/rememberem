@@ -1,17 +1,20 @@
 import 'encounter.dart';
+import 'geo_point.dart';
 import 'memory.dart';
 import 'place_finder.dart';
 import 'place_group.dart';
 
 /// Every place Fred has met people, derived from their encounters (there
 /// is no separate store). Named places group by trimmed name; unnamed
-/// spots group with the newest spot within [radiusMeters] of them.
+/// spots group with the newest spot within [radiusMeters] of them. A
+/// named place Fred moved on the map sits at its spot in [spots].
 class PlaceBook {
   PlaceBook._(this.groups);
 
   factory PlaceBook.from(
     List<Memory> people, {
     double radiusMeters = PlaceFinder.defaultRadiusMeters,
+    Map<String, GeoPoint> spots = const {},
   }) {
     final all = [
       for (final memory in people)
@@ -40,7 +43,11 @@ class PlaceBook {
     }
     final groups = [
       for (final entry in named.entries)
-        PlaceGroup(name: entry.key, members: entry.value),
+        PlaceGroup(
+          name: entry.key,
+          members: entry.value,
+          spot: spots[entry.key],
+        ),
       for (final cluster in clusters) PlaceGroup(name: null, members: cluster),
       if (nowhere.isNotEmpty) PlaceGroup(name: null, members: nowhere),
     ]..sort((a, b) {

@@ -63,7 +63,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     try {
       people = await widget.services.repository.all();
       places = [
-        for (final g in PlaceBook.from(people).groups)
+        for (final g in PlaceBook.from(
+          people,
+          spots: widget.services.settings.value.placeSpots,
+        ).groups)
           if (g.name != null && g.marker != null) g,
       ];
     } catch (_) {

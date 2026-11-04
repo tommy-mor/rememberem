@@ -12,11 +12,19 @@ class PlaceMarker extends Marker {
     required String label,
     bool selected = false,
     VoidCallback? onTap,
+    VoidCallback? onDoubleTap,
+    VoidCallback? onLongPress,
   }) : super(
          point: StreetMap.latLng(at),
          width: 160,
          height: 64,
          alignment: Alignment.topCenter,
-         child: PlaceMarkerView(label, selected: selected, onTap: onTap),
+         child: PlaceMarkerView(
+           label,
+           selected: selected,
+           onTap: onTap,
+           onDoubleTap: onDoubleTap,
+           onLongPress: onLongPress,
+         ),
        );
 }

@@ -8,6 +8,7 @@ class PlaceFinder {
   const PlaceFinder({
     this.radiusMeters = defaultRadiusMeters,
     this.radii = const {},
+    this.spots = const {},
   });
 
   /// 555 feet.
@@ -20,6 +21,10 @@ class PlaceFinder {
   /// Places' own radii in metres, by trimmed name.
   final Map<String, double> radii;
 
+  /// Where Fred moved places to, by trimmed name. A moved place is
+  /// measured from its spot, not from its photos' own locations.
+  final Map<String, GeoPoint> spots;
+
   /// How close a photo must be to [place] to take its name.
   double radiusFor(String place) => radii[place.trim()] ?? radiusMeters;
 
@@ -31,7 +36,7 @@ class PlaceFinder {
     var bestDistance = double.infinity;
     for (final memory in people) {
       for (final encounter in memory.encounters) {
-        final location = encounter.location;
+        final location = spots[encounter.place.trim()] ?? encounter.location;
         if (location == null || encounter.place.trim().isEmpty) continue;
         final distance = at.distanceTo(location);
         // Written this way round so NaN never passes.

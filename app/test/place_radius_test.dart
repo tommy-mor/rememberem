@@ -5,7 +5,7 @@ import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/maps/location_picker_screen.dart';
 import 'package:rememberem/src/places/place_row.dart';
 import 'package:rememberem/src/places/places_screen.dart';
-import 'package:rememberem/src/places/radius_panel.dart';
+import 'package:rememberem/src/places/radius_slider.dart';
 import 'package:rememberem/src/settings/settings_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -87,47 +87,62 @@ void main() {
     expect(radiusButton('1.6 km'), findsOneWidget);
   });
 
-  testWidgets('the slider moves the circle as it slides and saves on '
-      'release; Use default clears it', (tester) async {
+  testWidgets('the radius slides on its row: the circle moves as it '
+      'slides, saves on release, and a tap elsewhere ends it', (tester) async {
     await person('Alex', 'Cafe', north(0));
     await showPlaces(tester);
 
     await tester.tap(radiusButton('555 ft'));
-    await tester.pumpAndSettle();
-    expect(find.byType(RadiusPanel), findsOneWidget);
-    expect(find.text('Radius of Cafe: 555 ft'), findsOneWidget);
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(Slider)),
+    await tester.pump(); // not settle: the slider pulses
+    final slider = find.descendant(
+      of: find.byType(PlaceRow),
+      matching: find.byType(RadiusSlider),
     );
-    await gesture.moveBy(const Offset(150, 0));
+    expect(slider, findsOneWidget);
+    expect(radiusButton('555 ft'), findsNothing); // the slider replaced it
+
+    final gesture = await tester.startGesture(tester.getCenter(slider));
+    await gesture.moveBy(const Offset(40, 0));
+    await gesture.moveBy(const Offset(60, 0));
     await tester.pump();
     final dragged = circles(tester).single.radius;
-    expect(dragged, greaterThan(1000));
+    expect(dragged, greaterThan(500)); // from 169 m
     expect(services.settings.value.placeRadii, isEmpty); // not yet
 
-    await gesture.moveBy(const Offset(50, 0));
+    await gesture.moveBy(const Offset(30, 0));
     await tester.pump();
     expect(circles(tester).single.radius, greaterThan(dragged)); // live
 
     await gesture.up();
-    await tester.pumpAndSettle();
+    await tester.pump();
     final saved = services.settings.value.placeRadii['Cafe'];
     expect(saved, isNotNull);
     expect(circles(tester).single.radius, saved);
 
     await tester.tap(find.byTooltip('Smaller'));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(services.settings.value.placeRadii['Cafe'], lessThan(saved!));
 
-    await tester.tap(find.text('Use default'));
+    // Tapping elsewhere ends sliding.
+    await tester.tapAt(const Offset(540, 2300));
     await tester.pumpAndSettle();
-    expect(services.settings.value.placeRadii, isEmpty);
-    expect(radiusButton('555 ft'), findsOneWidget);
+    expect(find.byType(RadiusSlider), findsNothing);
+  });
 
-    await tester.tap(find.text('Done'));
-    await tester.pumpAndSettle();
-    expect(find.byType(RadiusPanel), findsNothing);
+  testWidgets('stepping back to the default radius ends the own radius', (
+    tester,
+  ) async {
+    await person('Alex', 'Cafe', north(0));
+    await showPlaces(tester);
+    await tester.tap(radiusButton('555 ft'));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Larger'));
+    await tester.pump();
+    expect(services.settings.value.placeRadii, isNotEmpty);
+    await tester.tap(find.byTooltip('Smaller'));
+    await tester.pump();
+    expect(services.settings.value.placeRadii, isEmpty);
   });
 
   testWidgets('a renamed place keeps its radius', (tester) async {

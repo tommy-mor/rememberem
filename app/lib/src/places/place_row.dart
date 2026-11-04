@@ -17,6 +17,7 @@ class PlaceRow extends StatefulWidget {
     required this.repository,
     this.radius,
     this.onRadius,
+    this.slider,
   });
 
   /// Least height of a collapsed row; the list scrolls by multiples of it
@@ -35,6 +36,9 @@ class PlaceRow extends StatefulWidget {
   /// The radius as text ("555 ft"), for named places only.
   final String? radius;
   final VoidCallback? onRadius;
+
+  /// While the radius is being slid, the slider, in place of [radius].
+  final Widget? slider;
 
   @override
   State<PlaceRow> createState() => _PlaceRowState();
@@ -134,19 +138,21 @@ class _PlaceRowState extends State<PlaceRow> {
               onSubmitted: (_) => _commit(),
             ),
             subtitle: Text('$count · $date', maxLines: 1),
-            trailing: radius == null
-                ? null
-                : TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    onPressed: widget.onRadius,
-                    child: Text(
-                      radius,
-                      semanticsLabel:
-                          'Radius of ${group.label}: $radius. Adjust',
-                    ),
-                  ),
+            trailing:
+                widget.slider ??
+                (radius == null
+                    ? null
+                    : TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                        ),
+                        onPressed: widget.onRadius,
+                        child: Text(
+                          radius,
+                          semanticsLabel:
+                              'Radius of ${group.label}: $radius. Adjust',
+                        ),
+                      )),
             // Tapping the row, not its name, ends any name being typed.
             onTap: () {
               FocusScope.of(context).unfocus();

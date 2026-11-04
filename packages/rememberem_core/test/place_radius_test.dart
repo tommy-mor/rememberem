@@ -176,4 +176,57 @@ void main() {
       expect(finder.nearest(north, people)?.place, 'Town');
     });
   });
+
+  group('moved places', () {
+    const park = GeoPoint(47.0, -122.0);
+    const moved = GeoPoint(47.05, -122.0); // about 5.6 km north
+
+    test('spots round-trip; damaged ones are dropped; old files have none', () {
+      final s = const AppSettings().withPlaceSpot(' Park ', moved);
+      expect(s.placeSpots, {'Park': moved});
+      expect(AppSettings.fromJson(s.toJson()), s);
+      expect(s, isNot(const AppSettings()));
+      expect(s.hashCode,
+          const AppSettings().withPlaceSpot('Park', moved).hashCode);
+      expect(s.withPlaceSpot('Park', null), const AppSettings());
+      expect(AppSettings.fromJson({}).placeSpots, isEmpty);
+      final bad = AppSettings.fromJson({
+        'placeSpots': {
+          'A': {'latitude': 'x', 'longitude': 1},
+          'B': {'latitude': 91, 'longitude': 0},
+          'C': [1, 2],
+          '': {'latitude': 1, 'longitude': 1},
+          'D': {'latitude': 1.5, 'longitude': -2},
+        },
+      });
+      expect(bad.placeSpots, {'D': const GeoPoint(1.5, -2)});
+    });
+
+    test('a rename carries the spot; a merge keeps the target one', () {
+      final s = const AppSettings()
+          .withPlaceSpot('Park', moved)
+          .withPlaceSpot('Cafe', park);
+      expect(s.withPlaceRenamed('Park', 'City Park').placeSpots,
+          {'City Park': moved, 'Cafe': park});
+      expect(s.withPlaceRenamed('Park', 'Cafe').placeSpots, {'Cafe': park});
+    });
+
+    test('a moved place is drawn at its spot', () {
+      final book = PlaceBook.from(
+        [metAt('a', 'Park', park), metAt('b', '', park)],
+        spots: {'Park': moved},
+      );
+      final named = book.groups.firstWhere((g) => g.name == 'Park');
+      expect(named.marker, moved);
+      final unknown = book.groups.firstWhere((g) => g.name == null);
+      expect(unknown.marker, park);
+    });
+
+    test('a moved place matches photos near its spot, not its old one', () {
+      final people = [metAt('a', 'Park', park)];
+      const finder = PlaceFinder(spots: {'Park': moved});
+      expect(finder.nearest(park, people), isNull);
+      expect(finder.nearest(moved, people)?.place, 'Park');
+    });
+  });
 }

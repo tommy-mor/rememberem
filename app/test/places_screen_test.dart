@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
@@ -79,6 +80,8 @@ void main() {
         matching: find.text(label),
       ),
     );
+    // A single tap counts once a double tap can no longer follow.
+    await tester.pump(kDoubleTapTimeout);
     await tester.pumpAndSettle();
   }
 
