@@ -90,7 +90,7 @@ void main() {
     expect(app().themeMode, ThemeMode.light);
     expect(
       app().theme!.scaffoldBackgroundColor,
-      const Color(0xFFE9EEFC), // light blue, the logo's hue
+      const Color(0xFFD3DEFA), // light blue, the logo's hue
     );
 
     await tester.tap(find.byTooltip('Settings'));
@@ -102,8 +102,8 @@ void main() {
 
     await tester.tap(find.byTooltip('Teal'));
     await tester.pumpAndSettle();
-    expect(controller.value.themeColor, 0xFF00695C);
-    expect(app().theme!.colorScheme.primary, const Color(0xFF00695C));
+    expect(controller.value.themeColor, 0xFF005B4F);
+    expect(app().theme!.colorScheme.primary, const Color(0xFF005B4F));
 
     final size = find.ancestor(
       of: find.text('Detail text size'),

@@ -43,7 +43,13 @@ class AppSettings {
     }
 
     int colour(String key, List<int> palette) {
-      final value = json[key];
+      var value = json[key];
+      // An older version's colour keeps its name.
+      value = switch (key) {
+        'backgroundColor' => AppPalette.legacyBackgrounds[value] ?? value,
+        'themeColor' => AppPalette.legacyThemeColors[value] ?? value,
+        _ => value,
+      };
       return value is int && palette.contains(value) ? value : palette.first;
     }
 
@@ -134,7 +140,7 @@ class AppSettings {
   static const defaultDetailTextPercent = 80;
   static const defaultThemeColor = 0xFF0A2A7A; // AppPalette.themeColors.first
   static const defaultBackgroundColor =
-      0xFFE9EEFC; // AppPalette.backgrounds.first
+      0xFFD3DEFA; // AppPalette.backgrounds.first
 
   static const placeRadiusRange = (min: 100, max: 1000);
   static const meetingWindowRange = (min: 30, max: 240);
@@ -180,8 +186,11 @@ class AppSettings {
   /// The page background in light mode, from [AppPalette.backgrounds].
   final int backgroundColor;
 
-  /// Dark pages; the background choice then does not apply.
+  /// Dark pages; a light background choice then does not apply.
   final bool darkMode;
+
+  /// Pages are dark: dark mode, or a dark background chosen.
+  bool get darkPages => darkMode || AppPalette.isDark(backgroundColor);
 
   /// Places' own radii in metres, by trimmed name. A place not here uses
   /// [placeRadiusFeet].

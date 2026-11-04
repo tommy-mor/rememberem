@@ -172,7 +172,7 @@ class _RememberemAppState extends State<RememberemApp>
         navigatorObservers: [_routeObserver],
         theme: RememberemTheme.light(settings),
         darkTheme: RememberemTheme.dark(settings),
-        themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
+        themeMode: settings.darkPages ? ThemeMode.dark : ThemeMode.light,
         // Tapping anywhere that is not a button or field closes the
         // keyboard.
         builder: (context, child) => GestureDetector(

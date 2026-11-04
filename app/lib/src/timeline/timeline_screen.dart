@@ -3,11 +3,13 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../app/home_button.dart';
+import '../memories/memory_tile.dart';
 import '../memories/person_card_route.dart';
 import 'timeline_miniature.dart';
 
-/// Timeline mode: each day details were recorded, newest first, with the
-/// people met grouped by place and meeting. Tapping a date shows just that
+/// Timeline mode: each day people were met, newest first, grouped by
+/// place and meeting; "Show details" adds the days of their happenings,
+/// dated tags and latest anniversaries. Tapping a date shows just that
 /// day. Read-only.
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({
@@ -35,6 +37,7 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    widget.services.timelineDetails.addListener(_reload);
     _reload();
   }
 
@@ -47,6 +50,7 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
 
   @override
   void dispose() {
+    widget.services.timelineDetails.removeListener(_reload);
     widget.routeObserver.unsubscribe(this);
     super.dispose();
   }
@@ -58,7 +62,11 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
     final gen = ++_reloadGen;
     try {
       final people = await widget.services.repository.all();
-      final days = const TimelineBuilder().build(people, only: widget.day);
+      final days = const TimelineBuilder().build(
+        people,
+        only: widget.day,
+        details: widget.services.timelineDetails.value,
+      );
       if (mounted && gen == _reloadGen) {
         setState(() {
           _days = days;
@@ -114,10 +122,15 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
     final days = _days;
     if (days == null) return const Center(child: CircularProgressIndicator());
     if (days.isEmpty) return const Center(child: Text('No one yet.'));
+    // The checkbox is on the whole timeline; a day's page follows it.
+    final toggle = widget.day == null;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: days.length,
-      itemBuilder: (context, index) => _dayTile(context, days[index]),
+      itemCount: days.length + (toggle ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (toggle && index == 0) return _detailsToggle();
+        return _dayTile(context, days[index - (toggle ? 1 : 0)]);
+      },
     );
   }
 
@@ -159,6 +172,18 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
                         ),
                     ],
                   ),
+                  // What put each person here, in the detail's own words.
+                  for (final memory in group.people)
+                    for (final detail
+                        in group.details[memory.id] ?? const <Detail>[])
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '${MemoryTile.nameOf(memory)} – '
+                          '${detailLine(detail)}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -168,6 +193,30 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
         ],
       ),
     );
+  }
+
+  Widget _detailsToggle() => ValueListenableBuilder<bool>(
+    valueListenable: widget.services.timelineDetails,
+    builder: (context, on, _) => CheckboxListTile(
+      title: const Text('Show details'),
+      subtitle: const Text(
+        'Adds happenings, dated tags and the latest anniversaries.',
+      ),
+      value: on,
+      onChanged: (v) => widget.services.timelineDetails.value = v ?? false,
+    ),
+  );
+
+  /// How a detail that put someone on a day reads: "Happening: picnic",
+  /// "Tag · Book club", "Anniversary · Wedding: big party".
+  static String detailLine(Detail detail) {
+    final label = detail.label?.trim() ?? '';
+    final head = [
+      detail.kind.label,
+      if (label.isNotEmpty) label[0].toUpperCase() + label.substring(1),
+    ].join(' · ');
+    final text = detail.text.trim();
+    return text.isEmpty ? head : '$head: $text';
   }
 
   String _groupLabel(TimelineGroup group) {

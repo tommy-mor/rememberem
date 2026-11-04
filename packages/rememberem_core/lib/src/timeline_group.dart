@@ -1,3 +1,4 @@
+import 'detail.dart';
 import 'memory.dart';
 
 /// The people met at one place and meeting on one day of the timeline.
@@ -6,7 +7,7 @@ class TimelineGroup {
     required this.place,
     required this.meeting,
     required this.people,
-    required this.recordedIds,
+    this.details = const {},
   });
 
   /// Trimmed; either may be empty.
@@ -16,9 +17,9 @@ class TimelineGroup {
   /// Each person once, sorted by name then id.
   final List<Memory> people;
 
-  /// People shown here only because they were recorded that day (they have
-  /// no details yet).
-  final Set<String> recordedIds;
+  /// By person id, the details that put them here (with "Show details"
+  /// on); a person met here has none of their own.
+  final Map<String, List<Detail>> details;
 
   bool get isUnknownPlace => place.isEmpty && meeting.isEmpty;
 }

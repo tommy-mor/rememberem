@@ -145,7 +145,9 @@ has already been tried and fallen short.
   never matched to a real place.
 - Meetings auto-fill by place plus local time of week (a weekly meeting),
   within the window set in Settings.
-- `settings.json` (`AppSettings`) holds Fred's settings; `reminders.json`
+- `settings.json` (`AppSettings`) holds Fred's settings. Colours saved
+  before story 28 read as their new values (`AppPalette.legacyBackgrounds`
+  and `legacyThemeColors`), and a dark background makes dark pages; `reminders.json`
   holds the reminder and the anniversary-notices switch (missing in older
   files: it follows the reminder switch). Damage in either never stops the
   app.

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../about/browser_link_opener.dart';
@@ -55,4 +56,7 @@ class AppServices {
 
   /// The main list's filters and order, which notices also set.
   final ListFilters listFilters;
+
+  /// The timeline's "Show details", for this run only.
+  final ValueNotifier<bool> timelineDetails = ValueNotifier(false);
 }

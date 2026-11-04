@@ -50,7 +50,7 @@ void main() {
       vibration: false,
       streetMaps: false,
       detailTextPercent: 110,
-      themeColor: 0xFF00695C,
+      themeColor: 0xFF005B4F,
       backgroundColor: 0xFFFFFFFF,
       darkMode: true,
     );
@@ -106,5 +106,22 @@ void main() {
     expect(AppSettings.fromJson(off.toJson()), off);
     expect(off, isNot(const AppSettings()));
     expect(off.copyWith(revealDelay: true), const AppSettings());
+  });
+
+  test('an older, paler background keeps its name; dark ones make dark pages',
+      () {
+    final old = AppSettings.fromJson({'backgroundColor': 0xFFFFF8E7});
+    expect(old.backgroundColor, 0xFFFCEFC7); // cream, deeper
+    expect(AppPalette.names[old.backgroundColor], 'Cream');
+    expect(old.darkPages, isFalse);
+    for (final dark in AppPalette.darkBackgrounds) {
+      final s = AppSettings.fromJson({'backgroundColor': dark});
+      expect(s.backgroundColor, dark);
+      expect(s.darkPages, isTrue);
+    }
+    expect(const AppSettings(darkMode: true).darkPages, isTrue);
+    for (final c in [...AppPalette.backgrounds, ...AppPalette.themeColors]) {
+      expect(AppPalette.names[c], isNotNull);
+    }
   });
 }

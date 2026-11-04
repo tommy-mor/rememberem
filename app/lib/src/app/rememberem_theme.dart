@@ -36,10 +36,13 @@ class RememberemTheme {
     return _themed(scheme, primary, background);
   }
 
-  /// Dark pages from the theme colour; the background choice does not
-  /// apply.
+  /// Dark pages from the theme colour, on the chosen dark background if
+  /// there is one; a light background choice does not apply.
   static ThemeData dark(AppSettings settings) {
     final primary = Color(settings.themeColor);
+    final chosen = AppPalette.isDark(settings.backgroundColor)
+        ? Color(settings.backgroundColor)
+        : null;
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.dark,
@@ -47,8 +50,14 @@ class RememberemTheme {
       onSecondary: deepNavy,
       tertiary: gold,
       onTertiary: deepNavy,
+      surface: chosen,
     );
-    return _themed(scheme, scheme.surfaceContainerHighest, scheme.surface);
+    // On a chosen background the bar is a lighter shade of it, so the
+    // two belong together.
+    final bar = chosen == null
+        ? scheme.surfaceContainerHighest
+        : Color.alphaBlend(Colors.white.withAlpha(28), chosen);
+    return _themed(scheme, bar, scheme.surface);
   }
 
   /// Gold on the app bar where it can be read (4.5:1, WCAG AA), else

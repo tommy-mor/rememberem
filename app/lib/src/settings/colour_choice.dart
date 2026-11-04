@@ -29,8 +29,6 @@ class ColourChoice extends StatelessWidget {
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
           children: [
             for (final colour in colours)
               _swatch(
@@ -64,18 +62,22 @@ class ColourChoice extends StatelessWidget {
         label: name,
         child: InkResponse(
           onTap: enabled ? () => onChanged(value) : null,
-          radius: 22,
-          child: Opacity(
-            opacity: enabled ? 1 : 0.4,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: colour,
-                shape: BoxShape.circle,
-                border: Border.all(color: outline, width: chosen ? 3 : 1),
+          radius: 24,
+          // 48 dp to tap, 36 dp to see.
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Opacity(
+              opacity: enabled ? 1 : 0.4,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: colour,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: outline, width: chosen ? 3 : 1),
+                ),
+                child: chosen ? Icon(Icons.check, size: 20, color: tick) : null,
               ),
-              child: chosen ? Icon(Icons.check, size: 20, color: tick) : null,
             ),
           ),
         ),

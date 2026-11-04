@@ -92,7 +92,9 @@ void main() {
       DateTime(2026, 11, 1, 10),
       place: 'Stake Center',
       meeting: 'Sunday',
-      details: [DateTime(2026, 11, 1, 10, 5)],
+      // A happening on another day: without "Show details" only the day
+      // he was met shows.
+      details: [DateTime(2026, 11, 5, 10, 5)],
     );
     final quiet = await person('Sam', DateTime(2026, 10, 30, 9), place: 'Cafe');
     final gone = await person(
@@ -110,7 +112,7 @@ void main() {
     expect(find.text('Stake Center - Sunday'), findsOneWidget);
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('Sam'), findsOneWidget);
-    expect(find.text('recorded'), findsNothing);
+    expect(find.text('Thursday, November 5, 2026'), findsNothing);
     expect(find.text('Gone'), findsNothing);
     expect(repository.saves, isEmpty);
     expect(repository.purges, isEmpty);

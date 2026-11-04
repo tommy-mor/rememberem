@@ -49,13 +49,14 @@ class AnniversaryFilter implements FilterCondition {
     // The range may span a new year, so try each year it touches.
     for (var year = first.year; year <= last.year; year++) {
       if (year < start.year) continue;
-      final day = _fallsOn(start, year);
+      final day = fallsOn(start, year);
       if (day.compareTo(first) >= 0 && day.compareTo(last) <= 0) return true;
     }
     return false;
   }
 
-  static LocalDay _fallsOn(DateTime start, int year) {
+  /// Where a yearly date first on [start] falls in [year].
+  static LocalDay fallsOn(DateTime start, int year) {
     final leapDay = start.month == 2 && start.day == 29;
     if (leapDay && DateTime(year, 2, 29).month != 2) {
       return LocalDay(year, 2, 28);

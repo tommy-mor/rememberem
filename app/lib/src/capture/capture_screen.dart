@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/allow_in_settings.dart';
@@ -11,15 +13,16 @@ import '../app/home_button.dart';
 import '../app/system_settings.dart';
 import '../memories/memory_edit_screen.dart';
 import 'face_picker_screen.dart';
+import 'photo_check.dart';
 import 'photo_picker.dart';
 import 'photo_problems.dart';
 
 /// A photo to keep, held until it is saved so a failure can try again.
 typedef _Photo = ({List<int> bytes, DateTime capturedAt, GeoPoint? location});
 
-/// Full-screen camera. Taking a photo saves a cropped portrait and moves on
-/// to the notes for that person; a photo of several people first asks whom
-/// to remember.
+/// Full-screen camera. A photo taken is shown first, to use or retake;
+/// using it saves a cropped portrait and moves on to the notes for that
+/// person, and a photo of several people first asks whom to remember.
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key, required this.services});
 
@@ -40,6 +43,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
   bool _denied = false;
   bool _saving = false;
 
+  /// The photo just taken, waiting for Use photo or Retake (its location
+  /// is looked up on Use). Only in memory, so leaving the app with it
+  /// showing uses it: a photo is never lost.
+  ({List<int> bytes, DateTime capturedAt})? _review;
+
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onHide: () {
+      if (_review != null) _usePhoto();
+    },
+  );
+
   /// This screen's own messages, which go when it does: a Try again left
   /// on the next screen would act on a photo no longer here.
   final _messages = GlobalKey<ScaffoldMessengerState>();
@@ -51,11 +65,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   void initState() {
     super.initState();
+    _lifecycle; // created now, so it listens from the start
     _openCamera();
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _camera?.dispose();
     super.dispose();
   }
@@ -114,16 +130,57 @@ class _CaptureScreenState extends State<CaptureScreen> {
     });
   }
 
+  /// Takes a photo and shows it to check; nothing is saved yet.
   Future<void> _takePhoto() async {
     final camera = _camera;
-    if (camera == null || _saving) return;
-    await _take(() async {
+    if (camera == null || _saving || _review != null) return;
+    setState(() => _saving = true);
+    final ({List<int> bytes, DateTime capturedAt}) photo;
+    try {
       final capturedAt = DateTime.now();
       final shot = await camera.takePicture();
       final bytes = await shot.readAsBytes();
       await File(shot.path).delete();
-      return (bytes: bytes, capturedAt: capturedAt, location: await _location);
+      photo = (bytes: bytes, capturedAt: capturedAt);
+      // The camera rests while the photo is checked.
+      await camera.pausePreview().catchError((_) {});
+    } catch (e) {
+      debugPrint('Could not get the photo: $e');
+      _failed("Couldn't get the photo. Please try again.");
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _review = photo;
     });
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      'Photo taken. Use photo, or Retake.',
+      Directionality.of(context),
+    );
+  }
+
+  void _retake() {
+    setState(() => _review = null);
+    _camera?.resumePreview().catchError((_) {});
+  }
+
+  Future<void> _usePhoto() async {
+    final review = _review;
+    if (review == null || _saving) return;
+    setState(() {
+      _review = null;
+      _saving = true;
+    });
+    final photo = (
+      bytes: review.bytes,
+      capturedAt: review.capturedAt,
+      location: await _location,
+    );
+    // A failed save comes back to the check, so the photo is kept.
+    final saved = await _save(photo, onFail: () => _review = review);
+    if (!saved && mounted) _camera?.resumePreview().catchError((_) {});
   }
 
   /// A photo already on the phone: where and when come from the photo
@@ -202,9 +259,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Saves [photo] and moves on to the notes for that person, or to
-  /// choosing faces if it has several. On failure the photo is kept, so
-  /// Fred can try again without taking it again.
-  Future<void> _save(_Photo photo) async {
+  /// choosing faces if it has several; true if it did. On failure the
+  /// photo is kept, so Fred can try again without taking it again: with
+  /// [onFail], it goes back where it came from; else a Try again.
+  Future<bool> _save(_Photo photo, {VoidCallback? onFail}) async {
     setState(() => _saving = true);
     try {
       final settings = widget.services.settings.value;
@@ -217,7 +275,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         meetingFinder: settings.meetingFinder,
       );
       if (draft.faces.length > 1) {
-        if (!mounted) return;
+        if (!mounted) return true;
         await _moveOn(
           MaterialPageRoute<void>(
             // Still the camera's job: the shortcut and reminders leave it be.
@@ -226,10 +284,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
                 FacePickerScreen(draft: draft, services: widget.services),
           ),
         );
-        return;
+        return true;
       }
       final memory = await capture.saveOne(draft, face: draft.largestFace);
-      if (!mounted) return;
+      if (!mounted) return true;
       await _moveOn(
         MaterialPageRoute<void>(
           builder: (_) => MemoryEditScreen(
@@ -239,10 +297,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ),
         ),
       );
+      return true;
     } catch (e) {
       // Any failure, Error included, must give the shutter back.
       debugPrint('Could not save photo: $e');
-      _failed(PhotoProblems.cannotSave, retry: () => _save(photo));
+      if (onFail != null && mounted) {
+        setState(onFail);
+        _failed(PhotoProblems.cannotSave);
+      } else {
+        _failed(PhotoProblems.cannotSave, retry: () => _save(photo));
+      }
+      return false;
     }
   }
 
@@ -322,9 +387,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final camera = _camera;
     final problem = _problem;
     final picker = widget.services.photoPicker;
-    return ScaffoldMessenger(
-      key: _messages,
-      child: _scaffold(camera, problem, picker),
+    // Back while checking a photo is Retake, never leaving with it.
+    return PopScope(
+      canPop: _review == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _retake();
+      },
+      child: ScaffoldMessenger(
+        key: _messages,
+        child: _scaffold(camera, problem, picker),
+      ),
     );
   }
 
@@ -339,7 +411,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: const Text('Meet someone'),
-        actions: [HomeButton(enabled: !_saving)],
+        actions: [HomeButton(enabled: !_saving && _review == null)],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -398,6 +470,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ),
             ),
           ),
+          if (_review case final photo?)
+            // Only the check's own buttons for a screen reader.
+            BlockSemantics(
+              child: PhotoCheck(
+                // The camera's bytes, not a copy, so it decodes once.
+                jpeg: photo.bytes is Uint8List
+                    ? photo.bytes as Uint8List
+                    : Uint8List.fromList(photo.bytes),
+                onUse: _usePhoto,
+                onRetake: _retake,
+              ),
+            ),
           if (_saving)
             const ColoredBox(
               color: Colors.black54,
