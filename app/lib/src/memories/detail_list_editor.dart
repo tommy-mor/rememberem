@@ -6,6 +6,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
 import 'detail_extras_editor.dart';
+import 'detail_help_dialog.dart';
 
 /// The Details section: one line per detail, its kind and data as the
 /// label on the field's border ("Happening · 3 Mar 2026 · Park") and its
@@ -57,18 +58,28 @@ class DetailListEditor extends StatefulWidget {
   /// The add buttons' labels, by kind.
   static String addLabel(DetailKind kind) => '+ ${kind.name}';
 
-  /// A detail's kind and data on one line: "Relationship · Brother · Ann".
-  /// A tag shows only "Tag"; its data goes before the text ([fieldPrefix]).
-  static String rowLabel(Detail detail, String? Function(String id) nameOf) {
+  /// The border label: the kind, plus a happening's date and place
+  /// ("Happening · 3 Mar 2026 · Park"). Other kinds show their data before
+  /// the text instead ([fieldPrefix]).
+  static String rowLabel(Detail detail) {
+    final d = detail;
+    final parts = d.kind == DetailKind.happening
+        ? [DetailPrompt.date(d.at.toLocal()), d.place?.trim() ?? '']
+        : const <String>[];
+    return [d.kind.label, ...parts.where((p) => p.isNotEmpty)].join(' · ');
+  }
+
+  /// The parts shown before a detail's text: a relationship's type and
+  /// person, an anniversary's type and date, a tag's type, place and date.
+  static List<String> prefixParts(
+    Detail detail,
+    String? Function(String id) nameOf,
+  ) {
     final d = detail;
     final label = _capitalised(d.label?.trim() ?? '');
     final target = d.targetId;
     final parts = switch (d.kind) {
-      DetailKind.fact => const <String>[],
-      DetailKind.happening => [
-        DetailPrompt.date(d.at.toLocal()),
-        d.place?.trim() ?? '',
-      ],
+      DetailKind.fact || DetailKind.happening => const <String>[],
       DetailKind.relationship => [
         label,
         if (target != null) nameOf(target) ?? DetailPrompt.someoneRemoved,
@@ -77,25 +88,33 @@ class DetailListEditor extends StatefulWidget {
         label,
         if (d.eventDate case final day?) DetailPrompt.date(day),
       ],
-      DetailKind.tag => const <String>[],
+      DetailKind.tag => DetailPrompt.tagParts(d),
     };
-    return [d.kind.label, ...parts.where((p) => p.isNotEmpty)].join(' · ');
+    return parts.where((p) => p.isNotEmpty).toList();
   }
 
-  /// What goes before a tag's text: "Relatives · Park · 3 Mar 2026 - ",
-  /// the parts it has; null for other kinds or a tag with none.
-  static String? fieldPrefix(Detail detail) {
-    if (detail.kind != DetailKind.tag) return null;
-    final parts = DetailPrompt.tagParts(detail);
-    return parts.isEmpty ? null : '${parts.join(' · ')} - ';
+  /// What goes before the text: "Brother: Ann - " for a relationship,
+  /// "Wedding: 3 Jun 2010 - " for an anniversary, "Relatives · Park ·
+  /// 3 Mar 2026 - " for a tag; the parts it has, or null with none.
+  static String? fieldPrefix(
+    Detail detail,
+    String? Function(String id) nameOf,
+  ) {
+    final parts = prefixParts(detail, nameOf);
+    if (parts.isEmpty) return null;
+    final joined = detail.kind == DetailKind.tag
+        ? parts.join(' · ')
+        : parts.join(': ');
+    return '$joined - ';
   }
 
-  /// How a row's buttons name it: its label, plus a tag's parts, so a
-  /// screen reader can tell tag rows apart.
-  static String spokenName(Detail detail, String label) {
-    if (detail.kind != DetailKind.tag) return label;
-    return [label, ...DetailPrompt.tagParts(detail)].join(' ');
-  }
+  /// How a row's buttons name it: its label and prefix, so a screen reader
+  /// can tell rows of one kind apart.
+  static String spokenName(
+    Detail detail,
+    String label,
+    String? Function(String id) nameOf,
+  ) => [label, ...prefixParts(detail, nameOf)].join(' ');
 
   static String _capitalised(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
@@ -208,8 +227,8 @@ class _DetailListEditorState extends State<DetailListEditor> {
 
   Widget _row(BuildContext context, Detail detail) {
     final id = detail.id;
-    final label = DetailListEditor.rowLabel(detail, widget.nameOf);
-    final name = DetailListEditor.spokenName(detail, label);
+    final label = DetailListEditor.rowLabel(detail);
+    final name = DetailListEditor.spokenName(detail, label, widget.nameOf);
     final open = _open.contains(id);
     final scheme = Theme.of(context).colorScheme;
     // The same widgets open or closed, so the description field (and any
@@ -241,7 +260,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
                 DictatedTextField(
                   key: ValueKey(id),
                   label: label,
-                  prefix: DetailListEditor.fieldPrefix(detail),
+                  prefix: DetailListEditor.fieldPrefix(detail, widget.nameOf),
                   initialValue: detail.text,
                   dictation: widget.dictation,
                   multiline: true,
@@ -272,14 +291,25 @@ class _DetailListEditorState extends State<DetailListEditor> {
                         onChanged: widget.onReplace,
                       ),
                     ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Delete $name',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _delete(detail),
-                    ),
+                  Row(
+                    children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip:
+                            'About ${detail.kind.label.toLowerCase()} '
+                            'details',
+                        icon: const Icon(Icons.help_outline),
+                        onPressed: () =>
+                            DetailHelpDialog.show(context, detail.kind),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Delete $name',
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _delete(detail),
+                      ),
+                    ],
                   ),
                 ],
               ],

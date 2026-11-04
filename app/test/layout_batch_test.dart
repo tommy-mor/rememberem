@@ -64,12 +64,12 @@ void main() {
       ]);
       await showCard(tester);
 
-      const label = 'Relationship · Boss';
+      const label = 'Relationship Boss';
       expect(find.byTooltip('Open $label'), findsOneWidget);
-      expect(find.byTooltip('Speak $label'), findsNothing);
+      expect(find.byTooltip('Speak Relationship'), findsNothing);
       expect(find.byTooltip('Delete $label'), findsNothing);
       final field = tester.widget<TextField>(
-        find.widgetWithText(TextField, label),
+        find.widgetWithText(TextField, 'Relationship'),
       );
       expect(
         field.decoration!.floatingLabelBehavior,
@@ -183,7 +183,7 @@ void main() {
     await tester.tap(find.text('Jill').last);
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Delete Relationship · Jill'), findsOneWidget);
+    expect(find.byTooltip('Delete Relationship Jill'), findsOneWidget);
   });
 
   testWidgets('trash tapped twice goes back once', (tester) async {

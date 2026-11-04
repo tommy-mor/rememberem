@@ -45,6 +45,19 @@ void main() {
     expect(t.toJson()['type'], 'tag');
   });
 
+  test('a tag without a type or words is empty, so it is never saved', () {
+    expect(tag('t', null, place: 'Library').isEmpty, isTrue);
+    expect(tag('t', '  ', on: DateTime(2026)).isEmpty, isTrue);
+    // Words Fred wrote are kept until he picks a type.
+    expect(tag('t', null, text: 'Hosts').isEmpty, isFalse);
+    expect(tag('t', 'book club').isEmpty, isFalse);
+    // Other kinds still count any data.
+    expect(
+      Detail(id: 'f', text: 'Tall', at: DateTime.utc(2026)).isEmpty,
+      isFalse,
+    );
+  });
+
   test('an unknown type reads as a fact', () {
     final json = tag('t', 'book club').toJson()..['type'] = 'sticker';
     expect(Detail.fromJson(json).kind, DetailKind.fact);

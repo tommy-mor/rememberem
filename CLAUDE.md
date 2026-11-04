@@ -128,7 +128,8 @@ has already been tried and fallen short.
   loads as a single detail timed at the first encounter, and the key is
   dropped on the next save. A detail's `text` may be blank once it has other
   data (a relationship's person or type, a place, a date); only a detail
-  with nothing entered (`Detail.isEmpty`) is left out of a save.
+  with nothing entered, or a tag with no tag type and no text
+  (`Detail.isEmpty`), is left out of a save.
 - Each detail has a `type` (fact, happening, relationship, anniversary or
   tag). A tag keeps its tag type in `label` and an optional `place` and
   `eventDate`; tags are never practice questions.

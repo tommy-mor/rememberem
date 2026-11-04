@@ -1,6 +1,7 @@
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'dictation.dart';
+import 'speech_transcript.dart';
 
 /// [Dictation] using the phone's own speech recogniser, on the device
 /// where the phone has an on-device recogniser (Android 12+), so the audio
@@ -35,8 +36,11 @@ class DeviceDictation implements Dictation {
     }
     _onDone = onDone;
     _onNoSpeechPack = onNoSpeechPack;
+    final transcript = SpeechTranscript();
     await _speech.listen(
-      onResult: (result) => onWords(result.recognizedWords),
+      onResult: (result) => onWords(
+        transcript.add(result.recognizedWords, isFinal: result.finalResult),
+      ),
       listenOptions: SpeechListenOptions(
         listenFor: longestListen,
         pauseFor: quietPause,

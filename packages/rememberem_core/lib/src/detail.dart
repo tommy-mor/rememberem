@@ -70,8 +70,13 @@ class Detail {
   DetailKind get kind => _type ?? DetailKind.fact;
 
   /// True if nothing has been entered: no description, place, type,
-  /// person or date. An empty detail is never saved.
+  /// person or date. A tag with neither a type nor a description is empty
+  /// too, whatever its place and date: it groups no one. Words Fred wrote
+  /// are never dropped. An empty detail is never saved.
   bool get isEmpty =>
+      text.trim().isEmpty &&
+          kind == DetailKind.tag &&
+          (label?.trim() ?? '').isEmpty ||
       text.trim().isEmpty &&
       (place?.trim() ?? '').isEmpty &&
       (label?.trim() ?? '').isEmpty &&

@@ -97,7 +97,8 @@ void main() {
 
     for (final label in ['Name', 'Place', 'Meeting']) {
       expect(find.widgetWithText(TextField, label), findsOneWidget);
-      expect(find.byTooltip('Speak $label'), findsOneWidget);
+      // Mics are for the moment of meeting, not a later visit.
+      expect(find.byTooltip('Speak $label'), findsNothing);
     }
     for (final kind in [
       'fact',
@@ -115,7 +116,7 @@ void main() {
   testWidgets('Fred speaks into each field and it all saves by itself', (
     tester,
   ) async {
-    await showScreen(tester);
+    await showScreen(tester, justMet: true);
 
     await speakInto(tester, 'Name', 'Alex Davis');
     await speakInto(tester, 'Place', 'Stake Center');
@@ -129,7 +130,7 @@ void main() {
   });
 
   testWidgets('words appear while still being spoken', (tester) async {
-    await showScreen(tester);
+    await showScreen(tester, justMet: true);
 
     await tester.tap(find.byTooltip('Speak Name'));
     await tester.pump();
@@ -141,7 +142,7 @@ void main() {
   });
 
   testWidgets('dictation adds to text already typed', (tester) async {
-    await showScreen(tester);
+    await showScreen(tester, justMet: true);
 
     await tester.enterText(find.widgetWithText(TextField, 'Meeting'), 'Choir');
     await speakInto(tester, 'Meeting', 'practice');
@@ -164,7 +165,7 @@ void main() {
     tester,
   ) async {
     dictation = FakeDictation(available: false);
-    await showScreen(tester);
+    await showScreen(tester, justMet: true);
 
     await tester.tap(find.byTooltip('Speak Name'));
     await tester.pump();
@@ -211,7 +212,7 @@ void main() {
   testWidgets('says so when the phone has no offline speech pack', (
     tester,
   ) async {
-    await showScreen(tester);
+    await showScreen(tester, justMet: true);
 
     await tester.tap(find.byTooltip('Speak Name'));
     await tester.pump();
@@ -357,8 +358,8 @@ void main() {
     );
   });
 
-  testWidgets('a relationship row reads its type and person on one line and '
-      'follows her name', (tester) async {
+  testWidgets('a relationship row reads its type and person before its '
+      'text and follows her name', (tester) async {
     final jill = await named('Jill');
     memory = memory.withDetails([
       Detail(
@@ -373,13 +374,14 @@ void main() {
     await repository.save(memory);
     await showScreen(tester);
     await tester.pump();
-    expect(find.text('Relationship · Boss · Jill'), findsOneWidget);
+    expect(find.text('Boss: Jill - '), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Relationship'), findsOneWidget);
 
     await repository.save(jill.withField('name', 'Jillian'));
     await tester.pumpWidget(const SizedBox());
     await showScreen(tester);
     await tester.pump();
-    expect(find.text('Relationship · Boss · Jillian'), findsOneWidget);
+    expect(find.text('Boss: Jillian - '), findsOneWidget);
   });
 
   testWidgets('a relationship to someone in the trash reads "someone '
@@ -400,8 +402,8 @@ void main() {
     await showScreen(tester);
     await tester.pump();
 
-    const label = 'Relationship · Boss · someone removed';
-    expect(find.text(label), findsOneWidget);
+    const label = 'Relationship Boss someone removed';
+    expect(find.text('Boss: someone removed - '), findsOneWidget);
     await tester.tap(find.byTooltip('Open $label'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -411,7 +413,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().details.single.targetId, bo.id);
-    expect(find.text('Relationship · Boss · Bo'), findsOneWidget);
+    expect(find.text('Boss: Bo - '), findsOneWidget);
   });
 
   testWidgets('a custom anniversary type is offered while it is in use', (
@@ -633,7 +635,7 @@ void main() {
 
   group('person card details', () {
     late Memory jill;
-    const relLabel = 'Relationship · Boss · Jill';
+    const relLabel = 'Relationship Boss Jill';
 
     Future<void> showWithDetails(WidgetTester tester) async {
       jill = await named('Jill');
@@ -661,7 +663,8 @@ void main() {
       await showWithDetails(tester);
 
       expect(find.widgetWithText(TextField, 'Fact'), findsOneWidget);
-      expect(find.widgetWithText(TextField, relLabel), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Relationship'), findsOneWidget);
+      expect(find.text('Boss: Jill - '), findsOneWidget);
       expect(find.text('Description'), findsNothing);
     });
 
@@ -673,7 +676,7 @@ void main() {
       await tester.tap(find.text('friend'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Relationship · Friend · Jill'), findsOneWidget);
+      expect(find.text('Friend: Jill - '), findsOneWidget);
       final b = repository.saves.last.details.last;
       expect([b.id, b.label, b.text, b.points], ['b', 'friend', 'Sings', 3]);
     });

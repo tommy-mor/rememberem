@@ -41,11 +41,16 @@ class DetailExtrasEditor extends StatefulWidget {
 
   /// Shown on a tag while Fred has made none.
   static const noTagsYet =
-      'Tags are a way to group people any way you like: relatives, '
-      'celebrities, memberships and so on. Make your own below.';
+      'Tags group people any way you like: relatives, celebrities, '
+      'memberships. Type a name under "Create a tag".';
 
   static const keepTagsKind =
-      'Keep tags kind: words the person would be happy to read.';
+      'Keep tag names kind: ones the person would be happy to read.';
+
+  /// Shown while a tag has no type.
+  static const needsType =
+      "Choose a tag above or create one. Without it, this entry groups no "
+      'one, and is not saved unless it has words.';
 
   @override
   State<DetailExtrasEditor> createState() => _DetailExtrasEditorState();
@@ -137,21 +142,27 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
             _eventDate(context),
           ],
           DetailKind.tag => [
-            if (_labels.isEmpty && (_detail.label?.trim() ?? '').isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(DetailExtrasEditor.noTagsYet),
+            // Only until Fred makes his first tag.
+            if (_labels.isEmpty && (_detail.label?.trim() ?? '').isEmpty) ...[
+              const Text(DetailExtrasEditor.noTagsYet),
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                child: Text(
+                  DetailExtrasEditor.keepTagsKind,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
+            ],
             ..._types(context, 'Create a tag'),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                DetailExtrasEditor.keepTagsKind,
-                style: Theme.of(context).textTheme.bodySmall,
+            if ((_detail.label?.trim() ?? '').isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  DetailExtrasEditor.needsType,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ),
-            ),
-            _placeTile('Where (optional)', clearable: true),
-            _tagDate(context),
+            ..._tagPlaceAndDate(context),
           ],
           DetailKind.fact => const [],
         },
@@ -203,30 +214,56 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     onTap: _pickPlace,
   );
 
-  Widget _tagDate(BuildContext context) {
+  /// A tag's place and date: a "+ place" and a "+ date" button side by
+  /// side for what is not set, and a clearable line for what is.
+  List<Widget> _tagPlaceAndDate(BuildContext context) {
+    final place = _detail.place?.trim() ?? '';
     final when = _detail.eventDate;
-    return ListTile(
-      dense: true,
-      visualDensity: VisualDensity.compact,
-      minVerticalPadding: 0,
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.event),
-      title: Text(
-        when == null
-            ? 'Choose a date'
-            : MaterialLocalizations.of(context).formatMediumDate(when),
-      ),
-      subtitle: const Text('When (optional)'),
-      trailing: when == null
-          ? null
-          : IconButton(
-              tooltip: 'Clear the date',
-              icon: const Icon(Icons.clear),
-              onPressed: () =>
-                  widget.onChanged(_detail.copyWith(eventDate: () => null)),
-            ),
-      onTap: _pickEventDate,
-    );
+    return [
+      if (place.isNotEmpty) _placeTile('Where', clearable: true),
+      if (when != null)
+        ListTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          minVerticalPadding: 0,
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.event),
+          title: Text(MaterialLocalizations.of(context).formatMediumDate(when)),
+          subtitle: const Text('When'),
+          trailing: IconButton(
+            tooltip: 'Clear the date',
+            icon: const Icon(Icons.clear),
+            onPressed: () =>
+                widget.onChanged(_detail.copyWith(eventDate: () => null)),
+          ),
+          onTap: _pickEventDate,
+        ),
+      if (place.isEmpty || when == null)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              if (place.isEmpty)
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: _pickPlace,
+                  child: const Text('+ place'),
+                ),
+              if (when == null)
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: _pickEventDate,
+                  child: const Text('+ date'),
+                ),
+            ],
+          ),
+        ),
+    ];
   }
 
   Widget _who(BuildContext context) {

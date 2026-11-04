@@ -89,12 +89,13 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text(DetailExtrasEditor.noTagsYet), findsNothing);
+    expect(find.text(DetailExtrasEditor.needsType), findsNothing);
     expect(tagField(tester).decoration?.prefixText, 'Book club - ');
     expect(find.text('Book club - '), findsOneWidget); // shown, not just set
     expect(find.byTooltip('Delete Tag Book club'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Choose a date'));
-    await tester.tap(find.text('Choose a date'));
+    await tester.ensureVisible(find.text('+ date'));
+    await tester.tap(find.text('+ date'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
@@ -112,7 +113,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 1));
     expect(saved().details.single.eventDate, isNull);
-    expect(find.text('Choose a date'), findsOneWidget);
+    expect(find.text('+ date'), findsOneWidget);
   });
 
   testWidgets('tags in use are offered and the explanation is not shown', (
@@ -160,7 +161,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Choose place'));
+    await tester.tap(find.text('+ place'));
     await tester.pumpAndSettle();
     expect(detail.place, 'Park');
     expect(find.text('Park'), findsOneWidget);
@@ -168,10 +169,11 @@ void main() {
     await tester.tap(find.byTooltip('Clear the place'));
     await tester.pumpAndSettle();
     expect(detail.place, isNull);
-    expect(find.text('Choose place'), findsOneWidget);
+    expect(find.text('+ place'), findsOneWidget);
   });
 
   test('the prefix lists the parts a tag has, joined by dots', () {
+    String? noName(String id) => null;
     Detail tag({String? label, String? place, DateTime? on}) => Detail(
       id: 't',
       text: '',
@@ -184,15 +186,17 @@ void main() {
     expect(
       DetailListEditor.fieldPrefix(
         tag(label: 'relatives', place: 'Park', on: DateTime(2026, 3, 3)),
+        noName,
       ),
       'Relatives · Park · 3 Mar 2026 - ',
     );
-    expect(DetailListEditor.fieldPrefix(tag(place: 'Park')), 'Park - ');
-    expect(DetailListEditor.fieldPrefix(tag()), isNull);
-    expect(DetailListEditor.rowLabel(tag(label: 'x'), (_) => null), 'Tag');
+    expect(DetailListEditor.fieldPrefix(tag(place: 'Park'), noName), 'Park - ');
+    expect(DetailListEditor.fieldPrefix(tag(), noName), isNull);
+    expect(DetailListEditor.rowLabel(tag(label: 'x')), 'Tag');
     expect(
       DetailListEditor.fieldPrefix(
         Detail(id: 'f', text: 'x', at: DateTime.utc(2026)),
+        noName,
       ),
       isNull,
     );

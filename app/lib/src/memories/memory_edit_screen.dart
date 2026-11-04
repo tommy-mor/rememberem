@@ -110,6 +110,16 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     }
   }
 
+  /// [_people] with this person as edited so far, so a type made on this
+  /// card is offered for the next detail.
+  List<Memory> get _peopleNow {
+    final me = _editor.memory;
+    return [
+      for (final m in _people) m.id == me.id ? me : m,
+      if (!_people.any((m) => m.id == me.id)) me,
+    ];
+  }
+
   /// The known place nearest to where the phone is now, or null.
   Future<String?> _placeHere() async {
     final at = await widget.services.location.current();
@@ -348,6 +358,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 label: field.label,
                 initialValue: memory.field(field),
                 dictation: widget.services.dictation,
+                // Speaking is for the moment of meeting; later, typing.
+                showMic: widget.justMet,
                 hint: switch (field) {
                   MemoryField.name => MemoryTile.unknownName,
                   MemoryField.place => 'unknown',
@@ -367,7 +379,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 details: _editor.memory.details,
                 dictation: widget.services.dictation,
                 ownerId: memory.id,
-                people: _people,
+                people: _peopleNow,
                 photoOf: widget.repository.photoFile,
                 choosePlace: _choosePlace,
                 nameOf: (id) => _activeNames[id],
@@ -383,7 +395,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             const SizedBox(height: 16),
             RelationshipsSection(
               person: memory,
-              people: _people,
+              people: _peopleNow,
               photoOf: widget.repository.photoFile,
               onOpen: _openRelated,
             ),
