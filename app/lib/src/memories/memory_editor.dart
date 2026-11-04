@@ -6,8 +6,9 @@ import 'package:rememberem_core/rememberem_core.dart';
 import 'edit_history.dart';
 
 /// Holds a memory being edited and saves every change shortly after it is
-/// made, so nothing needs a Save button. Changes to the fields and details
-/// can be undone and redone; listeners hear when that becomes possible.
+/// made, so nothing needs a Save button. Changes to the fields, details and
+/// crop can be undone and redone; listeners hear when that becomes
+/// possible.
 class MemoryEditor extends ChangeNotifier {
   MemoryEditor(
     this._repository,
@@ -37,9 +38,13 @@ class MemoryEditor extends ChangeNotifier {
   bool get canUndo => _history.canUndo;
   bool get canRedo => _history.canRedo;
 
+  /// The newest photo as it is now, known once it is cropped here.
+  CardPhoto? _photo;
+
   CardState get _state => (
     fields: {for (final f in MemoryField.values) f.key: _memory.field(f)},
     details: _memory.details,
+    photo: _photo,
   );
 
   /// Notes the state before a change, for Undo.
@@ -49,22 +54,26 @@ class MemoryEditor extends ChangeNotifier {
     if ((canUndo, canRedo) != could) notifyListeners();
   }
 
-  /// Puts back the fields and details before the last change, and saves.
-  /// Pictures, the contact and practice scores are never touched.
-  void undo() => _restore(_history.undo(_state));
+  /// Puts back the fields, details and crop before the last change, and
+  /// saves. Returns the photo being written back, or null if the photo is
+  /// unchanged. Other pictures, the contact and practice scores are never
+  /// touched.
+  Future<void>? undo() => _closed ? null : _restore(_history.undo(_state));
 
-  /// Puts back what [undo] took away, and saves.
-  void redo() => _restore(_history.redo(_state));
+  /// Puts back what [undo] took away, and saves; returns as [undo] does.
+  Future<void>? redo() => _closed ? null : _restore(_history.redo(_state));
 
   /// Forgets every Undo step, e.g. on going to another page.
   void clearHistory() {
+    // That page may change or remove the newest photo.
+    _photo = null;
     if (!canUndo && !canRedo) return;
     _history.clear();
     notifyListeners();
   }
 
-  void _restore(CardState? state) {
-    if (_closed || state == null) return;
+  Future<void>? _restore(CardState? state) {
+    if (_closed || state == null) return null;
     var memory = _memory;
     for (final MapEntry(:key, :value) in state.fields.entries) {
       memory = memory.withField(key, value);
@@ -75,6 +84,32 @@ class MemoryEditor extends ChangeNotifier {
     _deleted.removeAll(present);
     _flushNow();
     notifyListeners();
+    // Same bytes (by identity: every state shares _photo's record).
+    final photo = state.photo;
+    if (photo == null || photo == _photo) return null;
+    final was = _photo;
+    _photo = photo;
+    return _repository
+        .replaceEncounterPhoto(_memory.id, photo.file, photo.jpeg)
+        .catchError((Object error) {
+          // Not written: the file still holds what it did.
+          _photo = was;
+          throw error;
+        });
+  }
+
+  /// Replaces the photo in [file] with [after], a crop of [before], as one
+  /// Undo step.
+  Future<void> cropPhoto(
+    String file, {
+    required List<int> before,
+    required List<int> after,
+  }) async {
+    if (_closed) return;
+    await _repository.replaceEncounterPhoto(_memory.id, file, after);
+    _photo = (file: file, jpeg: before);
+    _record();
+    _photo = (file: file, jpeg: after);
   }
 
   /// The memory as edited, including empty details (just added, or

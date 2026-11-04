@@ -1,8 +1,16 @@
 import 'package:rememberem_core/rememberem_core.dart';
 
 /// What Undo and Redo put back on a person's card: its fields (name, place
-/// and meeting, by key) and its details.
-typedef CardState = ({Map<String, String> fields, List<Detail> details});
+/// and meeting, by key), its details, and once it has been cropped, the
+/// newest photo (its file and JPEG bytes; null leaves the photo as it is).
+typedef CardState = ({
+  Map<String, String> fields,
+  List<Detail> details,
+  CardPhoto? photo,
+});
+
+/// A photo file's bytes, as Undo or Redo puts them back.
+typedef CardPhoto = ({String file, List<int> jpeg});
 
 /// The card's Undo and Redo steps. Typing into one field (or one detail's
 /// description) makes a single step until something else is changed.

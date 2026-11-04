@@ -90,6 +90,10 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   /// Bumped after a crop, so the photo is read again from its file.
   int _photoGen = 0;
 
+  /// The photo Undo or Redo is writing back, which leaving waits for so
+  /// the list behind reads the photo as it will be.
+  Future<void>? _photoWrite;
+
   /// Places found for new happenings, applied only once Fred writes
   /// something, so a row he abandons is still empty and never saved.
   final Map<String, String> _suggestedPlaces = {};
@@ -233,16 +237,12 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     setState(() => _cropping = true);
     try {
       await _editor.flush();
-      await widget.repository.replaceEncounterPhoto(
-        memory.id,
+      await _editor.cropPhoto(
         memory.latest.photoFileName,
-        cropped,
+        before: jpeg,
+        after: cropped,
       );
-      // Every screen shows the photo from the same file name.
-      PaintingBinding.instance.imageCache
-        ..clear()
-        ..clearLiveImages();
-      if (mounted) setState(() => _photoGen++);
+      _showNewPhoto();
     } on Object {
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not save the crop. Try again.')),
@@ -250,6 +250,15 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     } finally {
       if (mounted) setState(() => _cropping = false);
     }
+  }
+
+  /// Reads the photo again after its file was rewritten.
+  void _showNewPhoto() {
+    // Every screen shows the photo from the same file name.
+    PaintingBinding.instance.imageCache
+      ..clear()
+      ..clearLiveImages();
+    if (mounted) setState(() => _photoGen++);
   }
 
   @override
@@ -294,6 +303,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         _messenger?.clearSnackBars();
         final navigator = Navigator.of(context);
         final route = ModalRoute.of(context);
+        await _photoWrite?.catchError((_) {});
         try {
           await _editor.flush();
         } catch (_) {
@@ -316,6 +326,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   Future<bool> _saveBeforeLeaving() async {
     // Already leaving (Back, trash or delete): that finishes the job.
     if (_leaving) return false;
+    await _photoWrite?.catchError((_) {});
     try {
       await _editor.flush();
     } catch (_) {
@@ -670,6 +681,9 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               onPressed: () {
                 if (!mounted) return;
                 setState(() {
+                  // It may be the newest again: a crop's Undo would then
+                  // rewrite the wrong picture.
+                  _editor.clearHistory();
                   _editor.restoreEncounter(removed);
                   _fieldsGen++;
                 });
@@ -768,18 +782,35 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     setState(() => listening ? _dictating.add(key) : _dictating.remove(key));
   }
 
-  /// Undo or Redo, then every field and row reads its text again.
-  void _step(VoidCallback step) => setState(() {
-    step();
-    _fieldsGen++;
-    _detailsGen++;
-  });
+  /// Undo or Redo, then every field and row reads its text again, and the
+  /// photo once a crop is put back.
+  Future<void> _step(Future<void>? Function() step) async {
+    final messenger = ScaffoldMessenger.of(context);
+    Future<void>? photo;
+    setState(() {
+      photo = step();
+      _fieldsGen++;
+      _detailsGen++;
+      if (photo != null) _cropping = true;
+    });
+    if (photo == null) return;
+    try {
+      await (_photoWrite = photo);
+      _showNewPhoto();
+    } on Object {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not put the photo back.')),
+      );
+    } finally {
+      if (mounted) setState(() => _cropping = false);
+    }
+  }
 
   /// Small Undo and Redo buttons either side of "Saved automatically.".
   Widget _undoRow(BuildContext context) => ListenableBuilder(
     listenable: _editor,
     builder: (context, _) {
-      final idle = _dictating.isEmpty;
+      final idle = _dictating.isEmpty && !_cropping;
       return Row(
         children: [
           IconButton(

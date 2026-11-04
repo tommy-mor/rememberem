@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +20,8 @@ void main() {
   );
   Detail fact(String id, String text) =>
       Detail(id: id, text: text, at: DateTime.utc(2026, 11, 1));
-  CardState state(String name) => (fields: {'name': name}, details: const []);
+  CardState state(String name) =>
+      (fields: {'name': name}, details: const [], photo: null);
 
   group('EditHistory', () {
     test('undo and redo walk the steps; a new change ends Redo', () {
@@ -150,6 +153,63 @@ void main() {
         expect(saved.text, 'Tall');
         expect(saved.points, 1);
       });
+    });
+
+    test('a crop is one step: Undo writes the old photo back, Redo the '
+        'crop, and earlier steps leave the photo alone', () async {
+      final repository = FakeMemoryRepository();
+      repository.stored[memory.id] = memory;
+      final editor = MemoryEditor(repository, memory);
+      editor.update('name', 'Ann');
+      await editor.cropPhoto('a.jpg', before: [1], after: [2]);
+      expect(repository.replacedPhotos.single.$3, [2]);
+      expect(editor.canUndo, isTrue);
+
+      await editor.undo();
+      expect(repository.replacedPhotos.last.$3, [1]);
+      expect(editor.memory.field(MemoryField.name), 'Ann');
+
+      expect(editor.undo(), isNull); // the name: the photo stays
+      expect(editor.memory.field(MemoryField.name), '');
+      expect(repository.replacedPhotos, hasLength(2));
+
+      expect(editor.redo(), isNull);
+      await editor.redo();
+      expect(repository.replacedPhotos.last.$3, [2]);
+      expect(editor.canRedo, isFalse);
+    });
+
+    test('after the history is cleared, Undo never puts back a photo '
+        'from before', () async {
+      final repository = FakeMemoryRepository();
+      repository.stored[memory.id] = memory;
+      final editor = MemoryEditor(repository, memory);
+      await editor.cropPhoto('a.jpg', before: [1], after: [2]);
+      editor.clearHistory();
+      editor.update('name', 'Ann');
+      await editor.cropPhoto('a.jpg', before: [9], after: [3]);
+
+      await editor.undo(); // the second crop
+      expect(editor.undo(), isNull); // the name
+      expect([for (final p in repository.replacedPhotos) p.$3], [
+        [2],
+        [3],
+        [9],
+      ]);
+    });
+
+    test('a photo that cannot be written back is still the one Undo and '
+        'Redo know', () async {
+      final repository = FakeMemoryRepository();
+      repository.stored[memory.id] = memory;
+      final editor = MemoryEditor(repository, memory);
+      await editor.cropPhoto('a.jpg', before: [1], after: [2]);
+
+      repository.failNextReplace = true;
+      await expectLater(editor.undo(), throwsA(isA<FileSystemException>()));
+      // The file still holds the crop, so Redo has nothing to write.
+      expect(editor.redo(), isNull);
+      expect(repository.replacedPhotos, hasLength(1));
     });
 
     test('listeners hear when Undo becomes possible and when the history '

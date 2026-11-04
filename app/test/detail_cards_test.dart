@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/rememberem_theme.dart';
 import 'package:rememberem/src/memories/detail_list_editor.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
+import 'package:rememberem/src/memories/pulsing_button.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import 'fakes/detail_finders.dart';
@@ -182,7 +183,7 @@ void main() {
   });
 
   testWidgets('a dateless anniversary offers + date, which opens the date '
-      'picker', (tester) async {
+      'picker; once a date is chosen nothing pulses', (tester) async {
     await withDetails([anniversary()]);
     await showCard(tester);
     await tester.tap(openToggle('Anniversary Wedding'));
@@ -194,6 +195,13 @@ void main() {
     await beat(tester);
 
     expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await beat(tester);
+    await beat(tester);
+
+    expect(find.text('+ date'), findsNothing);
+    expect(find.byType(PulsingButton), findsNothing);
+    expect(tester.hasRunningAnimations, isFalse);
   });
 
   testWidgets('a happening without a place offers + place', (tester) async {

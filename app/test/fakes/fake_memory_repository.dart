@@ -17,6 +17,9 @@ class FakeMemoryRepository implements MemoryRepository {
   /// When true, the next save throws (and clears this flag).
   bool failNextSave = false;
 
+  /// When true, the next photo replacement throws (and clears this flag).
+  bool failNextReplace = false;
+
   @override
   List<String> unreadable = [];
 
@@ -208,6 +211,10 @@ class FakeMemoryRepository implements MemoryRepository {
         memory.trashedAt != null ||
         !memory.encounters.any((e) => e.photoFileName == photoFileName)) {
       throw StateError('No photo $photoFileName for $id');
+    }
+    if (failNextReplace) {
+      failNextReplace = false;
+      throw const FileSystemException('disk full');
     }
     replacedPhotos.add((id, photoFileName, jpeg));
   }

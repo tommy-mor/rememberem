@@ -156,7 +156,9 @@ has already been tried and fallen short.
   (where Fred moved a named place on the Places map, keyed the same way;
   photos keep their own GPS, and the place is drawn and matched at its
   spot), `placeNotify` (Fred's Notify box per place, keyed the same way;
-  missing: on, except home, work and church; a rename carries it), and
+  missing: on, except home, work and church, which are routine, and
+  notices are only for places outside Fred's routine; a rename carries
+  it), and
   `metricUnits` (missing: by the phone's region; feet and miles in the US,
   Liberia, Myanmar and the UK).
 - `rememberedThreshold` defaults to 10 (range 3–20); a stored value is
