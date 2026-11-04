@@ -1,10 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/home_button.dart';
+import '../settings/app_settings_controller.dart';
+import 'countdown_button.dart';
 import 'game_feedback.dart';
+import 'mute_button.dart';
 
 enum _Phase { loading, reveal, choose, finished, stopped }
 
@@ -22,6 +23,9 @@ class FaceGameScreen extends StatefulWidget {
     this.turns = 10,
     this.feedback,
     this.pauseAfterRight = const Duration(seconds: 1),
+    this.showDelay = true,
+    this.pool,
+    this.settings,
   });
 
   final MemoryRepository repository;
@@ -33,6 +37,17 @@ class FaceGameScreen extends StatefulWidget {
 
   /// How long a right answer shows before the next question.
   final Duration pauseAfterRight;
+
+  /// Wait [reveal] (or a tap on Show) before the choices; false shows
+  /// them at once.
+  final bool showDelay;
+
+  /// The ids of the people to play with (a filtered list), fixed when
+  /// the game starts; null for everyone.
+  final Set<String>? pool;
+
+  /// For the mute button; null hides it (tests).
+  final AppSettingsController? settings;
 
   @override
   State<FaceGameScreen> createState() => _FaceGameScreenState();
@@ -66,7 +81,6 @@ class _FaceGameScreenState extends State<FaceGameScreen>
   bool _hidden = false;
   bool _ended = false;
   String _stopReason = '';
-  Timer? _timer;
 
   @override
   void initState() {
@@ -78,7 +92,6 @@ class _FaceGameScreenState extends State<FaceGameScreen>
   @override
   void dispose() {
     _ended = true;
-    _timer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -88,14 +101,12 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     switch (state) {
       case AppLifecycleState.inactive:
         // Keep the face off the app switcher and out of sight; no scoring.
-        _timer?.cancel();
+        // The Show countdown waits while hidden.
         setState(() => _hidden = true);
       case AppLifecycleState.resumed:
         setState(() => _hidden = false);
-        if (_phase == _Phase.reveal) _startReveal();
       case AppLifecycleState.paused || AppLifecycleState.hidden:
         _ended = true;
-        _timer?.cancel();
         if (mounted) Navigator.of(context).maybePop();
       case AppLifecycleState.detached:
         break;
@@ -103,6 +114,16 @@ class _FaceGameScreenState extends State<FaceGameScreen>
   }
 
   bool get _live => mounted && !_ended;
+
+  List<Memory> _inPool(List<Memory> people) {
+    final pool = widget.pool;
+    return pool == null
+        ? people
+        : [
+            for (final m in people)
+              if (pool.contains(m.id)) m,
+          ];
+  }
 
   int get _turns => _total ?? widget.turns;
 
@@ -113,7 +134,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     }
     final List<Memory> people;
     try {
-      people = await widget.repository.all();
+      people = _inPool(await widget.repository.all());
     } catch (_) {
       if (_live) _stop('Could not load people.');
       return;
@@ -143,41 +164,18 @@ class _FaceGameScreenState extends State<FaceGameScreen>
       _advancing = false;
       _correct = null;
       _said = null;
-      _phase = _Phase.reveal;
+      _phase = widget.showDelay ? _Phase.reveal : _Phase.choose;
     });
-    if (!_hidden) _startReveal();
   }
 
-  /// With a screen reader on, the reveal waits for [_showChoices], so a
-  /// timer never cuts the prompt off mid-sentence.
+  /// With a screen reader on, Show does not count down; it waits for a
+  /// tap, so the prompt is never cut off mid-sentence.
   bool get _paced => MediaQuery.accessibleNavigationOf(context);
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // A screen reader turned on or off mid-reveal: wait for the button, or
-    // start the timer the button was standing in for.
-    if (_phase == _Phase.reveal && !_hidden) {
-      if (_paced) {
-        _timer?.cancel();
-      } else if (!(_timer?.isActive ?? false)) {
-        _startReveal();
-      }
-    }
-  }
 
   void _showChoices() {
     if (_live && _phase == _Phase.reveal) {
       setState(() => _phase = _Phase.choose);
     }
-  }
-
-  void _startReveal() {
-    _timer?.cancel();
-    if (_paced) return;
-    _timer = Timer(widget.reveal, () {
-      if (_live) setState(() => _phase = _Phase.choose);
-    });
   }
 
   void _finish() => setState(() {
@@ -248,7 +246,10 @@ class _FaceGameScreenState extends State<FaceGameScreen>
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        actions: const [HomeButton()],
+        actions: [
+          if (widget.settings case final settings?) MuteButton(settings),
+          const HomeButton(),
+        ],
       ),
       body: SafeArea(child: _body(context)),
     );
@@ -304,11 +305,13 @@ class _FaceGameScreenState extends State<FaceGameScreen>
                 ),
               ),
             ),
-            if (_paced)
-              FilledButton(
-                onPressed: _showChoices,
-                child: const Text('Show names'),
-              ),
+            CountdownButton(
+              key: ValueKey(_turn),
+              label: 'Show names',
+              duration: widget.reveal,
+              running: !_paced && !_hidden,
+              onPressed: _showChoices,
+            ),
           ] else ...[
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

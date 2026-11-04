@@ -28,10 +28,6 @@ class MemoryTile extends StatelessWidget {
 
   static String nameOf(Memory memory) => memory.displayName;
 
-  /// Practice points for [memory]: its face's plus its details'.
-  static int pointsOf(Memory memory) =>
-      memory.points + memory.details.fold(0, (sum, d) => sum + d.points);
-
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;

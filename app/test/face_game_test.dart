@@ -146,7 +146,7 @@ void main() {
     expect(find.text('Not $other.'), findsOneWidget);
   });
 
-  testWidgets('turning the screen reader off mid-reveal starts the timer', (
+  testWidgets('turning the screen reader off mid-reveal starts the countdown', (
     tester,
   ) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
@@ -157,7 +157,7 @@ void main() {
 
     tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
     await tester.pump();
-    expect(find.text('Show names'), findsNothing);
+    expect(find.text('Show names'), findsOneWidget);
     await reveal(tester);
 
     expect(find.text(nameOf(person)), findsOneWidget);
@@ -340,7 +340,9 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    // Not settle: the Show countdown animates.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump(const Duration(seconds: 5));

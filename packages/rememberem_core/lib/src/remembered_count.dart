@@ -11,15 +11,20 @@ class RememberedCount {
     int threshold = defaultThreshold,
   }) =>
       RememberedCount(
-        active.where((m) => m.points >= threshold).length,
+        active.where((m) => isRemembered(m.points, threshold)).length,
         [
           for (final m in active)
             for (final d in m.details)
-              if (d.points >= threshold && d.text.trim().isNotEmpty) d,
+              if (isRemembered(d.points, threshold) && d.text.trim().isNotEmpty)
+                d,
         ].length,
       );
 
   static const int defaultThreshold = 5;
+
+  /// The one test of "remembered": a face or detail with at least
+  /// [threshold] points.
+  static bool isRemembered(int points, int threshold) => points >= threshold;
 
   final int faces;
   final int details;

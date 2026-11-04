@@ -35,4 +35,23 @@ enum FilterKind {
     TagFilter() => FilterKind.tag,
     _ => throw ArgumentError.value(condition, 'condition'),
   };
+
+  /// [condition] in words, for saying how the list is filtered:
+  /// "Place: Cafe", "Date range: 1 Nov 2026 – 3 Nov 2026".
+  static String describe(FilterCondition condition) {
+    String range(DateTime? from, DateTime? to) => from == null || to == null
+        ? 'any'
+        : '${DetailPrompt.date(from)} – ${DetailPrompt.date(to)}';
+    final value = switch (condition) {
+      PlaceFilter(:final name) => name ?? 'any',
+      MeetingFilter(:final name) => name ?? 'any',
+      NameFilter(:final text) => '"${text.trim()}"',
+      DetailsFilter(:final text) => '"${text.trim()}"',
+      DateRangeFilter(:final from, :final to) => range(from, to),
+      AnniversaryFilter(:final from, :final to) => range(from, to),
+      TagFilter(:final name) => name ?? 'any',
+      _ => '',
+    };
+    return '${of(condition).label}: $value';
+  }
 }

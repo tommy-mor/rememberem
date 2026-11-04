@@ -357,6 +357,22 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('a reminder plays with everyone, whatever the list shows', (
+      tester,
+    ) async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      await boot(tester);
+      services.listFilters.show([const NameFilter('ann')]);
+
+      await tap(tester, PracticeGame.faces);
+
+      expect(find.byType(FaceGameScreen), findsOneWidget);
+      expect(
+        tester.widget<FaceGameScreen>(find.byType(FaceGameScreen)).pool,
+        isNull,
+      );
+    });
+
     testWidgets('a cold-start reminder opens the game once; Back is the list', (
       tester,
     ) async {

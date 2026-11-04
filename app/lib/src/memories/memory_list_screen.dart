@@ -9,6 +9,7 @@ import '../app/app_routes.dart';
 import '../app/app_services.dart';
 import '../app/brand_logo.dart';
 import '../places/places_screen.dart';
+import '../practice/filtered_practice_screen.dart';
 import '../practice/practice_screens.dart';
 import '../settings/settings_screen.dart';
 import '../timeline/timeline_screen.dart';
@@ -17,6 +18,7 @@ import 'filter_bar.dart';
 import 'filter_match_lines.dart';
 import 'memory_tile.dart';
 import 'person_card_route.dart';
+import 'progress_badge.dart';
 import 'remembered_label.dart';
 
 /// Home screen: everyone you have met, newest first, narrowed and sorted
@@ -295,16 +297,36 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     );
   }
 
-  void _practiceFaces() =>
-      _openGame(PracticeScreens.build(PracticeGame.faces, widget.services));
+  void _practiceFaces() => _practice(PracticeGame.faces);
 
-  void _practiceDetails() =>
-      _openGame(PracticeScreens.build(PracticeGame.details, widget.services));
+  void _practiceDetails() => _practice(PracticeGame.details);
 
-  void _openGame(Widget game) {
+  /// Plays [game]; on a filtered list, first asks whether to play with
+  /// the filtered people or everyone.
+  void _practice(PracticeGame game) {
+    final filters = widget.services.listFilters;
+    // The practice buttons show only once the list has loaded.
+    final memories = _memories!;
+    if (!filters.isFiltered) {
+      _openGame(PracticeScreens.build(game, widget.services));
+      return;
+    }
+    _openGame(
+      FilteredPracticeScreen(
+        game: game,
+        services: widget.services,
+        filters: filters.active,
+        filtered: filters.apply(memories),
+      ),
+      fullscreenDialog: true,
+    );
+  }
+
+  void _openGame(Widget game, {bool fullscreenDialog = false}) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
+        fullscreenDialog: fullscreenDialog,
         settings: const RouteSettings(name: AppRoutes.practice),
         builder: (_) => game,
       ),
@@ -386,7 +408,6 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     Memory memory,
     List<FilterCondition> active,
   ) {
-    final points = MemoryTile.pointsOf(memory);
     return MemoryTile(
       memory: memory,
       photo: _repository.photoFile(memory),
@@ -394,16 +415,12 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       below: active.isEmpty
           ? null
           : FilterMatchLines(memory: memory, filters: active),
-      trailing: points == 0
+      // A face's progress toward remembered; nothing until it scores.
+      trailing: memory.points == 0
           ? null
-          : Tooltip(
-              message: '$points practice points',
-              child: Badge(
-                label: Text('$points'),
-                largeSize: 20,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                textColor: Theme.of(context).colorScheme.onPrimary,
-              ),
+          : ProgressBadge(
+              points: memory.points,
+              threshold: widget.services.settings.value.rememberedThreshold,
             ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
+import 'package:rememberem/src/memories/progress_badge.dart';
 import 'package:rememberem/src/memories/remembered_label.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -124,23 +125,29 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Faces'), findsOneWidget);
   });
 
-  testWidgets('each person shows a points badge once they have points', (
-    tester,
-  ) async {
+  testWidgets('a face with points shows a pie of its progress, green once '
+      'remembered; detail points alone show none', (tester) async {
     await person('Ann', points: 5);
-    await person('Bo');
+    await person('Bo', points: 2);
+    await person('Cy', detailPoints: 3);
     await showList(tester);
 
-    Finder badgeIn(String name) => find.descendant(
-      of: find.widgetWithText(ListTile, name),
-      matching: find.byType(Badge),
-    );
-    expect(badgeIn('Ann'), findsOneWidget);
-    expect(
-      find.descendant(of: badgeIn('Ann'), matching: find.text('5')),
-      findsOneWidget,
-    );
-    expect(badgeIn('Bo'), findsNothing);
+    ProgressBadge? badgeOf(String name) {
+      final found = find.descendant(
+        of: find.widgetWithText(ListTile, name),
+        matching: find.byType(ProgressBadge),
+      );
+      return found.evaluate().isEmpty
+          ? null
+          : tester.widget<ProgressBadge>(found);
+    }
+
+    expect(badgeOf('Ann')!.remembered, isTrue); // threshold 5
+    expect(find.byTooltip('Name remembered'), findsOneWidget);
+    expect(badgeOf('Bo')!.remembered, isFalse);
+    expect(find.byTooltip('2 of 5 right'), findsOneWidget);
+    expect(badgeOf('Cy'), isNull);
+    expect(find.text('5'), findsNothing); // no number any more
   });
 
   testWidgets('coming back from a game shows new points', (tester) async {

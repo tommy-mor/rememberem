@@ -83,7 +83,7 @@ void main() {
     expect(s.placeRadiusFeet, 1000);
     expect(s.meetingWindowMinutes, 30);
     expect(s.gameTurns, 7);
-    expect(s.revealSeconds, 5);
+    expect(s.revealSeconds, 10);
     expect(s.rememberedThreshold, 3);
   });
 
@@ -98,5 +98,13 @@ void main() {
   test('reminders default on at 19:00, but damage still means off', () {
     expect(const ReminderSettings.defaults().enabled, isTrue);
     expect(ReminderSettings.fromJson('junk').enabled, isFalse);
+  });
+
+  test('the show delay is on unless turned off, and round-trips', () {
+    expect(AppSettings.fromJson({}).revealDelay, isTrue);
+    const off = AppSettings(revealDelay: false);
+    expect(AppSettings.fromJson(off.toJson()), off);
+    expect(off, isNot(const AppSettings()));
+    expect(off.copyWith(revealDelay: true), const AppSettings());
   });
 }

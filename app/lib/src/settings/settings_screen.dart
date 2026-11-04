@@ -97,13 +97,22 @@ class SettingsScreen extends StatelessWidget {
               range: AppSettings.gameTurnsRange,
               onChanged: (v) => settings.update(s.copyWith(gameTurns: v)),
             ),
-            SettingStepper(
-              label: 'Time to look before choosing',
-              value: s.revealSeconds,
-              range: AppSettings.revealSecondsRange,
-              format: (v) => '$v s',
-              onChanged: (v) => settings.update(s.copyWith(revealSeconds: v)),
+            SwitchListTile(
+              title: const Text('Wait before showing choices'),
+              subtitle: const Text(
+                'Time to recall before the choices appear. Off: at once.',
+              ),
+              value: s.revealDelay,
+              onChanged: (v) => settings.update(s.copyWith(revealDelay: v)),
             ),
+            if (s.revealDelay)
+              SettingStepper(
+                label: 'Time to look before choosing',
+                value: s.revealSeconds,
+                range: AppSettings.revealSecondsRange,
+                format: (v) => '$v s',
+                onChanged: (v) => settings.update(s.copyWith(revealSeconds: v)),
+              ),
             SettingStepper(
               label: 'Remembered after right answers',
               value: s.rememberedThreshold,

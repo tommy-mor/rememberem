@@ -13,6 +13,7 @@ class AppSettings {
     this.gameTurns = defaultGameTurns,
     this.revealSeconds = defaultRevealSeconds,
     this.rememberedThreshold = RememberedCount.defaultThreshold,
+    this.revealDelay = true,
     this.sounds = true,
     this.vibration = true,
     this.streetMaps = true,
@@ -66,6 +67,7 @@ class AppSettings {
         RememberedCount.defaultThreshold,
         rememberedThresholdRange,
       ),
+      revealDelay: flag('revealDelay'),
       sounds: flag('sounds'),
       vibration: flag('vibration'),
       streetMaps: flag('streetMaps'),
@@ -118,7 +120,7 @@ class AppSettings {
   static const placeRadiusRange = (min: 100, max: 1000);
   static const meetingWindowRange = (min: 30, max: 240);
   static const gameTurnsRange = (min: 5, max: 20);
-  static const revealSecondsRange = (min: 1, max: 5);
+  static const revealSecondsRange = (min: 1, max: 10);
   static const rememberedThresholdRange = (min: 3, max: 10);
   static const detailTextPercentRange = (min: 60, max: 150);
 
@@ -138,6 +140,10 @@ class AppSettings {
 
   /// Right answers in a row before a face or detail counts as remembered.
   final int rememberedThreshold;
+
+  /// Practice waits [revealSeconds] (or a tap on Show) before the
+  /// choices; false shows them at once.
+  final bool revealDelay;
 
   final bool sounds;
   final bool vibration;
@@ -207,6 +213,7 @@ class AppSettings {
     int? gameTurns,
     int? revealSeconds,
     int? rememberedThreshold,
+    bool? revealDelay,
     bool? sounds,
     bool? vibration,
     bool? streetMaps,
@@ -223,6 +230,7 @@ class AppSettings {
         gameTurns: gameTurns ?? this.gameTurns,
         revealSeconds: revealSeconds ?? this.revealSeconds,
         rememberedThreshold: rememberedThreshold ?? this.rememberedThreshold,
+        revealDelay: revealDelay ?? this.revealDelay,
         sounds: sounds ?? this.sounds,
         vibration: vibration ?? this.vibration,
         streetMaps: streetMaps ?? this.streetMaps,
@@ -240,6 +248,7 @@ class AppSettings {
         'gameTurns': gameTurns,
         'revealSeconds': revealSeconds,
         'rememberedThreshold': rememberedThreshold,
+        'revealDelay': revealDelay,
         'sounds': sounds,
         'vibration': vibration,
         'streetMaps': streetMaps,
@@ -259,6 +268,7 @@ class AppSettings {
       other.gameTurns == gameTurns &&
       other.revealSeconds == revealSeconds &&
       other.rememberedThreshold == rememberedThreshold &&
+      other.revealDelay == revealDelay &&
       other.sounds == sounds &&
       other.vibration == vibration &&
       other.streetMaps == streetMaps &&
@@ -277,6 +287,7 @@ class AppSettings {
         gameTurns,
         revealSeconds,
         rememberedThreshold,
+        revealDelay,
         sounds,
         vibration,
         streetMaps,
