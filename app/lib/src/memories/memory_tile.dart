@@ -11,12 +11,17 @@ class MemoryTile extends StatelessWidget {
     required this.photo,
     this.trailing,
     this.onTap,
+    this.below,
   });
 
   final Memory memory;
   final File photo;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// Shown under the name and place, lined up with them (why a person
+  /// matches a filter).
+  final Widget? below;
 
   /// What to call someone whose name is blank (nothing is stored).
   static const unknownName = Memory.unknownName;
@@ -31,7 +36,7 @@ class MemoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     // Tight: lines close together, people close together.
-    return ListTile(
+    final tile = ListTile(
       visualDensity: const VisualDensity(vertical: -4),
       minVerticalPadding: 3,
       minTileHeight: 0,
@@ -53,6 +58,25 @@ class MemoryTile extends StatelessWidget {
       ),
       trailing: trailing,
       onTap: onTap,
+    );
+    final below = this.below;
+    if (below == null) return tile;
+    // One stop for a screen reader: the person, then why they match.
+    return MergeSemantics(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            tile,
+            // Past the photo: 16 padding, a 40 avatar, 16 gap.
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(72, 0, 16, 6),
+              child: below,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

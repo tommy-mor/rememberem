@@ -78,10 +78,10 @@ class Detail {
           kind == DetailKind.tag &&
           (label?.trim() ?? '').isEmpty ||
       text.trim().isEmpty &&
-      (place?.trim() ?? '').isEmpty &&
-      (label?.trim() ?? '').isEmpty &&
-      targetId == null &&
-      eventDate == null;
+          (place?.trim() ?? '').isEmpty &&
+          (label?.trim() ?? '').isEmpty &&
+          targetId == null &&
+          eventDate == null;
 
   /// Where a happening happened, or a tag's place.
   final String? place;

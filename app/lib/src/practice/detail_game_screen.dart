@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/home_button.dart';
 import '../memories/memory_tile.dart';
 import 'game_feedback.dart';
 
@@ -251,6 +252,7 @@ class _DetailGameScreenState extends State<DetailGameScreen>
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: const [HomeButton()],
       ),
       body: SafeArea(child: _body(context)),
     );

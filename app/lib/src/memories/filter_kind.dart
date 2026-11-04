@@ -1,6 +1,6 @@
 import 'package:rememberem_core/rememberem_core.dart';
 
-/// The kinds of filter the Filter List offers, in menu order.
+/// The kinds of filter the list offers, in menu order.
 enum FilterKind {
   place('Place'),
   meeting('Meeting'),

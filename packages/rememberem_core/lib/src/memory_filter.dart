@@ -2,7 +2,7 @@ import 'filter_condition.dart';
 import 'meeting_finder.dart';
 import 'memory.dart';
 
-/// Which people the Filter List shows: those matching every condition
+/// Which people the list shows: those matching every condition
 /// (AND). Blank conditions match everyone.
 class MemoryFilter {
   const MemoryFilter([this.conditions = const []]);

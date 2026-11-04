@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/home_button.dart';
+
 /// Crops a photo to a 4:5 portrait: pinch and drag it in the frame, then
 /// Crop pops with the framed part as JPEG bytes. Back pops with nothing.
 class CropScreen extends StatefulWidget {
@@ -96,7 +98,7 @@ class _CropScreenState extends State<CropScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(title: const Text('Crop')),
+      appBar: AppBar(title: const Text('Crop'), actions: const [HomeButton()]),
       body: Column(
         children: [
           const Padding(

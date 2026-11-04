@@ -155,8 +155,10 @@ has already been tried and fallen short.
   Liberia, Myanmar and the UK).
 - Anniversary notices are scheduled 30 days ahead on each sync (app open,
   resume, back to the list), ids 100–129, at 09:00 on each day whose next
-  week holds an anniversary. They name no one; a tap opens the Filter List
+  week holds an anniversary. They name no one; a tap returns to the list
   with an Anniversary filter for that week.
+- The list's filters and sort (`ListFilters` on `AppServices`) are not
+  saved: a restart shows everyone, newest first.
 - `contactKey` (top level, optional) links a person to a phone contact by
   Android lookup key only; no contact data is copied. It changes only through
   `setContactKey`, so autosave never undoes it.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import '../memories/person_card_route.dart';
 
 import '../settings/units.dart';
@@ -242,7 +243,10 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Places')),
+      appBar: AppBar(
+        title: const Text('Places'),
+        actions: const [HomeButton()],
+      ),
       body: _body(),
     );
   }

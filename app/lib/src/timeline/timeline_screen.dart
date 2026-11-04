@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import '../memories/person_card_route.dart';
 import 'timeline_miniature.dart';
 
@@ -90,7 +91,10 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
   Widget build(BuildContext context) {
     final day = widget.day;
     return Scaffold(
-      appBar: AppBar(title: Text(day == null ? 'Timeline' : _dayLabel(day))),
+      appBar: AppBar(
+        title: Text(day == null ? 'Timeline' : _dayLabel(day)),
+        actions: const [HomeButton()],
+      ),
       body: _body(context),
     );
   }

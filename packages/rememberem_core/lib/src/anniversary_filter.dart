@@ -1,3 +1,4 @@
+import 'detail.dart';
 import 'detail_kind.dart';
 import 'filter_condition.dart';
 import 'local_day.dart';
@@ -21,17 +22,35 @@ class AnniversaryFilter implements FilterCondition {
     if (isBlank) return true;
     final first = LocalDay.of(from!);
     final last = LocalDay.of(to!);
-    for (final detail in memory.details) {
-      final start = detail.eventDate;
-      if (detail.kind != DetailKind.anniversary || start == null) continue;
-      // The range may span a new year, so try each year it touches.
-      for (var year = first.year; year <= last.year; year++) {
-        if (year < start.year) continue;
-        final day = _fallsOn(start, year);
-        if (day.compareTo(first) >= 0 && day.compareTo(last) <= 0) {
-          return true;
-        }
-      }
+    return memory.details.any((d) => _matches(d, first, last));
+  }
+
+  /// The anniversaries in range.
+  List<Detail> detailsIn(Memory memory) {
+    if (isBlank) return const [];
+    final first = LocalDay.of(from!);
+    final last = LocalDay.of(to!);
+    return [
+      for (final d in memory.details)
+        if (_matches(d, first, last)) d,
+    ];
+  }
+
+  static bool _matches(Detail detail, LocalDay first, LocalDay last) {
+    final start = detail.eventDate;
+    return detail.kind == DetailKind.anniversary &&
+        start != null &&
+        fallsIn(start, first, last);
+  }
+
+  /// True if a yearly date first on [start] falls on a day from [first] to
+  /// [last].
+  static bool fallsIn(DateTime start, LocalDay first, LocalDay last) {
+    // The range may span a new year, so try each year it touches.
+    for (var year = first.year; year <= last.year; year++) {
+      if (year < start.year) continue;
+      final day = _fallsOn(start, year);
+      if (day.compareTo(first) >= 0 && day.compareTo(last) <= 0) return true;
     }
     return false;
   }

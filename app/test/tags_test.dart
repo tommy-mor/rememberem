@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/memories/detail_extras_editor.dart';
 import 'package:rememberem/src/memories/detail_list_editor.dart';
-import 'package:rememberem/src/memories/filter_list_screen.dart';
+import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -202,21 +202,22 @@ void main() {
     );
   });
 
-  testWidgets('the Filter List finds people by tag', (tester) async {
+  testWidgets('the Tag filter on the list finds people by tag', (tester) async {
     await withTag('Ann', 'Book club');
     await withTag('Bo', 'Relatives');
     phone(tester);
     await tester.pumpWidget(
       MaterialApp(
-        home: FilterListScreen(
+        home: MemoryListScreen(
           services: testServices(repository),
           routeObserver: RouteObserver<ModalRoute<void>>(),
+          onMeetSomeone: () {},
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Add filter'));
+    await tester.tap(find.byTooltip('Add filter'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tag').last);
     await tester.pumpAndSettle();

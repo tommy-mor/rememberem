@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/home_button.dart';
 import 'memory_tile.dart';
 
 /// Picks the existing person to merge someone into. Pops with the chosen
@@ -27,7 +28,10 @@ class _MergePickerScreenState extends State<MergePickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Merge with…')),
+      appBar: AppBar(
+        title: const Text('Merge with…'),
+        actions: const [HomeButton()],
+      ),
       body: FutureBuilder<List<Memory>>(
         future: _people,
         builder: (context, snapshot) {

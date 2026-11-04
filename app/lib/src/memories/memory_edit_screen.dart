@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import '../contacts/contact_link_button.dart';
 import '../maps/location_choice.dart';
 import '../maps/location_picker_screen.dart';
@@ -302,6 +303,18 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
   }
 
+  /// Home saves first, so the list shows the latest.
+  Future<bool> _saveBeforeLeaving() async {
+    // Already leaving (Back, trash or delete): that finishes the job.
+    if (_leaving) return false;
+    try {
+      await _editor.flush();
+    } catch (_) {
+      // Leave anyway; the edit stays queued for the dispose flush.
+    }
+    return true;
+  }
+
   Widget _buildScaffold(BuildContext context) {
     final memory = _editor.memory;
     return Scaffold(
@@ -320,6 +333,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
           ],
         ),
         actions: [
+          HomeButton(mayLeave: _saveBeforeLeaving),
           if (widget.services.contacts case final contacts?)
             ContactLinkButton(
               memoryId: memory.id,

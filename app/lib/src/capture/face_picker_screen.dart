@@ -5,7 +5,9 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import '../memories/memory_edit_screen.dart';
+import 'discard_photo_dialog.dart';
 import 'face_box.dart';
 import 'group_details_screen.dart';
 import 'photo_problems.dart';
@@ -18,12 +20,10 @@ class FacePickerScreen extends StatefulWidget {
     super.key,
     required this.draft,
     required this.services,
-    required this.routeObserver,
   });
 
   final CaptureDraft draft;
   final AppServices services;
-  final RouteObserver<ModalRoute<void>> routeObserver;
 
   @override
   State<FacePickerScreen> createState() => _FacePickerScreenState();
@@ -61,7 +61,6 @@ class _FacePickerScreenState extends State<FacePickerScreen> {
             draft: widget.draft,
             faces: faces,
             services: widget.services,
-            routeObserver: widget.routeObserver,
           ),
         ),
       );
@@ -94,27 +93,15 @@ class _FacePickerScreenState extends State<FacePickerScreen> {
     }
   }
 
-  /// Back would lose the photo, so ask first.
+  /// Leaving would lose the photo, so ask first; true to leave.
+  Future<bool> _mayDiscard() async {
+    if (_saving) return false;
+    final discard = await DiscardPhotoDialog.show(context);
+    return discard && mounted;
+  }
+
   Future<void> _confirmDiscard() async {
-    if (_saving) return;
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Discard this photo?'),
-        content: const Text('No one in it has been saved yet.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep choosing'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
-    );
-    if (discard == true && mounted) Navigator.of(context).pop();
+    if (await _mayDiscard() && mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -129,6 +116,7 @@ class _FacePickerScreenState extends State<FacePickerScreen> {
         appBar: AppBar(
           title: const Text('Choose faces'),
           actions: [
+            HomeButton(mayLeave: _mayDiscard),
             Tooltip(
               message: 'Choose all faces',
               child: TextButton(

@@ -7,6 +7,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../app/allow_in_settings.dart';
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import '../app/system_settings.dart';
 import '../memories/memory_edit_screen.dart';
 import 'face_picker_screen.dart';
@@ -20,16 +21,9 @@ typedef _Photo = ({List<int> bytes, DateTime capturedAt, GeoPoint? location});
 /// to the notes for that person; a photo of several people first asks whom
 /// to remember.
 class CaptureScreen extends StatefulWidget {
-  const CaptureScreen({
-    super.key,
-    required this.services,
-    required this.routeObserver,
-  });
+  const CaptureScreen({super.key, required this.services});
 
   final AppServices services;
-
-  /// For the Filter List a group photo ends on.
-  final RouteObserver<ModalRoute<void>> routeObserver;
 
   @override
   State<CaptureScreen> createState() => _CaptureScreenState();
@@ -228,11 +222,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
           MaterialPageRoute<void>(
             // Still the camera's job: the shortcut and reminders leave it be.
             settings: const RouteSettings(name: AppRoutes.capture),
-            builder: (_) => FacePickerScreen(
-              draft: draft,
-              services: widget.services,
-              routeObserver: widget.routeObserver,
-            ),
+            builder: (_) =>
+                FacePickerScreen(draft: draft, services: widget.services),
           ),
         );
         return;
@@ -348,6 +339,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: const Text('Meet someone'),
+        actions: [HomeButton(enabled: !_saving)],
       ),
       body: Stack(
         fit: StackFit.expand,

@@ -7,7 +7,8 @@ import 'package:rememberem/src/app/meet_shortcut.dart';
 import 'package:rememberem/src/app/rememberem_app.dart';
 import 'package:rememberem/src/capture/capture_screen.dart';
 import 'package:rememberem/src/location/device_location.dart';
-import 'package:rememberem/src/memories/filter_list_screen.dart';
+import 'package:rememberem/src/memories/memory_edit_screen.dart';
+import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem/src/reminders/local_notifications_scheduler.dart';
 import 'package:rememberem/src/reminders/reminder_coordinator.dart';
 import 'package:rememberem/src/reminders/reminder_settings_store.dart';
@@ -272,36 +273,39 @@ void main() {
 
     final notice = AnniversaryNotice.wireId(const LocalDay(2026, 11, 15));
 
-    Finder inFilterList(String text) => find.descendant(
-      of: find.byType(FilterListScreen),
+    Finder onList(String text) => find.descendant(
+      of: find.byType(MemoryListScreen),
       matching: find.text(text),
     );
+
+    /// The Anniversary filter's row on the list.
+    Finder anniversaryRow() =>
+        find.widgetWithText(InputDecorator, 'Anniversary');
 
     Future<void> twoPeople() async {
       await person('Ann', anniversary: DateTime(1990, 11, 20));
       await person('Bo', anniversary: DateTime(1990, 12, 25));
     }
 
-    testWidgets('opens the Filter List set to that week', (tester) async {
+    testWidgets('filters the list to that week', (tester) async {
       await twoPeople();
       await boot(tester);
 
       scheduler.emitPayload(notice);
       await tester.pumpAndSettle();
 
-      expect(find.byType(FilterListScreen), findsOneWidget);
-      expect(inFilterList('Anniversary'), findsOneWidget);
-      expect(inFilterList('Ann'), findsOneWidget);
-      expect(inFilterList('Bo'), findsNothing);
-      expect(inFilterList('1 person'), findsOneWidget);
+      expect(anniversaryRow(), findsOneWidget);
+      expect(onList('Ann'), findsOneWidget);
+      expect(onList('Bo'), findsNothing);
+      expect(onList('1 person'), findsOneWidget);
 
-      // A second tap does not stack another list.
+      // A second tap does not add another filter.
       scheduler.emitPayload(notice);
       await tester.pumpAndSettle();
-      expect(find.byType(FilterListScreen), findsOneWidget);
+      expect(anniversaryRow(), findsOneWidget);
     });
 
-    testWidgets('a newer notice replaces the open list', (tester) async {
+    testWidgets('a newer notice replaces the filter', (tester) async {
       await twoPeople();
       await boot(tester);
       scheduler.emitPayload(notice);
@@ -312,9 +316,23 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(FilterListScreen), findsOneWidget);
-      expect(inFilterList('Bo'), findsOneWidget);
-      expect(inFilterList('Ann'), findsNothing);
+      expect(anniversaryRow(), findsOneWidget);
+      expect(onList('Bo'), findsOneWidget);
+      expect(onList('Ann'), findsNothing);
+    });
+
+    testWidgets('a notice over a card closes it onto the list', (tester) async {
+      await twoPeople();
+      await boot(tester);
+      await tester.tap(find.text('Bo'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MemoryEditScreen), findsOneWidget);
+
+      scheduler.emitPayload(notice);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MemoryEditScreen), findsNothing);
+      expect(onList('Ann'), findsOneWidget);
     });
 
     testWidgets('coming back to the list counts a new anniversary', (
@@ -345,17 +363,19 @@ void main() {
       expect(scheduler.notices, week);
     });
 
-    testWidgets('from a cold start too; Back is the list', (tester) async {
+    testWidgets('from a cold start too; Clear all shows everyone', (
+      tester,
+    ) async {
       await twoPeople();
       scheduler.launch = notice;
 
       await boot(tester);
 
-      expect(inFilterList('Ann'), findsOneWidget);
-      await tester.binding.handlePopRoute();
+      expect(onList('Ann'), findsOneWidget);
+      expect(onList('Bo'), findsNothing);
+      await tester.tap(find.text('Clear all'));
       await tester.pumpAndSettle();
-      expect(find.byType(FilterListScreen), findsNothing);
-      expect(find.text('Bo'), findsOneWidget);
+      expect(onList('Bo'), findsOneWidget);
     });
 
     testWidgets('a stale notice, with no one in its week, leaves the list', (
@@ -367,7 +387,8 @@ void main() {
       scheduler.emitPayload(notice);
       await tester.pumpAndSettle();
 
-      expect(find.byType(FilterListScreen), findsNothing);
+      expect(anniversaryRow(), findsNothing);
+      expect(onList('Bo'), findsOneWidget);
     });
 
     testWidgets('ignored for junk, and while the camera is open', (
@@ -377,7 +398,7 @@ void main() {
       await boot(tester);
       scheduler.emitPayload('anniversaries:2026-13-01');
       await tester.pumpAndSettle();
-      expect(find.byType(FilterListScreen), findsNothing);
+      expect(anniversaryRow(), findsNothing);
 
       shortcut.trigger!();
       await tester.pump();
@@ -387,7 +408,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.byType(CaptureScreen), findsOneWidget);
-      expect(find.byType(FilterListScreen), findsNothing);
+      expect(anniversaryRow(), findsNothing);
     });
   });
 }

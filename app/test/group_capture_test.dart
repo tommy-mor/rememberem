@@ -6,13 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:rememberem/src/app/app_routes.dart';
+import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/capture/capture_screen.dart';
 import 'package:rememberem/src/capture/face_box.dart';
 import 'package:rememberem/src/capture/face_picker_screen.dart';
 import 'package:rememberem/src/capture/group_details_screen.dart';
 import 'package:rememberem/src/capture/photo_picker.dart';
 import 'package:rememberem/src/capture/picked_photo.dart';
-import 'package:rememberem/src/memories/filter_list_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -44,6 +44,7 @@ class _Faces implements FaceLocator {
 void main() {
   late FakeMemoryRepository repository;
   late RecordingCapture capture;
+  late AppServices services;
   const left = PixelRect(20, 100, 60, 80);
   const middle = PixelRect(160, 120, 60, 80);
   const right = PixelRect(300, 90, 60, 80);
@@ -58,6 +59,7 @@ void main() {
   ) async {
     final observer = RouteObserver<ModalRoute<void>>();
     final navigator = GlobalKey<NavigatorState>();
+    services = testServices(repository, capture: capture, photoPicker: picker);
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigator,
@@ -68,14 +70,7 @@ void main() {
     navigator.currentState!.push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: AppRoutes.capture),
-        builder: (_) => CaptureScreen(
-          services: testServices(
-            repository,
-            capture: capture,
-            photoPicker: picker,
-          ),
-          routeObserver: observer,
-        ),
+        builder: (_) => CaptureScreen(services: services),
       ),
     );
     await tester.pump();
@@ -184,7 +179,7 @@ void main() {
   });
 
   testWidgets('several faces share the place, meeting and details, are left '
-      'unnamed, and the Filter List opens on the unknown', (tester) async {
+      'unnamed, and the list shows the unknown', (tester) async {
     await pickPhoto(tester);
     await tester.tap(find.text('All'));
     await tester.pump();
@@ -223,14 +218,11 @@ void main() {
         DetailKind.fact,
       ]);
     }
-    expect(find.byType(FilterListScreen), findsOneWidget);
-    expect(find.text('Add their names while you remember.'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'unknown'), findsOneWidget);
-    expect(find.text('3 people'), findsOneWidget);
-
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    // Back on the list, filtered to the people just saved.
     expect(find.text('list'), findsOneWidget);
+    expect(services.listFilters.note, 'Add their names while you remember.');
+    expect(services.listFilters.active.single, isA<NameFilter>());
+    expect(services.listFilters.apply(people), hasLength(3));
   });
 
   testWidgets('Back from group details returns to choosing faces', (
@@ -247,6 +239,29 @@ void main() {
 
     expect(find.byType(FacePickerScreen), findsOneWidget);
     expect(find.text('Add 3 people'), findsOneWidget);
+    expect(repository.stored, isEmpty);
+  });
+
+  testWidgets('Home from group details asks first, then goes to the list '
+      'saving nothing', (tester) async {
+    await pickPhoto(tester);
+    await tester.tap(find.text('All'));
+    await tester.pump();
+    await tester.tap(find.text('Add 3 people'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Discard this photo?'), findsOneWidget);
+    await tester.tap(find.text('Keep choosing'));
+    await tester.pumpAndSettle();
+    expect(find.byType(GroupDetailsScreen), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    expect(find.text('list'), findsOneWidget);
     expect(repository.stored, isEmpty);
   });
 
@@ -288,7 +303,7 @@ void main() {
     capture.holdGroup!.complete();
     await tester.pumpAndSettle();
     expect(repository.stored, hasLength(3));
-    expect(find.byType(FilterListScreen), findsOneWidget);
+    expect(find.text('list'), findsOneWidget);
   });
 
   testWidgets('a double tap on Add opens the group page once', (tester) async {
@@ -322,7 +337,7 @@ void main() {
 
     expect(repository.stored, hasLength(1));
     expect(find.textContaining('Saved 1 of 3 people'), findsOneWidget);
-    expect(find.byType(FilterListScreen), findsOneWidget);
+    expect(find.text('list'), findsOneWidget);
   });
 
   testWidgets('a failure before anyone is saved stays to try again', (
@@ -381,7 +396,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Add 2 people'));
     await settleReal(tester);
 
-    expect(find.byType(FilterListScreen), findsOneWidget);
+    expect(find.text('list'), findsOneWidget);
     final people = repository.stored.values.toList();
     expect(people, hasLength(2));
     for (final person in people) {

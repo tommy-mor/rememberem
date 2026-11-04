@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/home_button.dart';
 import '../memories/memory_tile.dart';
 import 'purge_confirm_dialog.dart';
 
@@ -50,7 +51,7 @@ class _TrashScreenState extends State<TrashScreen> {
   Widget build(BuildContext context) {
     final trashed = _trashed;
     return Scaffold(
-      appBar: AppBar(title: const Text('Trash')),
+      appBar: AppBar(title: const Text('Trash'), actions: const [HomeButton()]),
       body: trashed == null
           ? const Center(child: CircularProgressIndicator())
           : trashed.isEmpty

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/brand_logo.dart';
+import '../app/home_button.dart';
 import 'link_opener.dart';
 
 /// Who made Rememberem, where to send ideas or report a problem, and
@@ -48,7 +49,7 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('About')),
+      appBar: AppBar(title: const Text('About'), actions: const [HomeButton()]),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [

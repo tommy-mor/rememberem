@@ -2,28 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
-import '../memories/filter_list_screen.dart';
+import '../app/home_button.dart';
 import '../memories/memory_edit_screen.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
+import 'discard_photo_dialog.dart';
 import 'photo_problems.dart';
 
 /// Several faces from one photo: the place, meeting and details they
-/// share. Saving makes one unnamed person per face, then opens the Filter
-/// List on the unnamed, so Fred can name them.
+/// share. Saving makes one unnamed person per face, then returns to the
+/// list filtered to the unnamed, so Fred can name them.
 class GroupDetailsScreen extends StatefulWidget {
   const GroupDetailsScreen({
     super.key,
     required this.draft,
     required this.faces,
     required this.services,
-    required this.routeObserver,
   });
 
   final CaptureDraft draft;
   final List<PixelRect> faces;
   final AppServices services;
-  final RouteObserver<ModalRoute<void>> routeObserver;
 
   @override
   State<GroupDetailsScreen> createState() => _GroupDetailsScreenState();
@@ -92,17 +91,11 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         SnackBar(content: Text(problem), duration: const Duration(seconds: 8)),
       );
     }
-    await Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => FilterListScreen(
-          services: widget.services,
-          routeObserver: widget.routeObserver,
-          initialFilters: [NameFilter(Memory.unknownName.toLowerCase())],
-          note: 'Add their names while you remember.',
-        ),
-      ),
-      (route) => route.isFirst,
-    );
+    // Back to the list, showing the people just saved.
+    widget.services.listFilters.show([
+      NameFilter(Memory.unknownName.toLowerCase()),
+    ], note: 'Add their names while you remember.');
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -116,7 +109,15 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
 
   Widget _page(int count, Dictation dictation, TextTheme text) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Group details')),
+      appBar: AppBar(
+        title: const Text('Group details'),
+        actions: [
+          HomeButton(
+            enabled: !_saving,
+            mayLeave: () => DiscardPhotoDialog.show(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

@@ -80,7 +80,6 @@ void main() {
             // Where the phone is now must not be used for an old photo.
             location: location ?? FakeLocation(const GeoPoint(1, 1)),
           ),
-          routeObserver: RouteObserver<ModalRoute<void>>(),
         ),
       ),
     );

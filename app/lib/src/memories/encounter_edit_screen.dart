@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import '../speech/dictated_text_field.dart';
 import 'memory_editor.dart';
 import 'when_where_row.dart';
@@ -66,7 +67,18 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
     }
     final isLast = _editor.memory.encounters.length < 2;
     return Scaffold(
-      appBar: AppBar(title: const Text('Picture')),
+      appBar: AppBar(
+        title: const Text('Picture'),
+        actions: [
+          HomeButton(
+            mayLeave: () async {
+              // Saved first, so the list shows the latest.
+              await _editor.flush().catchError((_) {});
+              return true;
+            },
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

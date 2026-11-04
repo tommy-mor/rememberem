@@ -13,12 +13,14 @@ import '../practice/practice_screens.dart';
 import '../settings/settings_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
-import 'filter_list_screen.dart';
+import 'filter_bar.dart';
+import 'filter_match_lines.dart';
 import 'memory_tile.dart';
 import 'person_card_route.dart';
 import 'remembered_label.dart';
 
-/// Home screen: everyone you have met, newest first.
+/// Home screen: everyone you have met, newest first, narrowed and sorted
+/// by the filters above them ([AppServices.listFilters]).
 class MemoryListScreen extends StatefulWidget {
   const MemoryListScreen({
     super.key,
@@ -154,18 +156,6 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     );
   }
 
-  void _openFilterList() {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FilterListScreen(
-          services: widget.services,
-          routeObserver: widget.routeObserver,
-        ),
-      ),
-    );
-  }
-
   void _openSettings() {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).push(
@@ -211,11 +201,6 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
             tooltip: 'Timeline',
             icon: const Icon(Icons.schedule),
             onPressed: _openTimeline,
-          ),
-          IconButton(
-            tooltip: 'Filter List',
-            icon: const Icon(Icons.filter_list),
-            onPressed: _openFilterList,
           ),
           IconButton(
             tooltip: 'Places',
@@ -364,28 +349,62 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
         ),
       );
     }
-    return ListView.builder(
-      itemCount: memories.length,
-      itemBuilder: (context, index) {
-        final memory = memories[index];
-        final points = MemoryTile.pointsOf(memory);
-        return MemoryTile(
-          memory: memory,
-          photo: _repository.photoFile(memory),
-          onTap: () => _open(memory),
-          trailing: points == 0
-              ? null
-              : Tooltip(
-                  message: '$points practice points',
-                  child: Badge(
-                    label: Text('$points'),
-                    largeSize: 20,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    textColor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                ),
+    final filters = widget.services.listFilters;
+    return ListenableBuilder(
+      listenable: filters,
+      builder: (context, _) {
+        final shown = filters.apply(memories);
+        final active = filters.active;
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: FilterBar(
+                filters: filters,
+                people: memories,
+                shown: shown.length,
+              ),
+            ),
+            if (shown.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text('No one matches.')),
+              )
+            else
+              SliverList.builder(
+                itemCount: shown.length,
+                itemBuilder: (context, index) =>
+                    _tile(context, shown[index], active),
+              ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _tile(
+    BuildContext context,
+    Memory memory,
+    List<FilterCondition> active,
+  ) {
+    final points = MemoryTile.pointsOf(memory);
+    return MemoryTile(
+      memory: memory,
+      photo: _repository.photoFile(memory),
+      onTap: () => _open(memory),
+      below: active.isEmpty
+          ? null
+          : FilterMatchLines(memory: memory, filters: active),
+      trailing: points == 0
+          ? null
+          : Tooltip(
+              message: '$points practice points',
+              child: Badge(
+                label: Text('$points'),
+                largeSize: 20,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                textColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+            ),
     );
   }
 }

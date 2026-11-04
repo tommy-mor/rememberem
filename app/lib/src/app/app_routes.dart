@@ -5,5 +5,4 @@ class AppRoutes {
 
   static const capture = 'capture';
   static const practice = 'practice';
-  static const anniversaries = 'anniversaries';
 }

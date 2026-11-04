@@ -37,10 +37,7 @@ void main() {
     test('a new stretch with the same first word is kept', () {
       final t = SpeechTranscript();
       t.add('she works at the library');
-      expect(
-        t.add('she has a cat'),
-        'she works at the library she has a cat',
-      );
+      expect(t.add('she has a cat'), 'she works at the library she has a cat');
     });
 
     test('a new stretch is kept even when it is as long as the last', () {

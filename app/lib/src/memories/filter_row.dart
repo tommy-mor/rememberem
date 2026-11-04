@@ -3,7 +3,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import 'filter_kind.dart';
 
-/// One filter on the Filter List: its kind as the label, a way to fill it
+/// One filter on the list: its kind as the label, a way to fill it
 /// in, and a remove button. Reports each change as a new condition.
 class FilterRow extends StatelessWidget {
   const FilterRow({

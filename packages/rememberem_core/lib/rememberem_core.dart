@@ -29,6 +29,7 @@ export 'src/memory.dart';
 export 'src/memory_field.dart';
 export 'src/name_filter.dart';
 export 'src/memory_repository.dart';
+export 'src/people_order.dart';
 export 'src/pixel_rect.dart';
 export 'src/photo_metadata.dart';
 export 'src/place_book.dart';

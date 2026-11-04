@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/home_button.dart';
 import 'location_choice.dart';
 import 'place_circle.dart';
 import 'place_marker.dart';
@@ -96,7 +97,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Where was this?')),
+      appBar: AppBar(
+        title: const Text('Where was this?'),
+        actions: const [HomeButton()],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

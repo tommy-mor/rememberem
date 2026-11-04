@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/home_button.dart';
 import 'game_feedback.dart';
 
 enum _Phase { loading, reveal, choose, finished, stopped }
@@ -247,6 +248,7 @@ class _FaceGameScreenState extends State<FaceGameScreen>
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: const [HomeButton()],
       ),
       body: SafeArea(child: _body(context)),
     );

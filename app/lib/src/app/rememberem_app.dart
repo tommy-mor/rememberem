@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../capture/capture_screen.dart';
-import '../memories/filter_list_screen.dart';
 import '../memories/memory_list_screen.dart';
 import '../practice/practice_screens.dart';
 import 'app_routes.dart';
@@ -65,14 +64,19 @@ class _RememberemAppState extends State<RememberemApp>
     }
   }
 
-  /// Opens the camera over the list. Ignored if the camera is already the
-  /// page on top (once it hands over to the notes page, it works again).
-  void _meetSomeone() => _openOnRoot(
-    AppRoutes.capture,
-    (_) =>
-        CaptureScreen(services: widget.services, routeObserver: _routeObserver),
-    blockedBy: {AppRoutes.capture},
-  );
+  /// Opens the camera over the list, which drops its filters so the
+  /// person about to be met is not hidden behind them. Ignored if the
+  /// camera is already the page on top (once it hands over to the notes
+  /// page, it works again).
+  void _meetSomeone() {
+    if (_topRouteIn({AppRoutes.capture})) return;
+    widget.services.listFilters.show(const []);
+    _openOnRoot(
+      AppRoutes.capture,
+      (_) => CaptureScreen(services: widget.services),
+      blockedBy: {AppRoutes.capture},
+    );
+  }
 
   /// A notification was tapped. Its payload is untrusted: anything that is
   /// not a game or a notice's day does nothing.
@@ -84,26 +88,20 @@ class _RememberemAppState extends State<RememberemApp>
     }
   }
 
-  /// An anniversary notice was tapped: the Filter List over the list, set
-  /// to the notice's week. Never over the camera or a game, and not if no
-  /// one matches any more (the list stays).
+  /// An anniversary notice was tapped: the list, filtered to the notice's
+  /// week (replacing any filters). Never over the camera or a game, and
+  /// not if no one matches any more (the list stays as it was).
   Future<void> _openAnniversaries(LocalDay day) async {
-    // A notice's list on top is replaced, so the newest week shows.
     const blockedBy = {AppRoutes.capture, AppRoutes.practice};
     if (_topRouteIn(blockedBy)) return;
     final filter = AnniversaryNotice.filterFor(day);
     try {
       final people = await widget.services.repository.all();
-      if (!people.any(filter.matches) || !mounted) return;
-      _openOnRoot(
-        AppRoutes.anniversaries,
-        (_) => FilterListScreen(
-          services: widget.services,
-          routeObserver: _routeObserver,
-          initialFilters: [filter],
-        ),
-        blockedBy: blockedBy,
-      );
+      final navigator = _navigator.currentState;
+      if (!people.any(filter.matches) || !mounted || navigator == null) return;
+      if (_topRouteIn(blockedBy)) return;
+      navigator.popUntil((route) => route.isFirst);
+      widget.services.listFilters.show([filter]);
     } catch (_) {
       // A notice must never break the app; the list stays.
     }

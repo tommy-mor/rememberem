@@ -8,7 +8,6 @@ import 'package:rememberem/src/app/rememberem_app.dart';
 import 'package:rememberem/src/capture/capture_screen.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/encounter_edit_screen.dart';
-import 'package:rememberem/src/memories/filter_list_screen.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/memories/merge_picker_screen.dart';
 import 'package:rememberem/src/memories/person_card_route.dart';
@@ -135,15 +134,19 @@ void main() {
     expectList(tester);
   });
 
-  testWidgets('matching, then a card: Back twice', (tester) async {
+  testWidgets('Home from a card over a day of the timeline: the list, '
+      'saved', (tester) async {
     await boot(tester);
-    await open(tester, find.byTooltip('Filter List'));
-    await open(tester, find.text('Bo'));
+    await open(tester, find.byTooltip('Timeline'));
+    await open(tester, find.text('Thursday, October 1, 2026'));
+    await open(tester, find.text('Ann'));
+    await tester.enterText(find.widgetWithText(TextField, 'Ann'), 'Annie');
 
-    await back(tester);
-    expect(find.byType(FilterListScreen), findsOneWidget);
-    await back(tester);
+    await tester.tap(find.byTooltip('Home'));
+    await tester.pumpAndSettle();
+
     expectList(tester);
+    expect(find.text('Annie'), findsOneWidget);
   });
 
   testWidgets('timeline, a day, then a card: Back three times', (tester) async {

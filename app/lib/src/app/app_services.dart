@@ -5,6 +5,7 @@ import '../about/link_opener.dart';
 import '../capture/photo_picker.dart';
 import '../contacts/contacts_service.dart';
 import '../location/device_location.dart';
+import '../memories/list_filters.dart';
 import '../practice/game_feedback.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../settings/app_settings_controller.dart';
@@ -23,8 +24,10 @@ class AppServices {
     this.feedback,
     this.contacts,
     LinkOpener? links,
+    ListFilters? listFilters,
   }) : settings = settings ?? AppSettingsController(),
-       links = links ?? BrowserLinkOpener();
+       links = links ?? BrowserLinkOpener(),
+       listFilters = listFilters ?? ListFilters();
 
   final MemoryRepository repository;
   final PortraitCapture capture;
@@ -49,4 +52,7 @@ class AppServices {
 
   /// Opens the About page's links in the browser.
   final LinkOpener links;
+
+  /// The main list's filters and order, which notices also set.
+  final ListFilters listFilters;
 }

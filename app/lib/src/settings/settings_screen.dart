@@ -3,6 +3,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../about/about_screen.dart';
 import '../about/link_opener.dart';
+import '../app/home_button.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../reminders/reminders_section.dart';
 import 'app_settings_controller.dart';
@@ -30,7 +31,10 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: const [HomeButton()],
+      ),
       body: ValueListenableBuilder<AppSettings>(
         valueListenable: settings,
         builder: (context, s, _) => ListView(

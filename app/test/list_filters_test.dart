@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
-import 'package:rememberem/src/memories/filter_list_screen.dart';
+import 'package:rememberem/src/memories/filter_bar.dart';
+import 'package:rememberem/src/memories/filter_match_lines.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
@@ -17,23 +18,11 @@ class _NoFaces implements FaceLocator {
   Future<List<PixelRect>> findFaces(File photo) async => [];
 }
 
-class _FailingOnceRepository extends FakeMemoryRepository {
-  bool fail = true;
-
-  @override
-  Future<List<Memory>> all() async {
-    if (fail) {
-      fail = false;
-      throw const FormatException('corrupt record');
-    }
-    return super.all();
-  }
-}
-
 void main() {
   late FakeMemoryRepository repository;
+  late AppServices services;
 
-  AppServices services() => AppServices(
+  AppServices makeServices() => AppServices(
     repository: repository,
     capture: PortraitCapture(
       repository: repository,
@@ -70,15 +59,18 @@ void main() {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    services = makeServices();
+    if (filters.isNotEmpty || note != null) {
+      services.listFilters.show(filters, note: note);
+    }
     final observer = RouteObserver<ModalRoute<void>>();
     await tester.pumpWidget(
       MaterialApp(
         navigatorObservers: [observer],
-        home: FilterListScreen(
-          services: services(),
+        home: MemoryListScreen(
+          services: services,
           routeObserver: observer,
-          initialFilters: filters,
-          note: note,
+          onMeetSomeone: () {},
         ),
       ),
     );
@@ -94,13 +86,14 @@ void main() {
 
   setUp(() => repository = FakeMemoryRepository());
 
-  testWidgets('it is the Filter List; it starts with no filters and offers '
-      'all five kinds', (tester) async {
+  testWidgets('the list starts with no filters and offers every kind', (
+    tester,
+  ) async {
     await person('Alex', 'Cafe');
     await showMatching(tester);
 
-    expect(find.text('Filter List'), findsOneWidget);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    expect(find.text('Clear all'), findsNothing);
     await tester.tap(find.byTooltip('Add filter'));
     await tester.pumpAndSettle();
     for (final kind in [
@@ -109,6 +102,8 @@ void main() {
       'Name contains',
       'Details contain',
       'Date range',
+      'Anniversary',
+      'Tag',
     ]) {
       expect(find.text(kind), findsOneWidget);
     }
@@ -266,37 +261,134 @@ void main() {
     expect(repository.stored[alex.id]!.latest.place, 'Library');
   });
 
-  testWidgets('a load failure offers Retry, which recovers', (tester) async {
-    repository = _FailingOnceRepository();
-    await person('Alex', 'Cafe');
-
-    await showMatching(tester);
-    expect(find.text('Could not load people.'), findsOneWidget);
-
-    await tester.tap(find.text('Retry'));
-    await tester.pumpAndSettle();
-    expect(find.text('Alex'), findsOneWidget);
-  });
-
-  testWidgets('the list has a Filter List button that opens it', (
+  testWidgets('choosing a sort twice reverses it; unnamed people stay last', (
     tester,
   ) async {
-    final observer = RouteObserver<ModalRoute<void>>();
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorObservers: [observer],
-        home: MemoryListScreen(
-          services: services(),
-          routeObserver: observer,
-          onMeetSomeone: () {},
+    await person('Cy Adams', 'Cafe'); // 1 Nov
+    await person('', 'Cafe'); // 2 Nov
+    await person('Ann Zed', 'Cafe'); // 3 Nov
+    await showMatching(tester);
+
+    List<String> order() => [
+      for (final t in tester.widgetList<ListTile>(find.byType(ListTile)))
+        (t.title! as Text).data!,
+    ];
+    expect(order(), ['Ann Zed', 'Cy Adams', 'Unknown']); // newest first
+
+    Future<void> sortBy(String label) async {
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining(label).last);
+      await tester.pumpAndSettle();
+    }
+
+    await sortBy('Last name');
+    expect(order(), ['Cy Adams', 'Ann Zed', 'Unknown']);
+    await sortBy('Last name');
+    expect(order(), ['Ann Zed', 'Cy Adams', 'Unknown']);
+    await sortBy('First name');
+    expect(order(), ['Ann Zed', 'Cy Adams', 'Unknown']);
+  });
+
+  testWidgets('a date range shows why each person matches', (tester) async {
+    final alex = await person('Alex', 'Cafe'); // met 1 Nov
+    await repository.save(
+      alex.withDetails([
+        Detail(
+          id: 'w',
+          text: '',
+          at: DateTime.utc(2026),
+          type: DetailKind.anniversary,
+          label: 'wedding',
+          eventDate: DateTime(2010, 11, 1),
         ),
-      ),
+        Detail(id: 'f', text: 'Tall', at: DateTime(2026, 11, 1)),
+      ]),
     );
+    await person('Sam', 'Cafe'); // met 2 Nov
+    await showMatching(
+      tester,
+      filters: [DateRangeFilter(DateTime(2026, 11, 1), DateTime(2026, 11, 1))],
+    );
+
+    expect(find.text('1 person'), findsOneWidget);
+    expect(find.text(FilterBar.dateHint), findsOneWidget);
+    expect(
+      find.text('Anniversary · Wedding · every 1 Nov (2010)'),
+      findsOneWidget,
+    );
+    expect(find.text('Photo · 1 Nov 2026'), findsOneWidget);
+    expect(find.textContaining('Tall'), findsNothing); // a fact has no date
+  });
+
+  testWidgets('details contain shows the matching details, the words in '
+      'bold, and finds a type too', (tester) async {
+    final alex = await person('Alex', 'Cafe', details: ['Sings bass']);
+    await repository.save(
+      alex.withDetails([
+        ...alex.details,
+        Detail(
+          id: 't',
+          text: '',
+          at: DateTime.utc(2026),
+          type: DetailKind.tag,
+          label: 'Bass choir',
+        ),
+      ]),
+    );
+    await showMatching(tester, filters: [const DetailsFilter('bass')]);
+
+    final lines = FilterMatchLines.linesFor(
+      repository.stored[alex.id]!,
+      services.listFilters.active,
+    );
+    expect(lines.map((l) => l.text), ['Fact · Sings bass', 'Tag · Bass choir']);
+    expect(lines.first.bold, [(13, 17)]);
+    expect(lines.last.bold, [(6, 10)]);
+    expect(find.text('Fact · Sings bass', findRichText: true), findsOneWidget);
+    final rich = tester.widget<RichText>(
+      find.text('Fact · Sings bass', findRichText: true),
+    );
+    final spans = <TextSpan>[];
+    rich.text.visitChildren((span) {
+      if (span is TextSpan && span.text != null) spans.add(span);
+      return true;
+    });
+    final bass = spans.singleWhere((s) => s.text == 'bass');
+    expect(bass.style?.fontWeight, FontWeight.bold);
+    expect(spans.firstWhere((s) => s.text == 'Fact · Sings ').style, isNull);
+  });
+
+  testWidgets('more than three reasons show three, then "+N more"', (
+    tester,
+  ) async {
+    await person('Alex', 'Cafe', details: ['a1', 'a2', 'a3', 'a4', 'a5']);
+    await showMatching(tester, filters: [const DetailsFilter('a')]);
+
+    expect(find.text('Fact · a1', findRichText: true), findsOneWidget);
+    expect(find.text('Fact · a3', findRichText: true), findsOneWidget);
+    expect(find.text('Fact · a4', findRichText: true), findsNothing);
+    expect(find.text('+2 more'), findsOneWidget);
+  });
+
+  testWidgets('Clear all shows everyone; changing a filter ends the note', (
+    tester,
+  ) async {
+    await person('Alex', 'Cafe');
+    await person('', 'Cafe');
+    await showMatching(
+      tester,
+      filters: [const NameFilter('unknown')],
+      note: 'Add their names while you remember.',
+    );
+
+    await tester.enterText(find.widgetWithText(TextField, 'unknown'), 'unk');
     await tester.pump();
+    expect(find.text('Add their names while you remember.'), findsNothing);
 
-    await tester.tap(find.byTooltip('Filter List'));
+    await tester.tap(find.text('Clear all'));
     await tester.pumpAndSettle();
-
-    expect(find.byType(FilterListScreen), findsOneWidget);
+    expect(find.text('2 people'), findsOneWidget);
+    expect(find.byType(FilterMatchLines), findsNothing);
   });
 }
