@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Everything is backed up (people come back on a new phone) except the
-     notification plugin's store of scheduled notifications, which holds
-     the names in anniversary notices; the app schedules them again on its
-     next open. -->
+<!-- Everything is backed up (people come back on a new phone) except:
+     the notification plugin's store of scheduled notifications (names in
+     anniversary notices); the geofence plugin's store (places' circles);
+     and when each place's notice last showed. The app rebuilds them all
+     on its next open. -->
 <full-backup-content>
     <exclude domain="sharedpref" path="scheduled_notifications.xml" />
+    <exclude domain="sharedpref" path="native_geofence_plugin_cache.xml" />
+    <exclude domain="root" path="app_flutter/place_notices.json" />
 </full-backup-content>

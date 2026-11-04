@@ -14,3 +14,7 @@
 -keep class com.google.mlkit.** { *; }
 -keep class com.google.android.gms.internal.mlkit_vision_face** { *; }
 -dontwarn com.google.mlkit.**
+
+# Place notices: the geofence plugin's worker, receivers and callback
+# lookup run with the app closed; shrinking could silently stop them.
+-keep class com.chunkytofustudios.native_geofence.** { *; }

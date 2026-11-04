@@ -169,6 +169,17 @@ has already been tried and fallen short.
   the list with an Anniversary filter for that week.
 - The list's filters and sort (`ListFilters` on `AppServices`) are not
   saved: a restart shows everyone, newest first.
+- Place notices (`ReminderSettings.places`, off by default and never on
+  without the `PlaceNoticeConsent` page) watch the named places with the
+  phone's geofencing (`native_geofence`, behind `PlaceFences`), at least
+  100 m, the 90 newest. Fences carry only an opaque id
+  (`PlaceNotice.fenceId`, a hash of the name), so no name reaches the
+  plugin's store or logs. On arrival (Android: a 3-minute stay; iOS:
+  entering), `placeArrived` runs in the background, builds what it needs
+  through `AppFiles`, and `PlaceArrival` shows "At Cafe: You've met Ann
+  here." at most once a place per 12 hours (`place_notices.json`, ids
+  only). A tap filters the list to the place. The plugin's store and
+  `place_notices.json` are left out of backup. No foreground service.
 - `contactKey` (top level, optional) links a person to a phone contact by
   Android lookup key only; no contact data is copied. It changes only through
   `setContactKey`, so autosave never undoes it.
@@ -185,6 +196,11 @@ has already been tried and fallen short.
 
 Check these before any public release. `sally` and `lena` own them.
 
+- **Background location:** place notices declare
+  ACCESS_BACKGROUND_LOCATION, so every Play release needs the location
+  permissions declaration, a video and the in-app disclosure (the consent
+  page). Play may judge it not core and reject the release. Eric files.
+  iOS is unbuilt and untested.
 - **Speech:** dictation requests on-device recognition (`onDevice: true`).
   Without an on-device recogniser (before Android 12, or none installed) the
   phone's speech service may still send audio to Google or Apple servers.

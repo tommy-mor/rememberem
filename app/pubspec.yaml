@@ -28,6 +28,7 @@ dependencies:
   audioplayers: 6.8.1
   # Opens the About page links in the browser.
   url_launcher: 6.3.3
+  native_geofence: ^1.5.1
 
 dev_dependencies:
   flutter_test:

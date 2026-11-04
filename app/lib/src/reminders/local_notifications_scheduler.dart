@@ -9,6 +9,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'notice_channel.dart';
 import 'reminder_scheduler.dart';
 
 /// [ReminderScheduler] on the phone's own notifications. Nothing leaves
@@ -75,6 +76,19 @@ class LocalNotificationsScheduler implements ReminderScheduler {
       // Names: nothing at all on a locked phone.
       visibility: NotificationVisibility.secret,
       // All of it, not one cut-off line.
+      styleInformation: BigTextStyleInformation(''),
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
+
+  /// How place notices show: the same, on their own channel.
+  @visibleForTesting
+  static const placeDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'places_named',
+      'Place notices',
+      channelDescription: 'Who you have met where you have just arrived',
+      visibility: NotificationVisibility.secret,
       styleInformation: BigTextStyleInformation(''),
     ),
     iOS: DarwinNotificationDetails(),
@@ -244,11 +258,12 @@ class LocalNotificationsScheduler implements ReminderScheduler {
   }
 
   @override
-  Future<void> showNow({
+  Future<bool> showNow({
     required int id,
     required String title,
     required String body,
     required String payload,
+    NoticeChannel channel = NoticeChannel.anniversaries,
   }) async {
     try {
       await _init();
@@ -257,10 +272,15 @@ class LocalNotificationsScheduler implements ReminderScheduler {
         title: title,
         body: body,
         payload: payload,
-        notificationDetails: noticeDetails,
+        notificationDetails: switch (channel) {
+          NoticeChannel.anniversaries => noticeDetails,
+          NoticeChannel.places => placeDetails,
+        },
       );
+      return true;
     } catch (error) {
       debugPrint('Rememberem: showing a notice failed: ${error.runtimeType}');
+      return false;
     }
   }
 

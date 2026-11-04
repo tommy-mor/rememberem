@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../places/place_notice_keeper.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../settings/settings_section.dart';
 
@@ -8,9 +9,10 @@ import '../settings/settings_section.dart';
 /// About in debug builds only (see [AboutScreen]); release builds never
 /// build it.
 class DebugSection extends StatelessWidget {
-  const DebugSection({super.key, required this.reminders});
+  const DebugSection({super.key, required this.reminders, this.placeNotices});
 
   final ReminderCoordinator reminders;
+  final PlaceNoticeKeeper? placeNotices;
 
   Future<void> _anniversary(BuildContext context) async {
     final picked = await showDatePicker(
@@ -24,8 +26,33 @@ class DebugSection extends StatelessWidget {
     await reminders.showAnniversaryNow(LocalDay.of(picked));
   }
 
+  Future<void> _place(BuildContext context, PlaceNoticeKeeper keeper) async {
+    final places = await keeper.places();
+    if (!context.mounted) return;
+    final place = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Notice for which place?'),
+        children: [
+          if (places.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No named places yet.'),
+            ),
+          for (final p in places)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(p),
+              child: Text(p),
+            ),
+        ],
+      ),
+    );
+    if (place != null) await keeper.showNow(place);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final keeper = placeNotices;
     return SettingsSection(
       title: 'Debug',
       children: [
@@ -41,6 +68,13 @@ class DebugSection extends StatelessWidget {
           subtitle: const Text('Shows nothing if notifications are off.'),
           onTap: reminders.showReminderNow,
         ),
+        if (keeper != null)
+          ListTile(
+            leading: const Icon(Icons.place_outlined),
+            title: const Text('Place notice for…'),
+            subtitle: const Text('Pick a place; its arrival notice shows now.'),
+            onTap: () => _place(context, keeper),
+          ),
       ],
     );
   }

@@ -7,6 +7,7 @@ import '../capture/photo_picker.dart';
 import '../contacts/contacts_service.dart';
 import '../location/device_location.dart';
 import '../memories/list_filters.dart';
+import '../places/place_notice_keeper.dart';
 import '../practice/game_feedback.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../settings/app_settings_controller.dart';
@@ -20,6 +21,7 @@ class AppServices {
     required this.dictation,
     required this.location,
     this.reminders,
+    this.placeNotices,
     AppSettingsController? settings,
     this.photoPicker,
     this.feedback,
@@ -38,6 +40,10 @@ class AppServices {
   /// Daily practice reminders; null where there is no notification system
   /// (tests).
   final ReminderCoordinator? reminders;
+
+  /// Notices on arriving at a place; null where there is no geofencing
+  /// (tests, unless given).
+  final PlaceNoticeKeeper? placeNotices;
 
   /// Fred's settings; in memory only unless given a store.
   final AppSettingsController settings;

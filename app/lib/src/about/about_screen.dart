@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../app/brand_logo.dart';
 import '../app/home_button.dart';
+import '../places/place_notice_keeper.dart';
 import '../reminders/reminder_coordinator.dart';
 import 'debug_section.dart';
 import 'link_opener.dart';
@@ -10,12 +11,18 @@ import 'link_opener.dart';
 /// Who made Rememberem, where to send ideas or report a problem, and
 /// where Fred's people are kept.
 class AboutScreen extends StatelessWidget {
-  const AboutScreen({super.key, required this.links, this.reminders});
+  const AboutScreen({
+    super.key,
+    required this.links,
+    this.reminders,
+    this.placeNotices,
+  });
 
   final LinkOpener links;
 
   /// For the debug controls, shown only in a debug build.
   final ReminderCoordinator? reminders;
+  final PlaceNoticeKeeper? placeNotices;
 
   static final website = Uri.parse('https://ericjorgensen.com');
   static final issues = Uri.parse(
@@ -42,6 +49,9 @@ class AboutScreen extends StatelessWidget {
         'be recognised.',
     'Street maps load from OpenStreetMap, which sees your internet address '
         'and the area shown. You can turn maps off in Settings.',
+    'Place notices, if you turn them on, use your location in the '
+        "background: your phone's own location service watches the places "
+        'you have named, and Rememberem never sends your location anywhere.',
   ];
 
   Future<void> _open(BuildContext context, Uri url) async {
@@ -113,7 +123,7 @@ class AboutScreen extends StatelessWidget {
           ),
           if (kDebugMode)
             if (reminders case final reminders?)
-              DebugSection(reminders: reminders),
+              DebugSection(reminders: reminders, placeNotices: placeNotices),
         ],
       ),
     );

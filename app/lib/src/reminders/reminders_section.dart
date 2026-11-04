@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../places/place_notice_consent.dart';
+import '../places/location_ask.dart';
+import '../places/place_notice_keeper.dart';
 import 'reminder_coordinator.dart';
 
 /// Turn the daily practice reminder on or off and choose its time, and
 /// turn anniversary notices on or off. Part of the Settings page.
 class RemindersSection extends StatefulWidget {
-  const RemindersSection({super.key, required this.coordinator});
+  const RemindersSection({
+    super.key,
+    required this.coordinator,
+    this.placeNotices,
+  });
 
   final ReminderCoordinator coordinator;
+
+  /// Place notices; null hides their switch.
+  final PlaceNoticeKeeper? placeNotices;
 
   @override
   State<RemindersSection> createState() => _RemindersSectionState();
@@ -19,12 +29,34 @@ class _RemindersSectionState extends State<RemindersSection> {
 
   /// The last switch turned on was refused notification permission.
   bool _denied = false;
+
+  /// How the last turning on of place notices went, if it did not.
+  LocationAsk? _placesAsk;
   bool _busy = false;
+
+  /// Back from the phone's settings: finish any turning on, then show it.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: () async {
+      try {
+        await widget.placeNotices?.sync();
+      } catch (_) {
+        // The switch shows what is stored.
+      }
+      if (mounted) await _load();
+    },
+  );
 
   @override
   void initState() {
     super.initState();
+    _lifecycle; // created now, so it listens from the start
     _load();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -51,6 +83,32 @@ class _RemindersSectionState extends State<RemindersSection> {
         setState(() {
           _busy = false;
           _denied = denied;
+        });
+      }
+    }
+    await _load();
+  }
+
+  /// On: first the page saying what location in the background is for,
+  /// then the permissions. Off at once.
+  Future<void> _setPlaces(PlaceNoticeKeeper keeper, bool on) async {
+    if (on && !await PlaceNoticeConsent.show(context)) return;
+    setState(() => _busy = true);
+    LocationAsk? ask;
+    try {
+      if (on) {
+        final result = await keeper.enable();
+        ask = result == LocationAsk.granted ? null : result;
+      } else {
+        await keeper.disable();
+      }
+    } catch (_) {
+      // The switch shows what is actually stored.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _placesAsk = ask;
         });
       }
     }
@@ -133,6 +191,32 @@ class _RemindersSectionState extends State<RemindersSection> {
                 value: settings.anniversaries,
                 onChanged: _busy ? null : _setAnniversaries,
               ),
+              if (widget.placeNotices case final keeper?) ...[
+                SwitchListTile(
+                  title: const Text('Place notices'),
+                  subtitle: const Text(
+                    'When you arrive somewhere you have met people, a note '
+                    'says who. Uses your location in the background; it '
+                    'stays on this phone. Off until you turn it on.',
+                  ),
+                  value: settings.places,
+                  onChanged: _busy ? null : (on) => _setPlaces(keeper, on),
+                ),
+                if (_placesAsk case final ask?)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      ask == LocationAsk.inSettings
+                          ? 'In the settings page, choose Location, then '
+                                '"Allow all the time". Place notices turn on '
+                                'when you come back.'
+                          : 'Place notices need location "Allow all the '
+                                'time" and notifications. You can allow them '
+                                'in Settings.',
+                      style: small,
+                    ),
+                  ),
+              ],
               if (_denied)
                 Padding(
                   padding: const EdgeInsets.all(16),

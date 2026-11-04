@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:rememberem/src/reminders/notice_channel.dart';
 import 'package:rememberem/src/reminders/reminder_scheduler.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -24,7 +25,10 @@ class FakeReminderScheduler implements ReminderScheduler {
   Map<LocalDay, String> noticeTexts = {};
 
   /// Notifications shown at once (debug controls).
-  final List<({int id, String title, String body, String payload})> shown = [];
+  final List<
+    ({int id, String title, String body, String payload, NoticeChannel channel})
+  >
+  shown = [];
   final _taps = StreamController<String?>.broadcast();
 
   void emitTap(PracticeGame? game) => _taps.add(game?.wireId);
@@ -69,11 +73,25 @@ class FakeReminderScheduler implements ReminderScheduler {
     noticeTexts = Map.of(notices);
   }
 
+  /// When set, showing fails (nothing is recorded as shown).
+  bool failShow = false;
+
   @override
-  Future<void> showNow({
+  Future<bool> showNow({
     required int id,
     required String title,
     required String body,
     required String payload,
-  }) async => shown.add((id: id, title: title, body: body, payload: payload));
+    NoticeChannel channel = NoticeChannel.anniversaries,
+  }) async {
+    if (failShow) return false;
+    shown.add((
+      id: id,
+      title: title,
+      body: body,
+      payload: payload,
+      channel: channel,
+    ));
+    return true;
+  }
 }

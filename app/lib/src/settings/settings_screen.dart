@@ -4,6 +4,7 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../about/about_screen.dart';
 import '../about/link_opener.dart';
 import '../app/home_button.dart';
+import '../places/place_notice_keeper.dart';
 import '../reminders/reminder_coordinator.dart';
 import '../reminders/reminders_section.dart';
 import 'app_settings_controller.dart';
@@ -22,11 +23,13 @@ class SettingsScreen extends StatelessWidget {
     required this.settings,
     required this.links,
     this.reminders,
+    this.placeNotices,
   });
 
   final AppSettingsController settings;
   final LinkOpener links;
   final ReminderCoordinator? reminders;
+  final PlaceNoticeKeeper? placeNotices;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +46,12 @@ class SettingsScreen extends StatelessWidget {
             if (reminders case final reminders?)
               SettingsSection(
                 title: 'Reminders',
-                children: [RemindersSection(coordinator: reminders)],
+                children: [
+                  RemindersSection(
+                    coordinator: reminders,
+                    placeNotices: placeNotices,
+                  ),
+                ],
               ),
             SettingsSection(
               title: 'Display',
@@ -177,8 +185,11 @@ class SettingsScreen extends StatelessWidget {
               title: const Text('About Rememberem'),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) =>
-                      AboutScreen(links: links, reminders: reminders),
+                  builder: (_) => AboutScreen(
+                    links: links,
+                    reminders: reminders,
+                    placeNotices: placeNotices,
+                  ),
                 ),
               ),
             ),

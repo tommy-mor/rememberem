@@ -24,6 +24,10 @@
          Deliberately no exact-alarm permission (inexact delivery is fine). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Place notices (off until Fred turns them on, after a page saying
+         what for): the phone's own geofencing watches named places, which
+         needs location all the time. No foreground service is used. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
     <!-- Backup stays on (Eric's call): the phone's Google backup includes
          Fred's people, so a new phone can get them back. About says so.
          Capture work files are in the cache, which is never backed up. -->
@@ -63,6 +67,18 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        <!-- Place notices: geofence events (sent by the system on the app's
+             own pending intent) and re-registering after a reboot. -->
+        <receiver
+            android:name="com.chunkytofustudios.native_geofence.receivers.NativeGeofenceBroadcastReceiver"
+            android:exported="false"/>
+        <receiver
+            android:name="com.chunkytofustudios.native_geofence.receivers.NativeGeofenceRebootBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
         <!-- Don't delete the meta-data below.

@@ -94,6 +94,13 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   @override
   void didPopNext() {
     _reload();
+    // A place may have been named, moved or resized.
+    unawaited(
+      widget.services.placeNotices?.sync().catchError(
+        (Object e) =>
+            debugPrint('Rememberem: place sync failed: ${e.runtimeType}'),
+      ),
+    );
     // An anniversary may have been added or changed.
     unawaited(
       widget.services.reminders?.sync().catchError(
@@ -168,6 +175,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
           settings: widget.services.settings,
           links: widget.services.links,
           reminders: widget.services.reminders,
+          placeNotices: widget.services.placeNotices,
         ),
       ),
     );
@@ -180,6 +188,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
         builder: (_) => AboutScreen(
           links: widget.services.links,
           reminders: widget.services.reminders,
+          placeNotices: widget.services.placeNotices,
         ),
       ),
     );

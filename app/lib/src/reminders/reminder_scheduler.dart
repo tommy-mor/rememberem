@@ -1,5 +1,7 @@
 import 'package:rememberem_core/rememberem_core.dart';
 
+import 'notice_channel.dart';
+
 /// The phone's notification system, as far as reminders need it.
 abstract interface class ReminderScheduler {
   /// The practice reminder's words: fixed, never a name, place or detail.
@@ -23,12 +25,14 @@ abstract interface class ReminderScheduler {
   /// already past that hour are skipped; none cancels them all.
   Future<void> scheduleAnniversaries(Map<LocalDay, String> notices);
 
-  /// Shows a notification at once (the debug controls on About).
-  Future<void> showNow({
+  /// Shows a named notice at once, on [channel]: a place notice, or the
+  /// debug controls on About. True if it was shown.
+  Future<bool> showNow({
     required int id,
     required String title,
     required String body,
     required String payload,
+    NoticeChannel channel = NoticeChannel.anniversaries,
   });
 
   /// The payload of the notification that launched the app, if one did;

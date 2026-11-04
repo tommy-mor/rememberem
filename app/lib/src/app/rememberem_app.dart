@@ -56,6 +56,13 @@ class _RememberemAppState extends State<RememberemApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Back from the phone's settings, perhaps with location changed.
+      unawaited(
+        widget.services.placeNotices?.sync().catchError(
+          (Object e) =>
+              debugPrint('Rememberem: place sync failed: ${e.runtimeType}'),
+        ),
+      );
       unawaited(
         widget.services.reminders?.sync().catchError(
           (Object e) =>
@@ -86,6 +93,31 @@ class _RememberemAppState extends State<RememberemApp>
       _openReminder(game);
     } else if (AnniversaryNotice.dayFromWire(payload) case final day?) {
       _openAnniversaries(day);
+    } else if (PlaceNotice.fenceFromWire(payload) case final fence?) {
+      _openPlace(fence);
+    }
+  }
+
+  /// A place notice was tapped: the list, filtered to that place. Never
+  /// over the camera or a game, and not if the place is gone.
+  Future<void> _openPlace(String fence) async {
+    const blockedBy = {AppRoutes.capture, AppRoutes.practice};
+    if (_topRouteIn(blockedBy)) return;
+    try {
+      final people = await widget.services.repository.all();
+      final places = {
+        for (final m in people)
+          for (final e in m.encounters)
+            if (e.place.trim().isNotEmpty) e.place.trim(),
+      };
+      final place = PlaceNotice.placeFor(fence, places);
+      final navigator = _navigator.currentState;
+      if (place == null || !mounted || navigator == null) return;
+      if (_topRouteIn(blockedBy)) return;
+      navigator.popUntil((route) => route.isFirst);
+      widget.services.listFilters.show([PlaceFilter(place)]);
+    } catch (_) {
+      // A notice must never break the app; the list stays.
     }
   }
 

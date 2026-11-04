@@ -10,6 +10,8 @@
 	<string>Rememberem listens when you tap a microphone button so you can speak notes instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Rememberem turns your spoken notes into text.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>If you turn on place notices, Rememberem notices when you arrive at a place where you have met people and tells you who. Your location stays on this phone.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Rememberem records where you met someone, to help you remember them.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

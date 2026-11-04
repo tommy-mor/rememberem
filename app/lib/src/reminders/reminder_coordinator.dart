@@ -52,7 +52,11 @@ class ReminderCoordinator {
       // Before the first ask (see [askOnce]) there is nothing to take away.
       if (await store.hasSaved()) {
         await store.save(
-          settings.copyWith(enabled: false, anniversaries: false),
+          settings.copyWith(
+            enabled: false,
+            anniversaries: false,
+            places: false,
+          ),
         );
       }
       await _cancelAll();
@@ -168,6 +172,13 @@ class ReminderCoordinator {
     await store.save(settings.copyWith(anniversaries: enabled));
     await _sync();
     return EnableResult.enabled;
+  });
+
+  /// Saves whether place notices are on; [PlaceNoticeKeeper] asks for
+  /// the permissions and watches the places.
+  Future<void> setPlaces(bool on) => _serial(() async {
+    final settings = await store.load();
+    await store.save(settings.copyWith(places: on));
   });
 
   Future<void> setTime(int hour, int minute) => _serial(() async {

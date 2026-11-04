@@ -279,11 +279,18 @@ void main() {
       'android/app/src/main/res/xml/data_extraction_rules.xml',
     ]) {
       final xml = File(file).readAsStringSync();
-      expect(
-        'path="scheduled_notifications.xml"'.allMatches(xml).length,
-        file.contains('extraction') ? 2 : 1,
-        reason: file,
-      );
+      final each = file.contains('extraction') ? 2 : 1;
+      for (final excluded in [
+        'path="scheduled_notifications.xml"',
+        'path="native_geofence_plugin_cache.xml"',
+        'path="app_flutter/place_notices.json"',
+      ]) {
+        expect(
+          excluded.allMatches(xml).length,
+          each,
+          reason: '$file $excluded',
+        );
+      }
     }
   });
 
