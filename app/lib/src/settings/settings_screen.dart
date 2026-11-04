@@ -177,7 +177,8 @@ class SettingsScreen extends StatelessWidget {
               title: const Text('About Rememberem'),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => AboutScreen(links: links),
+                  builder: (_) =>
+                      AboutScreen(links: links, reminders: reminders),
                 ),
               ),
             ),

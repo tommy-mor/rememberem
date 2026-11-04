@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Everything is backed up (people come back on a new phone) except the
+     notification plugin's store of scheduled notifications, which holds
+     the names in anniversary notices; the app schedules them again on its
+     next open. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="scheduled_notifications.xml" />
+</full-backup-content>

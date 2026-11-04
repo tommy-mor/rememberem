@@ -2,6 +2,10 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 /// The phone's notification system, as far as reminders need it.
 abstract interface class ReminderScheduler {
+  /// The practice reminder's words: fixed, never a name, place or detail.
+  static const practiceTitle = 'Time to practice';
+  static const practiceBody = 'A minute to practice remembering people';
+
   /// Asks Fred for permission to notify; true if granted.
   Future<bool> requestPermission();
 
@@ -14,10 +18,18 @@ abstract interface class ReminderScheduler {
   /// Cancels the practice reminder only; anniversary notices stay.
   Future<void> cancel();
 
-  /// One anniversary notice on each of [days], at
-  /// [AnniversaryNotice.hour], replacing every earlier notice. Days already
-  /// past that hour are skipped; an empty list cancels them all.
-  Future<void> scheduleAnniversaries(List<LocalDay> days);
+  /// One anniversary notice on each day of [notices], saying its text,
+  /// at [AnniversaryNotice.hour], replacing every earlier notice. Days
+  /// already past that hour are skipped; none cancels them all.
+  Future<void> scheduleAnniversaries(Map<LocalDay, String> notices);
+
+  /// Shows a notification at once (the debug controls on About).
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+  });
 
   /// The payload of the notification that launched the app, if one did;
   /// given once only.

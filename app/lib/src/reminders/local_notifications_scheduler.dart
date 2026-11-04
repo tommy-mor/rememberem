@@ -12,16 +12,20 @@ import 'package:timezone/timezone.dart' as tz;
 import 'reminder_scheduler.dart';
 
 /// [ReminderScheduler] on the phone's own notifications. Nothing leaves
-/// the device: the time zone data is bundled, and no notification names
-/// anyone.
+/// the device: the time zone data is bundled. The practice reminder names
+/// no one; anniversary notices name people, so they are secret on a
+/// locked phone, and their text is never logged.
 class LocalNotificationsScheduler implements ReminderScheduler {
   static const _id = 1;
 
   /// Fixed, generic text: never a name, place or detail (lock screens).
-  static const title = 'Time to practice';
-  static const body = 'A minute to practice remembering people';
-  static const noticeTitle = 'Anniversaries coming up';
-  static const noticeBody = 'Someone you know has an anniversary this week.';
+  static const title = ReminderScheduler.practiceTitle;
+  static const body = ReminderScheduler.practiceBody;
+
+  /// The notices' channel. A new one, because Android keeps a channel's
+  /// lock-screen setting once made: the old one showed text when locked.
+  static const noticeChannel = 'anniversaries_named';
+  static const _oldNoticeChannel = 'anniversaries';
 
   final _plugin = FlutterLocalNotificationsPlugin();
   final _taps = StreamController<String?>.broadcast();
@@ -54,7 +58,37 @@ class LocalNotificationsScheduler implements ReminderScheduler {
       onDidReceiveNotificationResponse: (response) =>
           _taps.add(response.payload),
     );
+    try {
+      await _android()?.deleteNotificationChannel(channelId: _oldNoticeChannel);
+    } catch (_) {
+      // Gone already, or not Android.
+    }
   }
+
+  /// How anniversary notices show.
+  @visibleForTesting
+  static const noticeDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      noticeChannel,
+      'Anniversary notices',
+      channelDescription: 'Who has an anniversary in the coming week',
+      // Names: nothing at all on a locked phone.
+      visibility: NotificationVisibility.secret,
+      // All of it, not one cut-off line.
+      styleInformation: BigTextStyleInformation(''),
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
+
+  /// What a set of notices is, to tell whether it changed: the days, the
+  /// slots to clear, and the words (a rename changes them).
+  @visibleForTesting
+  static String noticeKey(
+    ({Map<int, LocalDay> schedule, List<int> cancel}) plan,
+    Map<LocalDay, String> notices,
+  ) =>
+      '${plan.schedule}|${plan.cancel}|'
+      '${[for (final day in plan.schedule.values) notices[day]]}';
 
   @override
   Stream<String?> get taps => _taps.stream;
@@ -146,17 +180,19 @@ class LocalNotificationsScheduler implements ReminderScheduler {
     } catch (error) {
       // Never block the app over a reminder, but leave a trace (no data
       // about anyone is involved here).
-      debugPrint('Rememberem: scheduling the reminder failed: $error');
+      debugPrint(
+        'Rememberem: scheduling the reminder failed: ${error.runtimeType}',
+      );
     }
   }
 
   @override
-  Future<void> scheduleAnniversaries(List<LocalDay> days) async {
+  Future<void> scheduleAnniversaries(Map<LocalDay, String> notices) async {
     try {
       await _init();
       final now = tz.TZDateTime.now(tz.local);
-      final plan = AnniversaryNotice.plan(days, now);
-      final key = '${plan.schedule}|${plan.cancel}';
+      final plan = AnniversaryNotice.plan(notices.keys.toList(), now);
+      final key = noticeKey(plan, notices);
       // Every return to the list syncs; skip the work if nothing changed.
       if (key == _lastNotices) return;
       var done = true;
@@ -174,24 +210,18 @@ class LocalNotificationsScheduler implements ReminderScheduler {
               day.day,
               AnniversaryNotice.hour,
             ),
-            title: noticeTitle,
-            body: noticeBody,
+            title: AnniversaryNotice.title,
+            body: notices[day],
             payload: AnniversaryNotice.wireId(day),
             androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            notificationDetails: const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'anniversaries',
-                'Anniversary notices',
-                channelDescription:
-                    'When an anniversary is a week away or less',
-                visibility: NotificationVisibility.private,
-              ),
-              iOS: DarwinNotificationDetails(),
-            ),
+            notificationDetails: noticeDetails,
           );
         } catch (error) {
           done = false;
-          debugPrint('Rememberem: scheduling a notice failed: $error');
+          // Only the kind of error: it may carry the names.
+          debugPrint(
+            'Rememberem: scheduling a notice failed: ${error.runtimeType}',
+          );
         }
       }
       for (final id in plan.cancel) {
@@ -199,12 +229,38 @@ class LocalNotificationsScheduler implements ReminderScheduler {
           await _plugin.cancel(id: id);
         } catch (error) {
           done = false;
-          debugPrint('Rememberem: cancelling a notice failed: $error');
+          debugPrint(
+            'Rememberem: cancelling a notice failed: ${error.runtimeType}',
+          );
         }
       }
       _lastNotices = done ? key : null;
     } catch (error) {
-      debugPrint('Rememberem: scheduling anniversary notices failed: $error');
+      debugPrint(
+        'Rememberem: scheduling anniversary notices failed: '
+        '${error.runtimeType}',
+      );
+    }
+  }
+
+  @override
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+  }) async {
+    try {
+      await _init();
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        payload: payload,
+        notificationDetails: noticeDetails,
+      );
+    } catch (error) {
+      debugPrint('Rememberem: showing a notice failed: ${error.runtimeType}');
     }
   }
 

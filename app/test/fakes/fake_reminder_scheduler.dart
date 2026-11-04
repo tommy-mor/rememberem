@@ -19,8 +19,12 @@ class FakeReminderScheduler implements ReminderScheduler {
   final List<String> calls = [];
   (int, int)? scheduled;
 
-  /// The days with an anniversary notice.
+  /// The days with an anniversary notice, and what each says.
   List<LocalDay> notices = [];
+  Map<LocalDay, String> noticeTexts = {};
+
+  /// Notifications shown at once (debug controls).
+  final List<({int id, String title, String body, String payload})> shown = [];
   final _taps = StreamController<String?>.broadcast();
 
   void emitTap(PracticeGame? game) => _taps.add(game?.wireId);
@@ -60,7 +64,16 @@ class FakeReminderScheduler implements ReminderScheduler {
   }
 
   @override
-  Future<void> scheduleAnniversaries(List<LocalDay> days) async {
-    notices = List.of(days);
+  Future<void> scheduleAnniversaries(Map<LocalDay, String> notices) async {
+    this.notices = notices.keys.toList();
+    noticeTexts = Map.of(notices);
   }
+
+  @override
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+  }) async => shown.add((id: id, title: title, body: body, payload: payload));
 }

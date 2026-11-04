@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/app/meet_shortcut.dart';
@@ -103,6 +104,56 @@ void main() {
       expect(scheduler.notices, week);
     });
 
+    test('each notice names who, and a rename reaches it', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+
+      await coordinator.sync();
+
+      expect(
+        scheduler.noticeTexts[const LocalDay(2026, 11, 13)],
+        "Ann's birthday is next Friday.",
+      );
+      expect(
+        scheduler.noticeTexts[const LocalDay(2026, 11, 20)],
+        "Ann's birthday is today.",
+      );
+
+      final ann = repository.stored.values.single;
+      await repository.save(ann.withField('name', 'Annie'));
+      await coordinator.sync();
+      expect(
+        scheduler.noticeTexts[const LocalDay(2026, 11, 20)],
+        "Annie's birthday is today.",
+      );
+    });
+
+    test('someone in the trash is never named', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+      await person('Bo', anniversary: DateTime(1990, 11, 20));
+      final bo = repository.stored.values.firstWhere(
+        (m) => m.displayName == 'Bo',
+      );
+      await repository.trash(bo.id, DateTime(2026, 10, 1));
+
+      await coordinator.sync();
+
+      expect(scheduler.noticeTexts.values, everyElement(isNot(contains('Bo'))));
+    });
+
+    test('the debug buttons show the real notice and reminder now', () async {
+      await person('Ann', anniversary: DateTime(1990, 11, 20));
+
+      await coordinator.showAnniversaryNow(const LocalDay(2026, 11, 18));
+      await coordinator.showReminderNow();
+
+      expect(scheduler.shown, hasLength(2));
+      expect(scheduler.shown.first.title, AnniversaryNotice.title);
+      expect(scheduler.shown.first.body, "Ann's birthday is on Friday.");
+      expect(scheduler.shown.first.payload, 'anniversaries:2026-11-18');
+      expect(scheduler.shown.last.payload, PracticeGame.faces.wireId);
+      expect(scheduler.shown.last.body, isNot(contains('Ann')));
+    });
+
     test('no anniversaries, no notices', () async {
       await person('Ann');
       scheduler.notices = [const LocalDay(2026, 11, 2)];
@@ -201,12 +252,44 @@ void main() {
     });
   });
 
-  test('the notice text is fixed and names no one', () {
-    expect(LocalNotificationsScheduler.noticeTitle, 'Anniversaries coming up');
+  test('notices show nothing on a locked phone, and show all their words', () {
+    final android = LocalNotificationsScheduler.noticeDetails.android!;
+    expect(android.channelId, 'anniversaries_named');
+    expect(android.visibility, NotificationVisibility.secret);
+    expect(android.styleInformation, isA<BigTextStyleInformation>());
+  });
+
+  test('a renamed person changes the notices, so they are scheduled anew', () {
+    final plan = AnniversaryNotice.plan([
+      const LocalDay(2026, 11, 20),
+    ], DateTime(2026, 11, 1));
+    String key(String text) => LocalNotificationsScheduler.noticeKey(plan, {
+      const LocalDay(2026, 11, 20): text,
+    });
+    expect(key("Ann's birthday is today."), key("Ann's birthday is today."));
     expect(
-      LocalNotificationsScheduler.noticeBody,
-      'Someone you know has an anniversary this week.',
+      key("Ann's birthday is today."),
+      isNot(key("Annie's birthday is today.")),
     );
+  });
+
+  test("backup leaves out the plugin's store of scheduled notices", () {
+    for (final file in [
+      'android/app/src/main/res/xml/backup_rules.xml',
+      'android/app/src/main/res/xml/data_extraction_rules.xml',
+    ]) {
+      final xml = File(file).readAsStringSync();
+      expect(
+        'path="scheduled_notifications.xml"'.allMatches(xml).length,
+        file.contains('extraction') ? 2 : 1,
+        reason: file,
+      );
+    }
+  });
+
+  test('the notice title names no one; its payload is only the day', () {
+    expect(AnniversaryNotice.title, 'Anniversaries this week');
+    expect(LocalNotificationsScheduler.noticeChannel, 'anniversaries_named');
     expect(
       AnniversaryNotice.wireId(const LocalDay(2026, 11, 13)),
       'anniversaries:2026-11-13',

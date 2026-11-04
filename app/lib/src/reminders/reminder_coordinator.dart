@@ -68,15 +68,43 @@ class ReminderCoordinator {
     settings = await store.load();
     await _syncPractice(settings, people);
     await scheduler.scheduleAnniversaries(
-      settings.anniversaries
-          ? AnniversaryNotice.days(
-              people,
-              LocalDay.of(clock()),
-              AnniversaryNotice.ahead,
-            )
-          : const [],
+      settings.anniversaries ? _notices(people) : const {},
     );
   }
+
+  /// Each day with a notice, and what it says about [people] (active
+  /// only, so no one trashed is ever named).
+  Map<LocalDay, String> _notices(List<Memory> people) => {
+    for (final day in AnniversaryNotice.days(
+      people,
+      LocalDay.of(clock()),
+      AnniversaryNotice.ahead,
+    ))
+      day: AnniversaryNotice.textFor(people, day),
+  };
+
+  /// Debug controls: the notice for [day], shown now, as it would come.
+  Future<void> showAnniversaryNow(LocalDay day) async {
+    final people = await repository.all();
+    await scheduler.showNow(
+      id: debugNoticeId,
+      title: AnniversaryNotice.title,
+      body: AnniversaryNotice.textFor(people, day),
+      payload: AnniversaryNotice.wireId(day),
+    );
+  }
+
+  /// Debug controls: the practice reminder, shown now.
+  Future<void> showReminderNow() => scheduler.showNow(
+    id: debugReminderId,
+    title: ReminderScheduler.practiceTitle,
+    body: ReminderScheduler.practiceBody,
+    payload: PracticeGame.faces.wireId,
+  );
+
+  /// Ids for notifications fired by hand, apart from the scheduled ones.
+  static const debugNoticeId = 900;
+  static const debugReminderId = 901;
 
   Future<void> _syncPractice(
     ReminderSettings settings,
@@ -97,7 +125,7 @@ class ReminderCoordinator {
 
   Future<void> _cancelAll() async {
     await scheduler.cancel();
-    await scheduler.scheduleAnniversaries(const []);
+    await scheduler.scheduleAnniversaries(const {});
   }
 
   /// Reminders and notices start on, but the permission is asked for only

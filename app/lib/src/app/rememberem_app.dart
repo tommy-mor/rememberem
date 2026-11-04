@@ -58,7 +58,8 @@ class _RememberemAppState extends State<RememberemApp>
     if (state == AppLifecycleState.resumed) {
       unawaited(
         widget.services.reminders?.sync().catchError(
-          (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+          (Object e) =>
+              debugPrint('Rememberem: reminder sync failed: ${e.runtimeType}'),
         ),
       );
     }

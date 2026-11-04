@@ -126,8 +126,9 @@ class _RemindersSectionState extends State<RemindersSection> {
               SwitchListTile(
                 title: const Text('Anniversary notices'),
                 subtitle: const Text(
-                  'A morning note on days when someone has an anniversary '
-                  'in the coming week. It never names anyone.',
+                  'A morning note naming who has an anniversary in the '
+                  'coming week. A locked Android phone hides it; on an '
+                  'iPhone, your preview setting decides.',
                 ),
                 value: settings.anniversaries,
                 onChanged: _busy ? null : _setAnniversaries,

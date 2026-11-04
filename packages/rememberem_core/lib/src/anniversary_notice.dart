@@ -1,9 +1,13 @@
 import 'anniversary_filter.dart';
+import 'detail_kind.dart';
+import 'detail_type_catalog.dart';
 import 'local_day.dart';
 import 'memory.dart';
+import 'memory_field.dart';
 
 /// The daily notice that an anniversary is coming up: which days get one,
-/// and what the notification carries (a day, and nothing about anyone).
+/// what it says (who, and when), and what it carries when tapped (only
+/// the day).
 class AnniversaryNotice {
   const AnniversaryNotice._();
 
@@ -16,6 +20,84 @@ class AnniversaryNotice {
 
   /// The local hour each notice arrives.
   static const hour = 9;
+
+  /// The notice's title: generic, so a glance names no one.
+  static const title = 'Anniversaries this week';
+
+  /// The types a notice says aloud, and how. Any other type (a loss, or
+  /// one Fred made up) gives only the name and the day: the person's
+  /// details are for the app, not a glance over Fred's shoulder.
+  static const spokenTypes = {
+    'birthday': 'birthday',
+    'wedding': 'wedding anniversary',
+    'first met': 'anniversary of when you met',
+  };
+
+  /// At most this many people are named; the rest are counted.
+  static const most = 3;
+
+  static const _weekdays = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', //
+    'Friday', 'Saturday', 'Sunday',
+  ];
+
+  /// What a notice on [day] says: each of [active] with an anniversary
+  /// from [day] to a week later, soonest first. "Ann Lee's birthday is
+  /// today. Bo has an anniversary on Saturday."
+  static String textFor(List<Memory> active, LocalDay day) {
+    final filter = filterFor(day);
+    final first = LocalDay.of(filter.from!);
+    final last = LocalDay.of(filter.to!);
+    final entries = <({LocalDay on, String line})>[];
+    for (final person in active) {
+      for (final d in person.details) {
+        final start = d.eventDate;
+        if (d.kind != DetailKind.anniversary || start == null) continue;
+        for (final year in {first.year, last.year}) {
+          if (!AnniversaryFilter.fallsIn(
+              start, LocalDay(year, 1, 1), LocalDay(year, 12, 31))) {
+            continue;
+          }
+          final on = AnniversaryFilter.fallsOn(start, year);
+          if (on.compareTo(first) < 0 || on.compareTo(last) > 0) continue;
+          entries.add((on: on, line: _line(person, d.label, on, day)));
+        }
+      }
+    }
+    if (entries.isEmpty) return 'No anniversaries this week.';
+    entries.sort((a, b) {
+      final byDay = a.on.compareTo(b.on);
+      return byDay != 0 ? byDay : a.line.compareTo(b.line);
+    });
+    final named = [for (final e in entries.take(most)) e.line].join(' ');
+    final rest = entries.length - most;
+    return rest > 0 ? '$named And $rest more.' : named;
+  }
+
+  static String _line(Memory person, String? label, LocalDay on, LocalDay day) {
+    final when = _when(on, day);
+    final spoken = spokenTypes[DetailTypeCatalog.normalizeKey(label ?? '')];
+    if (person.field(MemoryField.name).trim().isEmpty) {
+      return 'Someone you met has ${spoken == null ? 'an anniversary' : 'a $spoken'} $when.';
+    }
+    final name = person.displayName;
+    return spoken == null
+        ? '$name has an anniversary $when.'
+        : "$name's $spoken is $when.";
+  }
+
+  /// "today", "tomorrow", or "on Saturday" (within a week, a weekday
+  /// says which).
+  static String _when(LocalDay on, LocalDay day) {
+    // Calendar days, so a clock change never makes a day short.
+    final days = DateTime.utc(on.year, on.month, on.day)
+        .difference(DateTime.utc(day.year, day.month, day.day))
+        .inDays;
+    if (days <= 0) return 'today';
+    if (days == 1) return 'tomorrow';
+    final weekday = _weekdays[on.toDate().weekday - 1];
+    return days >= week ? 'next $weekday' : 'on $weekday';
+  }
 
   static const _prefix = 'anniversaries:';
   static final _pattern = RegExp(r'^anniversaries:(\d{4})-(\d{2})-(\d{2})$');

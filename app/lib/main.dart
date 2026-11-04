@@ -75,7 +75,8 @@ Future<void> main() async {
   WidgetsBinding.instance.addPostFrameCallback(
     (_) => unawaited(
       reminders.sync().catchError(
-        (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+        (Object e) =>
+            debugPrint('Rememberem: reminder sync failed: ${e.runtimeType}'),
       ),
     ),
   );

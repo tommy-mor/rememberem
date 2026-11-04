@@ -206,4 +206,88 @@ void main() {
       expect(const ReminderSettings.off().anniversaries, isFalse);
     });
   });
+
+  group('what a notice says', () {
+    Memory who(String name, List<(String, DateTime)> anniversaries,
+            {String id = ''}) =>
+        Memory.captured(
+          id: id.isEmpty ? name : id,
+          photoFileName: 'x.jpg',
+          capturedAt: DateTime.utc(2026),
+          fields: {'name': name},
+          details: [
+            for (final (i, (label, on)) in anniversaries.indexed)
+              Detail(
+                id: '$name$i',
+                text: '',
+                at: DateTime.utc(2026),
+                type: DetailKind.anniversary,
+                label: label,
+                eventDate: on,
+              ),
+          ],
+        );
+    // A Tuesday.
+    const day = LocalDay(2026, 11, 3);
+
+    test('names each person, soonest first, the day in words', () {
+      final text = AnniversaryNotice.textFor([
+        who('Bo', [('wedding', DateTime(2010, 11, 7))]),
+        who('Ann Lee', [('birthday', DateTime(1990, 11, 3))]),
+        who('Cy', [('first met', DateTime(2020, 11, 4))]),
+      ], day);
+      expect(
+        text,
+        "Ann Lee's birthday is today. "
+        "Cy's anniversary of when you met is tomorrow. "
+        "Bo's wedding anniversary is on Saturday.",
+      );
+    });
+
+    test('a loss or a custom type gives only the name and the day', () {
+      final text = AnniversaryNotice.textFor([
+        who('Di', [('lost someone', DateTime(2019, 11, 6))]),
+        who('Ed', [('sobriety', DateTime(2021, 11, 10))]),
+      ], day);
+      expect(
+        text,
+        'Di has an anniversary on Friday. Ed has an anniversary next Tuesday.',
+      );
+      expect(text, isNot(contains('lost')));
+      expect(text, isNot(contains('sobriety')));
+    });
+
+    test('at most three are named; no name is "someone you met"', () {
+      final people = [
+        for (var i = 0; i < 5; i++)
+          who('P$i', [('birthday', DateTime(1990, 11, 4 + i))]),
+      ];
+      final text = AnniversaryNotice.textFor(people, day);
+      expect(text, endsWith('And 2 more.'));
+      expect(text, contains('P0'));
+      expect(text, isNot(contains('P3')));
+      expect(
+        AnniversaryNotice.textFor([
+          who('', [('birthday', DateTime(1990, 11, 3))], id: 'x'),
+        ], day),
+        'Someone you met has a birthday today.',
+      );
+    });
+
+    test('outside the week, or none at all, says so', () {
+      expect(
+        AnniversaryNotice.textFor([
+          who('Bo', [('wedding', DateTime(2010, 11, 20))]),
+        ], day),
+        'No anniversaries this week.',
+      );
+    });
+
+    test('a week across the new year finds next January', () {
+      final text = AnniversaryNotice.textFor([
+        who('Bo', [('birthday', DateTime(1990, 1, 2))]),
+      ], const LocalDay(2026, 12, 30));
+      expect(text, "Bo's birthday is on Saturday.");
+    });
+  });
 }

@@ -1,15 +1,21 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/brand_logo.dart';
 import '../app/home_button.dart';
+import '../reminders/reminder_coordinator.dart';
+import 'debug_section.dart';
 import 'link_opener.dart';
 
 /// Who made Rememberem, where to send ideas or report a problem, and
 /// where Fred's people are kept.
 class AboutScreen extends StatelessWidget {
-  const AboutScreen({super.key, required this.links});
+  const AboutScreen({super.key, required this.links, this.reminders});
 
   final LinkOpener links;
+
+  /// For the debug controls, shown only in a debug build.
+  final ReminderCoordinator? reminders;
 
   static final website = Uri.parse('https://ericjorgensen.com');
   static final issues = Uri.parse(
@@ -105,6 +111,9 @@ class AboutScreen extends StatelessWidget {
               applicationName: 'Rememberem',
             ),
           ),
+          if (kDebugMode)
+            if (reminders case final reminders?)
+              DebugSection(reminders: reminders),
         ],
       ),
     );

@@ -97,7 +97,8 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     // An anniversary may have been added or changed.
     unawaited(
       widget.services.reminders?.sync().catchError(
-        (Object e) => debugPrint('Rememberem: reminder sync failed: $e'),
+        (Object e) =>
+            debugPrint('Rememberem: reminder sync failed: ${e.runtimeType}'),
       ),
     );
   }
@@ -126,7 +127,8 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     _askedReminders = true;
     reminders.askOnce().catchError(
-      (Object e) => debugPrint('Rememberem: reminder ask failed: $e'),
+      (Object e) =>
+          debugPrint('Rememberem: reminder ask failed: ${e.runtimeType}'),
     );
   }
 
@@ -175,7 +177,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AboutScreen(links: widget.services.links),
+        builder: (_) => AboutScreen(
+          links: widget.services.links,
+          reminders: widget.services.reminders,
+        ),
       ),
     );
   }
