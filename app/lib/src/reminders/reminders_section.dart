@@ -4,6 +4,8 @@ import 'package:rememberem_core/rememberem_core.dart';
 import '../places/place_notice_consent.dart';
 import '../places/location_ask.dart';
 import '../places/place_notice_keeper.dart';
+import '../app/rememberem_theme.dart';
+import '../settings/setting_switch.dart';
 import 'reminder_coordinator.dart';
 
 /// Turn the daily practice reminder on or off and choose its time, and
@@ -151,11 +153,11 @@ class _RemindersSectionState extends State<RemindersSection> {
     final settings = _settings;
     final small = Theme.of(context).textTheme.bodySmall;
     return settings == null
-        ? const Center(child: CircularProgressIndicator())
+        ? const LinearProgressIndicator(minHeight: 3, semanticsLabel: 'Loading')
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SwitchListTile(
+              SettingSwitch(
                 title: const Text('Daily practice reminder'),
                 subtitle: const Text('One gentle nudge a day.'),
                 value: settings.enabled,
@@ -163,7 +165,7 @@ class _RemindersSectionState extends State<RemindersSection> {
               ),
               if (settings.enabled)
                 ListTile(
-                  leading: const Icon(Icons.schedule),
+                  leading: const Icon(Icons.schedule_rounded),
                   title: Text(
                     'Around ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay(hour: settings.hour, minute: settings.minute))}',
                   ),
@@ -172,14 +174,14 @@ class _RemindersSectionState extends State<RemindersSection> {
                 ),
               if (settings.enabled && widget.coordinator.waitingForPeople)
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(RememberemTheme.gutter),
                   child: Text(
                     'Reminders start once there are enough people to '
                     'practice with.',
                     style: small,
                   ),
                 ),
-              SwitchListTile(
+              SettingSwitch(
                 title: const Text('Anniversary notices'),
                 subtitle: const Text(
                   'A daily reminder of who has an anniversary in the '
@@ -189,7 +191,7 @@ class _RemindersSectionState extends State<RemindersSection> {
                 onChanged: _busy ? null : _setAnniversaries,
               ),
               if (widget.placeNotices case final keeper?) ...[
-                SwitchListTile(
+                SettingSwitch(
                   title: const Text('Place notices'),
                   subtitle: const Text(
                     'Tell me when I arrive somewhere significant for '
@@ -200,7 +202,7 @@ class _RemindersSectionState extends State<RemindersSection> {
                 ),
                 if (_placesAsk case final ask?)
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(RememberemTheme.gutter),
                     child: Text(
                       ask == LocationAsk.inSettings
                           ? 'In the settings page, choose Location, then '
@@ -215,7 +217,7 @@ class _RemindersSectionState extends State<RemindersSection> {
               ],
               if (_denied)
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(RememberemTheme.gutter),
                   child: Text(
                     'Notifications are turned off for Rememberem. To get '
                     'reminders, allow notifications for it in Settings.',

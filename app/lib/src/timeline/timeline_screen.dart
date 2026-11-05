@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/empty_state.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
+import '../app/section_header.dart';
 import '../memories/memory_tile.dart';
 import '../memories/person_card_route.dart';
 import 'timeline_miniature.dart';
 
 /// Timeline mode: each day people were met, newest first, grouped by
-/// place and meeting; "Show details" adds the days of their happenings,
+/// place and meeting; the "Details" switch adds the days of their happenings,
 /// dated tags and latest anniversaries. Tapping a date shows just that
 /// day. Read-only.
 class TimelineScreen extends StatefulWidget {
@@ -17,6 +20,7 @@ class TimelineScreen extends StatefulWidget {
     required this.services,
     required this.routeObserver,
     this.day,
+    this.onMeetSomeone,
   });
 
   final AppServices services;
@@ -24,6 +28,10 @@ class TimelineScreen extends StatefulWidget {
 
   /// Show only this day, or every day if null.
   final LocalDay? day;
+
+  /// What "Meet someone" does on an empty timeline; null leaves the
+  /// button out.
+  final VoidCallback? onMeetSomeone;
 
   @override
   State<TimelineScreen> createState() => _TimelineScreenState();
@@ -84,6 +92,7 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
         services: widget.services,
         routeObserver: widget.routeObserver,
         day: day,
+        onMeetSomeone: widget.onMeetSomeone,
       ),
     ),
   );
@@ -95,13 +104,37 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
   String _dayLabel(LocalDay day) =>
       MaterialLocalizations.of(context).formatFullDate(day.toDate());
 
+  /// The people on a day, each once.
+  static int _peopleOn(TimelineDay day) => {
+    for (final group in day.groups)
+      for (final memory in group.people) memory.id,
+  }.length;
+
   @override
   Widget build(BuildContext context) {
     final day = widget.day;
+    final shown = _days;
+    final Widget title;
+    if (day == null) {
+      title = const Text('Timeline');
+    } else if (shown == null || shown.isEmpty) {
+      title = Text(_dayLabel(day));
+    } else {
+      final count = _peopleOn(shown.first);
+      title = RememberemTheme.titleWithSuffix(
+        context,
+        _dayLabel(day),
+        count == 1 ? '1 person' : '$count people',
+      );
+    }
     return Scaffold(
       appBar: AppBar(
-        title: Text(day == null ? 'Timeline' : _dayLabel(day)),
-        actions: const [HomeButton()],
+        title: title,
+        actions: [
+          // The switch is on the whole timeline; a day's page follows it.
+          if (day == null) _detailsToggle(),
+          const HomeButton(),
+        ],
       ),
       body: _body(context),
     );
@@ -109,101 +142,173 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
 
   Widget _body(BuildContext context) {
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Could not load the timeline.'),
-            TextButton(onPressed: _reload, child: const Text('Retry')),
-          ],
-        ),
+      return EmptyState(
+        title: 'Could not load the timeline.',
+        actionLabel: 'Retry',
+        onAction: _reload,
       );
     }
     final days = _days;
-    if (days == null) return const Center(child: CircularProgressIndicator());
-    if (days.isEmpty) return const Center(child: Text('No one yet.'));
-    // The checkbox is on the whole timeline; a day's page follows it.
-    final toggle = widget.day == null;
+    if (days == null) {
+      return const LinearProgressIndicator(
+        minHeight: 3,
+        semanticsLabel: 'Loading',
+      );
+    }
+    if (days.isEmpty) {
+      return EmptyState(
+        title: 'No one yet.',
+        actionLabel: widget.onMeetSomeone == null ? null : 'Meet someone',
+        onAction: widget.onMeetSomeone,
+      );
+    }
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: days.length + (toggle ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (toggle && index == 0) return _detailsToggle();
-        return _dayTile(context, days[index - (toggle ? 1 : 0)]);
-      },
+      itemCount: days.length,
+      itemBuilder: (context, index) => _dayTile(context, days[index]),
     );
   }
 
   Widget _dayTile(BuildContext context, TimelineDay day) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: widget.day == null ? () => _openDay(day.day) : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                _dayLabel(day.day),
-                style: theme.textTheme.titleMedium,
+    final opens = widget.day == null;
+    final header = SectionHeader(
+      title: _dayLabel(day.day),
+      tinted: false,
+      trailing: opens
+          ? const Padding(
+              padding: EdgeInsets.only(right: RememberemTheme.gutter),
+              child: Icon(Icons.chevron_right_rounded, size: 20),
+            )
+          : null,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        opens
+            ? Semantics(
+                container: true,
+                button: true,
+                onTap: () => _openDay(day.day),
+                child: InkWell(
+                  onTap: () => _openDay(day.day),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: RememberemTheme.tapTarget,
+                    ),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: header,
+                    ),
+                  ),
+                ),
+              )
+            : header,
+        for (final group in day.groups) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              RememberemTheme.gutter,
+              6,
+              RememberemTheme.gutter,
+              4,
+            ),
+            child: Text(
+              _groupLabel(group),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.primary,
               ),
             ),
           ),
-          // Everything under a date is indented beneath it.
           Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(
+              horizontal: RememberemTheme.gutter,
+            ),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                for (final group in day.groups) ...[
-                  Text(_groupLabel(group), style: theme.textTheme.labelLarge),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final memory in group.people)
-                        TimelineMiniature(
-                          memory: memory,
-                          photo: widget.services.repository.photoFile(memory),
-                          onOpen: () => _openPerson(memory),
-                        ),
-                    ],
+                for (final memory in group.people)
+                  TimelineMiniature(
+                    memory: memory,
+                    photo: widget.services.repository.photoFile(memory),
+                    onOpen: () => _openPerson(memory),
                   ),
-                  // What put each person here, in the detail's own words.
-                  for (final memory in group.people)
-                    for (final detail
-                        in group.details[memory.id] ?? const <Detail>[])
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          '${MemoryTile.nameOf(memory)} – '
-                          '${detailLine(detail)}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ),
-                  const SizedBox(height: 12),
-                ],
               ],
             ),
           ),
-          const Divider(),
+          // What put each person here, in the detail's own words.
+          for (final memory in group.people)
+            for (final detail in group.details[memory.id] ?? const <Detail>[])
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  RememberemTheme.gutter,
+                  4,
+                  RememberemTheme.gutter,
+                  0,
+                ),
+                child: Text(
+                  '${MemoryTile.nameOf(memory)} – ${detailLine(detail)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+          const SizedBox(height: 8),
         ],
-      ),
+        Divider(height: 1, thickness: 1, color: RememberemTheme.rule(theme)),
+      ],
     );
   }
 
+  /// An app bar switch: an icon and the word "Details". Its label stays
+  /// "Details"; a screen reader hears whether it is on.
   Widget _detailsToggle() => ValueListenableBuilder<bool>(
     valueListenable: widget.services.timelineDetails,
-    builder: (context, on, _) => CheckboxListTile(
-      // The box just before its label.
-      controlAffinity: ListTileControlAffinity.leading,
-      title: const Text('Show details'),
-      value: on,
-      onChanged: (v) => widget.services.timelineDetails.value = v ?? false,
-    ),
+    builder: (context, on, _) {
+      void toggle() => widget.services.timelineDetails.value = !on;
+      final color = IconTheme.of(context).color;
+      return Semantics(
+        toggled: on,
+        label: 'Details',
+        onTap: toggle,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: toggle,
+          borderRadius: BorderRadius.circular(8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: RememberemTheme.tapTarget,
+              minHeight: RememberemTheme.tapTarget,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    on
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
+                    size: 22,
+                    color: color,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
   );
 
   /// How a detail that put someone on a day reads: "Happening: picnic",
@@ -220,6 +325,6 @@ class _TimelineScreenState extends State<TimelineScreen> with RouteAware {
 
   String _groupLabel(TimelineGroup group) {
     if (group.isUnknownPlace) return 'Unknown place';
-    return [group.place, group.meeting].where((s) => s.isNotEmpty).join(' - ');
+    return [group.place, group.meeting].where((s) => s.isNotEmpty).join(' · ');
   }
 }

@@ -5,7 +5,9 @@ import 'package:flutter/semantics.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/empty_state.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import '../memories/person_card_route.dart';
 
 import '../settings/units.dart';
@@ -173,9 +175,9 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
     final scaler = MediaQuery.textScalerOf(context);
     var estimate = 0.0;
     for (final above in groups.take(index)) {
-      estimate += scaler.scale(PlaceRow.collapsedExtent);
+      estimate += PlaceRow.collapsedHeight(scaler);
       if (_expanded.contains(_keyOf(above))) {
-        estimate += scaler.scale(44) * (above.people.length / 2).ceil();
+        estimate += PlaceRow.personHeight(scaler) * above.people.length;
       }
     }
     final position = _scroll.position;
@@ -398,7 +400,13 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Places'),
+        title: _groups == null
+            ? const Text('Places')
+            : RememberemTheme.titleWithSuffix(
+                context,
+                'Places',
+                '${_groups!.length}',
+              ),
         actions: const [HomeButton()],
       ),
       body: _body(),
@@ -412,19 +420,20 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
 
   Widget _content(AppSettings settings) {
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Could not load places.'),
-            TextButton(onPressed: _reload, child: const Text('Retry')),
-          ],
-        ),
+      return EmptyState(
+        title: 'Could not load places.',
+        actionLabel: 'Retry',
+        onAction: _reload,
       );
     }
     final groups = _groups;
-    if (groups == null) return const Center(child: CircularProgressIndicator());
-    if (groups.isEmpty) return const Center(child: Text('No places yet.'));
+    if (groups == null) {
+      return const Align(
+        alignment: Alignment.topCenter,
+        child: LinearProgressIndicator(minHeight: 3, semanticsLabel: 'Loading'),
+      );
+    }
+    if (groups.isEmpty) return const EmptyState(title: 'No places yet.');
     return Column(
       children: [
         Expanded(
@@ -468,62 +477,74 @@ class _PlacesScreenState extends State<PlacesScreen> with RouteAware {
         ),
         const Divider(height: 1),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: PlacesMap(
-                  groups: groups,
-                  selected: _selected,
-                  onSelect: _select,
-                  onZoom: _zoomTo,
-                  onMove: _startMove,
-                  streetMaps: settings.streetMaps,
-                  links: widget.services.links,
-                  radiusFor: _radiusFor,
-                  focus: _focus,
-                  zoomTo: _zoom,
-                  centreTick: _centreTick,
-                  hidden: _moving,
-                  onCentreChanged: _moving == null
-                      ? null
-                      : (at) => _moveTo = at,
+          child: DecoratedBox(
+            // A 2 dp rule of the theme colour along the map's bottom edge.
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 2,
                 ),
               ),
-              if (_moving case PlaceGroup(:final name?)) ...[
-                // A pin fixed over the map's middle, its tip on the spot.
-                const IgnorePointer(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 40),
-                      child: Icon(Icons.place, size: 40),
-                    ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: PlacesMap(
+                    groups: groups,
+                    selected: _selected,
+                    onSelect: _select,
+                    onZoom: _zoomTo,
+                    onMove: _startMove,
+                    streetMaps: settings.streetMaps,
+                    links: widget.services.links,
+                    radiusFor: _radiusFor,
+                    focus: _focus,
+                    zoomTo: _zoom,
+                    centreTick: _centreTick,
+                    hidden: _moving,
+                    onCentreChanged: _moving == null
+                        ? null
+                        : (at) => _moveTo = at,
                   ),
                 ),
-                Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 8,
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text('Drag the map to move $name')),
-                          TextButton(
-                            onPressed: () => _finishMove(save: false),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () => _finishMove(save: true),
-                            child: const Text('Move here'),
-                          ),
-                        ],
+                if (_moving case PlaceGroup(:final name?)) ...[
+                  // A pin fixed over the map's middle, its tip on the spot.
+                  const IgnorePointer(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 40),
+                        child: Icon(Icons.place, size: 40),
                       ),
                     ),
                   ),
-                ),
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text('Drag the map to move $name')),
+                            TextButton(
+                              onPressed: () => _finishMove(save: false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () => _finishMove(save: true),
+                              child: const Text('Move here'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],

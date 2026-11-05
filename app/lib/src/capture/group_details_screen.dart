@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/bottom_action_bar.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import '../memories/memory_edit_screen.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
 import 'discard_photo_dialog.dart';
+import 'face_thumb.dart';
 import 'photo_problems.dart';
 
 /// Several faces from one photo: the place, meeting and details they
@@ -120,13 +123,13 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: RememberemTheme.gutter,
+            vertical: 12,
+          ),
           children: [
-            Text('Added to each of the $count people.'),
-            const SizedBox(height: 4),
-            Text(MemoryEditScreen.askedText, style: text.bodySmall),
-            const SizedBox(height: 12),
             DictatedTextField(
+              ledger: true,
               label: 'Place',
               initialValue: _place,
               hint: 'unknown',
@@ -135,11 +138,18 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             ),
             const SizedBox(height: 8),
             DictatedTextField(
+              ledger: true,
               label: 'Meeting',
               initialValue: _meeting,
               dictation: dictation,
               onChanged: (v) => _meeting = v,
             ),
+            const SizedBox(height: 12),
+            Text('Added to each of the $count people.'),
+            const SizedBox(height: 4),
+            Text(MemoryEditScreen.askedText, style: text.bodySmall),
+            const SizedBox(height: 8),
+            for (final (i, face) in widget.faces.indexed) _faceRow(i, face),
             const SizedBox(height: 16),
             Text('Details true of everyone here', style: text.titleSmall),
             Text('Each person may read these.', style: text.bodySmall),
@@ -152,16 +162,16 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                   children: [
                     Expanded(
                       child: DictatedTextField(
+                        ledger: true,
                         label: 'Detail',
                         initialValue: d.text,
                         dictation: dictation,
-                        dense: true,
                         onChanged: (v) => _setLine(d.id, v),
                       ),
                     ),
                     IconButton(
                       tooltip: 'Remove detail ${i + 1}',
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close_rounded),
                       onPressed: () => _removeLine(d.id),
                     ),
                   ],
@@ -171,17 +181,35 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: _addLine,
-                icon: const Icon(Icons.add),
+                icon: const Icon(Icons.add_rounded),
                 label: const Text('Add detail'),
               ),
             ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: Text('Add $count people'),
-            ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomActionBar(
+        end: FilledButton(
+          style: BottomActionBar.goldStyle,
+          onPressed: _saving ? null : _save,
+          child: Text('Add $count people'),
+        ),
+      ),
+    );
+  }
+
+  /// One face being added: its portrait and which one it is. At least
+  /// 58 dp tall.
+  Widget _faceRow(int i, PixelRect face) {
+    final label = 'Face ${i + 1}';
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
+      child: Row(
+        children: [
+          FaceThumb(photo: widget.draft.photo, face: face, label: label),
+          const SizedBox(width: RememberemTheme.thumbGap),
+          Expanded(child: ExcludeSemantics(child: Text(label))),
+        ],
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,12 +8,14 @@ import 'package:rememberem/src/memories/memory_editor.dart';
 import 'package:rememberem/src/memories/merge_picker_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import 'fakes/detail_finders.dart';
 import 'fakes/fake_memory_repository.dart';
 import 'fakes/test_services.dart';
 
 void main() {
   late FakeMemoryRepository repository;
   late GlobalKey<NavigatorState> navigator;
+  const mergeTooltip = 'Merge with existing person record';
 
   Future<Memory> person(String name, DateTime capturedAt) async {
     final memory = await repository.add(photoJpeg: [], capturedAt: capturedAt);
@@ -42,11 +46,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// The card's Merge button, then the picked person, then the picker's
+  /// Merge.
   Future<void> mergeInto(WidgetTester tester, String name) async {
-    await tester.ensureVisible(find.text('Merge with existing person record'));
-    await tester.tap(find.text('Merge with existing person record'));
+    await tester.ensureVisible(find.byTooltip(mergeTooltip));
+    await tester.tap(find.byTooltip(mergeTooltip));
     await tester.pumpAndSettle();
     await tester.tap(find.text(name));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
     await tester.pumpAndSettle();
   }
 
@@ -85,7 +93,7 @@ void main() {
       await openCard(tester, newbie);
 
       await tester.enterText(
-        find.widgetWithText(TextField, 'Name'),
+        find.widgetWithText(TextField, 'NAME'),
         'A. Davis',
       );
       await mergeInto(tester, 'Alex');
@@ -136,14 +144,203 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: MergePickerScreen(repository: repository, excludeId: me.id),
+          home: MergePickerScreen(repository: repository, source: me),
         ),
       );
       await tester.pump();
 
       expect(find.text('Alex'), findsOneWidget);
-      expect(find.text('Me'), findsNothing);
       expect(find.text('Gone'), findsNothing);
+      // Me is named in the strip and the title, never in the list.
+      expect(find.text('Merge Me into…'), findsOneWidget);
+      expect(find.text('Me'), findsOneWidget);
+      expect(
+        find.text('will be merged into the person you pick'),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ListView), matching: find.text('Me')),
+        findsNothing,
+      );
+    });
+
+    group('the picker', () {
+      late Memory me;
+      late Memory alex;
+      Memory? popped;
+      var pops = 0;
+
+      Future<void> open(WidgetTester tester, {bool under = false}) async {
+        popped = null;
+        pops = 0;
+        me = await person('Me', DateTime(2026, 1, 1));
+        alex = await person('Alex', DateTime(2026, 2, 1));
+        await person('Bo', DateTime(2026, 3, 1));
+        navigator = GlobalKey<NavigatorState>();
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: navigator,
+            home: const Scaffold(body: Text('list')),
+          ),
+        );
+        if (under) {
+          // A page beneath the picker, to catch a second pop.
+          navigator.currentState!.push<void>(
+            MaterialPageRoute(
+              builder: (_) => const Scaffold(body: Text('under')),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        navigator.currentState!
+            .push<Memory>(
+              MaterialPageRoute(
+                builder: (_) => MergePickerScreen(
+                  repository: repository,
+                  source: me,
+                  clock: () => DateTime(2026, 11, 5),
+                ),
+              ),
+            )
+            .then((m) {
+              popped = m;
+              pops++;
+            });
+        await tester.pumpAndSettle();
+      }
+
+      Finder mergeButton() => find.widgetWithText(FilledButton, 'Merge');
+
+      testWidgets('a tap picks and does not pop; Merge appears only then', (
+        tester,
+      ) async {
+        await open(tester);
+        expect(mergeButton(), findsNothing);
+
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+
+        expect(pops, 0);
+        expect(find.byType(MergePickerScreen), findsOneWidget);
+        expect(mergeButton(), findsOneWidget);
+      });
+
+      testWidgets('a picked row says so, with a check and not by colour '
+          'alone', (tester) async {
+        await open(tester);
+        final handle = tester.ensureSemantics();
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.getSemantics(find.text('Alex')).flagsCollection.isSelected,
+          Tristate.isTrue,
+        );
+        expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+        expect(
+          tester.getSemantics(find.text('Bo')).flagsCollection.isSelected,
+          isNot(Tristate.isTrue),
+        );
+        handle.dispose();
+      });
+
+      testWidgets('tapping the picked row again lets go of it', (tester) async {
+        await open(tester);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+
+        expect(mergeButton(), findsNothing);
+        expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+        expect(pops, 0);
+      });
+
+      testWidgets('tapping another row moves the pick', (tester) async {
+        await open(tester);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Bo'));
+        await tester.pumpAndSettle();
+        await tester.tap(mergeButton());
+        await tester.pumpAndSettle();
+
+        expect(popped!.field(MemoryField.name), 'Bo');
+      });
+
+      testWidgets('Merge pops exactly the one picked', (tester) async {
+        await open(tester);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+        await tester.tap(mergeButton());
+        await tester.pumpAndSettle();
+
+        expect(pops, 1);
+        expect(popped!.id, alex.id);
+        expect(find.text('list'), findsOneWidget);
+      });
+
+      testWidgets('a double tap on Merge pops only once', (tester) async {
+        await open(tester, under: true);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+        final merge = tester.getCenter(mergeButton());
+        // Both taps land before the next frame, as a fast double tap can.
+        await tester.tapAt(merge);
+        await tester.tapAt(merge);
+        await tester.pumpAndSettle();
+
+        expect(pops, 1);
+        // A second pop would have taken the page beneath the picker too.
+        expect(find.text('under'), findsOneWidget);
+      });
+
+      testWidgets('Merge pressed twice before a frame pops only once', (
+        tester,
+      ) async {
+        await open(tester, under: true);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+        // The route's own pointer guard needs a frame, so call the
+        // handler the button holds twice, as two quick presses would.
+        final press = tester.widget<FilledButton>(mergeButton()).onPressed!;
+        press();
+        press();
+        await tester.pumpAndSettle();
+
+        expect(pops, 1);
+        // A second pop would have taken the page beneath the picker too.
+        expect(find.text('under'), findsOneWidget);
+      });
+
+      testWidgets('the pick survives a rotation', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(400, 800);
+        addTearDown(tester.view.reset);
+        await open(tester);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+
+        tester.view.physicalSize = const Size(800, 400);
+        await tester.pumpAndSettle();
+
+        expect(mergeButton(), findsOneWidget);
+        expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+        await tester.tap(mergeButton());
+        await tester.pumpAndSettle();
+        expect(popped!.id, alex.id);
+      });
+
+      testWidgets('Back merges no one', (tester) async {
+        await open(tester);
+        await tester.tap(find.text('Alex'));
+        await tester.pumpAndSettle();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(pops, 1);
+        expect(popped, isNull);
+      });
     });
   });
 
@@ -165,9 +362,17 @@ void main() {
           .map((t) => (t.title! as Text).data)
           .toList();
       expect(dates, ['Thursday, October 1, 2026']);
+      // Under the name and the time and place, above the details.
+      final top = tester.getTopLeft(find.text('Thursday, October 1, 2026')).dy;
       expect(
-        tester.getTopLeft(find.text('Thursday, October 1, 2026')).dy,
-        lessThan(tester.getTopLeft(find.widgetWithText(TextField, 'Name')).dy),
+        top,
+        greaterThan(
+          tester.getBottomLeft(find.widgetWithText(TextField, 'MEETING')).dy,
+        ),
+      );
+      expect(
+        top,
+        lessThan(tester.getTopLeft(detailHeading(DetailKind.fact)).dy),
       );
     });
 
@@ -187,6 +392,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(repository.stored[alex.id]!.encounters, hasLength(2));
       expect(repository.deletedPhotos, isEmpty);
+    });
+
+    testWidgets('the Picture-deleted Undo stays for 10 seconds, and the file '
+        'waits for it', (tester) async {
+      final alex = await twoPictures();
+      await openCard(tester, alex);
+      await tester.tap(find.byTooltip('Open this picture'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete picture'));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 9; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(find.text('Undo'), findsOneWidget);
+      expect(repository.deletedPhotos, isEmpty);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+      expect(repository.deletedPhotos, hasLength(1));
     });
 
     testWidgets('the photo file is deleted once Undo has gone', (tester) async {

@@ -5,6 +5,8 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
+import '../app/pill_button.dart';
+import '../app/rememberem_theme.dart';
 import '../memories/filter_kind.dart';
 import 'practice_screens.dart';
 
@@ -84,43 +86,68 @@ class FilteredPracticeScreen extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('The list is filtered:', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            for (final f in filters)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(FilterKind.describe(f)),
+            // How the list is filtered, as pills under the bar.
+            Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(
+                horizontal: RememberemTheme.gutter,
+                vertical: 4,
               ),
-            const SizedBox(height: 16),
-            Text(
-              game == PracticeGame.faces
-                  ? '${count == 1 ? '1 person' : '$count people'}, '
-                        '$asked ${asked == 1 ? 'face' : 'faces'} to ask.'
-                  // Every detail of these people, not only matching ones.
-                  : '${count == 1 ? '1 person' : '$count people'}; '
-                        '$asked of their '
-                        '${asked == 1 ? 'detail' : 'details'} to ask.',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: problem != null
-                  ? null
-                  : () => _play(context, {for (final m in filtered) m.id}),
-              child: const Text('Play with the filtered list'),
-            ),
-            if (problem != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(problem, style: theme.textTheme.bodySmall),
+              child: Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'The list is filtered:',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  for (final f in filters)
+                    PillButton(label: FilterKind.describe(f), filled: true),
+                ],
               ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => _play(context, null),
-              child: const Text('Play with everyone'),
+            ),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: RememberemTheme.rule(theme),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(RememberemTheme.gutter),
+                children: [
+                  Text(
+                    game == PracticeGame.faces
+                        ? '${count == 1 ? '1 person' : '$count people'}, '
+                              '$asked ${asked == 1 ? 'face' : 'faces'} to ask.'
+                        // Every detail of these people, not only matching ones.
+                        : '${count == 1 ? '1 person' : '$count people'}; '
+                              '$asked of their '
+                              '${asked == 1 ? 'detail' : 'details'} to ask.',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: problem != null
+                        ? null
+                        : () =>
+                              _play(context, {for (final m in filtered) m.id}),
+                    child: const Text('Play with the filtered list'),
+                  ),
+                  if (problem != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(problem, style: theme.textTheme.bodySmall),
+                    ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () => _play(context, null),
+                    child: const Text('Play with everyone'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

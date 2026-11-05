@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:rememberem/src/app/pill_button.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
@@ -53,7 +55,7 @@ void main() {
 
   Finder radiusButton(String text) => find.descendant(
     of: find.byType(PlaceRow),
-    matching: find.widgetWithText(OutlinedButton, '$text radius'),
+    matching: find.widgetWithText(PillButton, '$text radius'),
   );
 
   setUp(() {
@@ -74,7 +76,7 @@ void main() {
 
     expect(radiusButton('555 ft'), findsOneWidget);
     expect(radiusButton('1.0 mi'), findsOneWidget);
-    expect(find.byType(OutlinedButton), findsNWidgets(2)); // not the unknown
+    expect(find.byType(PillButton), findsNWidgets(2)); // not the unknown
     expect(circles(tester).map((c) => c.radius).toList()..sort(), [
       closeTo(169.164, 1e-6),
       closeTo(1609.344, 1e-6),
@@ -128,6 +130,8 @@ void main() {
     // Tapping elsewhere ends sliding.
     await tester.tapAt(const Offset(540, 2300));
     await tester.pumpAndSettle();
+    // The map waits out a possible double tap before it counts the tap.
+    await tester.pump(kDoubleTapTimeout);
     expect(find.byType(RadiusSlider), findsNothing);
   });
 
@@ -221,12 +225,18 @@ void main() {
       ),
     );
     final radius = tester.getTopLeft(radiusButton('555 ft'));
+    // The expander's glyph, not its 48 dp tap area.
     final expander = tester.getTopLeft(
-      find.byTooltip('Show the people met at Cafe'),
+      find.descendant(
+        of: find.byTooltip('Show the people met at Cafe'),
+        matching: find.byType(Icon),
+      ),
     );
-    expect(radius.dx, greaterThan(name.dx));
-    expect(expander.dx, greaterThan(name.dx));
-    expect(tester.getSize(radiusButton('555 ft')).height, lessThan(48));
+    // All three start on the name's own left edge.
+    expect(radius.dx, closeTo(name.dx, 0.5));
+    expect(expander.dx, closeTo(name.dx, 0.5));
+    // A 30 dp pill inside its 48 dp tap area.
+    expect(tester.getSize(radiusButton('555 ft')).height, 48);
   });
 
   testWidgets('outside the US, metres by default', (tester) async {

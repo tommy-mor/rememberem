@@ -3,9 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/portrait_thumb.dart';
+import '../app/rememberem_theme.dart';
 import '../memories/memory_tile.dart';
 
-/// A small photo of a person with their first name, for the timeline.
+/// A small photo of a person with their first name under it, for the
+/// timeline. A screen reader hears the full name and a button.
 class TimelineMiniature extends StatelessWidget {
   const TimelineMiniature({
     super.key,
@@ -14,6 +17,9 @@ class TimelineMiniature extends StatelessWidget {
     required this.onOpen,
   });
 
+  /// The cell's width; the photo is 44 dp wide inside it.
+  static const cellWidth = 52.0;
+
   final Memory memory;
   final File photo;
 
@@ -21,36 +27,30 @@ class TimelineMiniature extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final small = Theme.of(context).textTheme.bodySmall;
-    return InkWell(
+    final name = MemoryTile.nameOf(memory);
+    return Semantics(
+      container: true,
+      button: true,
+      label: name,
       onTap: onOpen,
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                photo,
-                width: 64,
-                height: 80,
-                fit: BoxFit.cover,
-                cacheWidth: 160,
-                errorBuilder: (_, _, _) => const SizedBox(
-                  width: 64,
-                  height: 80,
-                  child: Icon(Icons.person),
-                ),
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: cellWidth,
+          child: Column(
+            children: [
+              PortraitThumb(photo: photo, size: RememberemTheme.thumbTimeline),
+              const SizedBox(height: 2),
+              Text(
+                name.trim().split(' ').first,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
               ),
-            ),
-            Text(
-              MemoryTile.nameOf(memory).trim().split(' ').first,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: small,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

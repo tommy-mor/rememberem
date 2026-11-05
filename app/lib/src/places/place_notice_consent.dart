@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../app/bottom_action_bar.dart';
+import '../app/rememberem_theme.dart';
+
 /// The page Fred reads before place notices ask for location all the time:
 /// what is used, when, what for, and where it stays. True to go on.
 class PlaceNoticeConsent extends StatelessWidget {
@@ -31,29 +34,53 @@ class PlaceNoticeConsent extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Place notices')),
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(RememberemTheme.gutter),
           children: [
-            const Icon(Icons.location_on_outlined, size: 48),
+            const Icon(Icons.location_on_rounded, size: 48),
             const SizedBox(height: 16),
-            Text('Location in the background', style: text.titleLarge),
+            Text(
+              'Location in the background',
+              style: text.titleLarge?.copyWith(
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(height: 16),
             for (final p in paragraphs)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(p, style: text.bodyLarge),
               ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Allow'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No thanks'),
-            ),
           ],
+        ),
+      ),
+      // One row, "No thanks" left and "Allow" right; at a large text size
+      // the buttons wrap onto two lines instead of running off the screen.
+      bottomNavigationBar: BottomActionBar(
+        middle: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, RememberemTheme.tapTarget),
+                ),
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No thanks'),
+              ),
+              FilledButton(
+                style: BottomActionBar.goldStyle,
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Allow'),
+              ),
+            ],
+          ),
         ),
       ),
     );

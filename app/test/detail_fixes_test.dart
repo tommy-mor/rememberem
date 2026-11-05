@@ -91,8 +91,7 @@ void main() {
       );
       await tester.ensureVisible(plus);
       await tester.tap(plus);
-      // An anniversary's "+ date" pulses for ever, so never settle.
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
     }
 
     Memory saved() => repository.stored[memory.id]!;

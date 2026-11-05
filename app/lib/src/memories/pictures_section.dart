@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/portrait_thumb.dart';
+import '../app/rememberem_theme.dart';
+import '../app/section_header.dart';
+
 /// The [encounters] given (the person's other pictures, newest first),
-/// each with when and where it was taken. Tapping one opens it.
+/// each with when and where it was taken, under a "Pictures" header.
+/// Tapping one opens it.
 class PicturesSection extends StatelessWidget {
   const PicturesSection({
     super.key,
@@ -21,22 +26,15 @@ class PicturesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        SectionHeader(title: 'Pictures', count: encounters.length),
         for (final encounter in encounters)
           ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.file(
-                repository.encounterPhoto(encounter),
-                width: 48,
-                height: 60,
-                fit: BoxFit.cover,
-                cacheWidth: 160,
-                errorBuilder: (_, _, _) =>
-                    const SizedBox(width: 48, child: Icon(Icons.person)),
-              ),
+            contentPadding: const EdgeInsetsDirectional.symmetric(
+              horizontal: RememberemTheme.gutter,
             ),
+            horizontalTitleGap: RememberemTheme.thumbGap,
+            minLeadingWidth: RememberemTheme.thumbRow.width,
+            leading: PortraitThumb(photo: repository.encounterPhoto(encounter)),
             title: Text(
               localizations.formatFullDate(encounter.capturedAt.toLocal()),
             ),
@@ -49,7 +47,7 @@ class PicturesSection extends StatelessWidget {
                 encounter.meeting,
               ].where((s) => s.trim().isNotEmpty).join(' · '),
             ),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => onOpen(encounter),
           ),
       ],

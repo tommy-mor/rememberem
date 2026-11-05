@@ -17,4 +17,9 @@ Finder openToggle(String name) =>
     find.byWidgetPredicate((w) => w is Icon && w.semanticLabel == 'Open $name');
 
 /// The description field of an open card.
-Finder descriptionField() => find.widgetWithText(TextField, 'Description');
+Finder descriptionField() => find.widgetWithText(TextField, 'DESCRIPTION');
+
+/// A kind's tinted header on the card: its title in capitals, then the
+/// count.
+Finder detailHeading(DetailKind kind) =>
+    find.textContaining(kind.plural.toUpperCase());

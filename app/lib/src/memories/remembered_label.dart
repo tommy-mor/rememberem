@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
-/// A small, encouraging line: how many faces and details Fred remembers.
+/// A small, encouraging two lines: how many faces and details Fred remembers.
 class RememberedLabel extends StatelessWidget {
   const RememberedLabel(this.count, {super.key});
 
@@ -14,13 +14,31 @@ class RememberedLabel extends StatelessWidget {
     final details = count.details == 1
         ? '1 detail'
         : '${count.details} details';
-    return Text(
-      count.isNothing
-          ? 'Remembered: nothing yet, practice to start'
-          : 'Remembered: $faces · $details',
-      textAlign: TextAlign.center,
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
+    final summary = count.isNothing
+        ? 'nothing yet, practice to start'
+        : '$faces · $details';
+    return Semantics(
+      label: 'Remembered: $summary',
+      excludeSemantics: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Remembered',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            summary,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 13,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

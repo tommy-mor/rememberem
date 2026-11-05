@@ -99,22 +99,19 @@ void main() {
 
     testWidgets('says 1 face and 1 detail in the singular', (tester) async {
       await label(tester, const RememberedCount(1, 1));
-      expect(find.text('Remembered: 1 face · 1 detail'), findsOneWidget);
+      expect(find.text('1 face · 1 detail'), findsOneWidget);
     });
 
     testWidgets('plural, and zero details as a number', (tester) async {
       await label(tester, const RememberedCount(2, 0));
-      expect(find.text('Remembered: 2 faces · 0 details'), findsOneWidget);
+      expect(find.text('2 faces · 0 details'), findsOneWidget);
     });
 
     testWidgets('nothing yet invites practice, never "0 faces"', (
       tester,
     ) async {
       await label(tester, const RememberedCount(0, 0));
-      expect(
-        find.text('Remembered: nothing yet, practice to start'),
-        findsOneWidget,
-      );
+      expect(find.text('nothing yet, practice to start'), findsOneWidget);
       expect(find.textContaining('0 faces'), findsNothing);
     });
   });
@@ -125,8 +122,8 @@ void main() {
     await person('Cy', points: 9);
     await showList(tester);
 
-    expect(find.text('Remembered: 2 faces · 2 details'), findsOneWidget);
-    expect(find.text('Meet someone'), findsOneWidget);
+    expect(find.text('2 faces · 2 details'), findsOneWidget);
+    expect(find.byTooltip('Meet someone'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Faces'), findsOneWidget);
   });
 
@@ -173,7 +170,7 @@ void main() {
     navigator.currentState!.pop();
     await tester.pumpAndSettle();
 
-    expect(find.text('Remembered: 1 face · 0 details'), findsOneWidget);
+    expect(find.text('1 face · 0 details'), findsOneWidget);
     expect(repository.saves, isEmpty); // the list only reads
   });
 

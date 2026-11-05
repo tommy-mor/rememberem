@@ -260,7 +260,7 @@ void main() {
         tester.widget<IconButton>(
           find.widgetWithIcon(
             IconButton,
-            tooltip == 'Undo' ? Icons.undo : Icons.redo,
+            tooltip == 'Undo' ? Icons.undo_rounded : Icons.redo_rounded,
           ),
         );
 

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/pill_button.dart';
+import '../app/rememberem_theme.dart';
 import 'filter_kind.dart';
 import 'filter_row.dart';
 import 'list_filters.dart';
 
-/// Above the list: any note, the filters, then "Add filter", "Sort", how
-/// many people show, and "Clear all" while filters are on.
+/// Above the list: how many people show with "Clear all" while filters are
+/// on, the Filter and sort pills, then any note and the filters.
 class FilterBar extends StatelessWidget {
   const FilterBar({
     super.key,
@@ -36,61 +38,96 @@ class FilterBar extends StatelessWidget {
     final meetings = MemoryFilter.meetings(people);
     final tags = DetailTypeCatalog.labels(DetailKind.tag, people);
     final dated = filters.active.any((c) => c is DateRangeFilter);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (note != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 8),
-              child: Text(note),
-            ),
-          for (final f in filters.filters)
-            FilterRow(
-              key: ValueKey(f.id),
-              condition: f.condition,
-              places: places,
-              meetings: meetings,
-              tags: tags,
-              openNow: f.id == filters.added,
-              onOpened: () => filters.consumeAdded(f.id),
-              onChanged: (c) => filters.change(f.id, c),
-              onRemove: () => filters.remove(f.id),
-            ),
-          if (dated) Text(dateHint, style: small),
-          // Wraps rather than overflowing with large text.
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 16,
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _countBar(context),
+        Divider(height: 1, thickness: 1, color: RememberemTheme.rule(theme)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PopupMenuButton<FilterKind>(
-                tooltip: 'Add filter',
-                onSelected: filters.add,
-                itemBuilder: (_) => [
-                  for (final kind in FilterKind.values)
-                    PopupMenuItem(value: kind, child: Text(kind.label)),
-                ],
-                child: _menuLabel(Icons.filter_list, 'Add filter'),
-              ),
-              _sortMenu(),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(shown == 1 ? '1 person' : '$shown people', style: small),
-                  if (filters.filters.isNotEmpty)
-                    TextButton(
-                      onPressed: filters.clear,
-                      child: const Text('Clear all'),
-                    ),
-                ],
-              ),
+              if (note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: Text(note),
+                ),
+              for (final f in filters.filters)
+                FilterRow(
+                  key: ValueKey(f.id),
+                  condition: f.condition,
+                  places: places,
+                  meetings: meetings,
+                  tags: tags,
+                  openNow: f.id == filters.added,
+                  onOpened: () => filters.consumeAdded(f.id),
+                  onChanged: (c) => filters.change(f.id, c),
+                  onRemove: () => filters.remove(f.id),
+                ),
+              if (dated) Text(dateHint, style: small),
             ],
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  /// How many people show, then the Filter and sort pills. Wraps rather
+  /// than overflowing with large text.
+  Widget _countBar(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        start: RememberemTheme.gutter,
+        end: 8,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  shown == 1 ? '1 person' : '$shown people',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (filters.filters.isNotEmpty)
+                  TextButton(
+                    onPressed: filters.clear,
+                    child: const Text('Clear all'),
+                  ),
+              ],
+            ),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [_filterMenu(), _sortMenu()],
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _filterMenu() => PopupMenuButton<FilterKind>(
+    tooltip: 'Add filter',
+    onSelected: filters.add,
+    padding: EdgeInsets.zero,
+    itemBuilder: (_) => [
+      for (final kind in FilterKind.values)
+        PopupMenuItem(value: kind, child: Text(kind.label)),
+    ],
+    child: const PillButton(label: 'Filter', icon: Icons.filter_list_rounded),
+  );
 
   /// Which way a sort runs, in words.
   static String direction(PeopleOrder order) {
@@ -105,8 +142,11 @@ class FilterBar extends StatelessWidget {
 
   Widget _sortMenu() {
     final order = filters.order;
-    final arrow = order.reversed ? Icons.arrow_upward : Icons.arrow_downward;
+    final arrow = order.reversed
+        ? Icons.arrow_upward_rounded
+        : Icons.arrow_downward_rounded;
     return PopupMenuButton<PersonSort>(
+      padding: EdgeInsets.zero,
       tooltip: 'Sort by ${order.sort.label}, ${direction(order)}',
       onSelected: filters.sortBy,
       itemBuilder: (_) => [
@@ -137,22 +177,11 @@ class FilterBar extends StatelessWidget {
             ),
           ),
       ],
-      child: _menuLabel(Icons.sort, order.sort.label, trailing: arrow),
+      child: PillButton(
+        label: order.sort.label,
+        trailingIcon: arrow,
+        filled: true,
+      ),
     );
   }
-
-  /// An icon and a word, the look of the bar's menus.
-  static Widget _menuLabel(IconData icon, String text, {IconData? trailing}) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon),
-            const SizedBox(width: 6),
-            Text(text),
-            if (trailing != null) Icon(trailing, size: 16),
-          ],
-        ),
-      );
 }

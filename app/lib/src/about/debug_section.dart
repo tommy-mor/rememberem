@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/section_header.dart';
 import '../places/place_notice_keeper.dart';
 import '../reminders/reminder_coordinator.dart';
-import '../settings/settings_section.dart';
 
 /// Buttons that fire notifications now, for trying them out. Shown on
 /// About in debug builds only (see [AboutScreen]); release builds never
@@ -53,24 +53,25 @@ class DebugSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final keeper = placeNotices;
-    return SettingsSection(
-      title: 'Debug',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const SectionHeader(title: 'Debug'),
         ListTile(
-          leading: const Icon(Icons.cake_outlined),
+          leading: const Icon(Icons.cake_rounded),
           title: const Text('Anniversary notice for…'),
           subtitle: const Text('Pick a day; its notice shows now.'),
           onTap: () => _anniversary(context),
         ),
         ListTile(
-          leading: const Icon(Icons.notifications_outlined),
+          leading: const Icon(Icons.notifications_rounded),
           title: const Text('Practice reminder now'),
           subtitle: const Text('Shows nothing if notifications are off.'),
           onTap: reminders.showReminderNow,
         ),
         if (keeper != null)
           ListTile(
-            leading: const Icon(Icons.place_outlined),
+            leading: const Icon(Icons.place_rounded),
             title: const Text('Place notice for…'),
             subtitle: const Text('Pick a place; its arrival notice shows now.'),
             onTap: () => _place(context, keeper),

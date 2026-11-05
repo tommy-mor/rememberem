@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rememberem/src/memories/memory_tile.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
@@ -175,7 +176,10 @@ void main() {
     await showPlaces(tester);
 
     expect(inList('Somewhere'), findsOneWidget);
-    expect(find.byIcon(Icons.help_outline), findsOneWidget); // no marker
+    expect(
+      find.byIcon(Icons.help_outline_rounded),
+      findsOneWidget,
+    ); // no marker
   });
 
   testWidgets('renaming a place updates the list and the people', (
@@ -392,11 +396,11 @@ void main() {
     await showPlaces(tester);
 
     await tapMarker(tester, 'Cafe');
-    expect(find.widgetWithText(ActionChip, 'Alex'), findsNothing);
+    expect(find.widgetWithText(MemoryTile, 'Alex'), findsNothing);
     await expand(tester, 'Cafe');
-    expect(find.widgetWithText(ActionChip, 'Alex'), findsOneWidget);
+    expect(find.widgetWithText(MemoryTile, 'Alex'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ActionChip, 'Alex'));
+    await tester.tap(find.widgetWithText(MemoryTile, 'Alex'));
     await tester.pumpAndSettle();
     expect(find.byType(MemoryEditScreen), findsOneWidget);
 

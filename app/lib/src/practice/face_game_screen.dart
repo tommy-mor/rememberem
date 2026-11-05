@@ -1,11 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import '../settings/app_settings_controller.dart';
+import 'answer_row.dart';
 import 'countdown_button.dart';
 import 'game_feedback.dart';
 import 'mute_button.dart';
+import 'quiz_progress_bar.dart';
 import 'quiz_result.dart';
 import 'quiz_results_view.dart';
 
@@ -247,6 +252,13 @@ class _FaceGameScreenState extends State<FaceGameScreen>
     }
   }
 
+  /// How far through the turns: moving while loading, full at the end.
+  double? get _progress => switch (_phase) {
+    _Phase.loading => null,
+    _Phase.finished => 1,
+    _ => _turns == 0 ? 0 : _turn / _turns,
+  };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -254,23 +266,23 @@ class _FaceGameScreenState extends State<FaceGameScreen>
         title: Text(_turn == 0 ? 'Practice faces' : 'Turn $_turn of $_turns'),
         leading: IconButton(
           tooltip: 'Stop practice',
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close_rounded, size: 22),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         actions: [
           if (widget.settings case final settings?) MuteButton(settings),
           const HomeButton(),
         ],
+        bottom: QuizProgressBar(value: _progress),
       ),
       body: SafeArea(child: _body(context)),
     );
   }
 
   Widget _body(BuildContext context) {
-    final theme = Theme.of(context);
     switch (_phase) {
       case _Phase.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const SizedBox.shrink();
       case _Phase.finished:
         return QuizResultsView(
           results: _results,
@@ -287,81 +299,121 @@ class _FaceGameScreenState extends State<FaceGameScreen>
         break;
     }
     final person = _person!;
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: _hidden
-                ? const Center(child: Icon(Icons.visibility_off, size: 64))
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      widget.repository.photoFile(person),
-                      fit: BoxFit.cover,
-                      semanticLabel:
-                          'The face to name. This game needs sight; '
-                          'Practice details works with a screen reader.',
-                      errorBuilder: (_, _, _) =>
-                          const Center(child: Icon(Icons.person, size: 96)),
-                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The photo takes what the page leaves once the question and the
+        // four answers have their room, and the same in the reveal as in
+        // the choosing, so it never jumps when the names appear. Never
+        // under 200 dp: the page scrolls instead.
+        final line = MediaQuery.textScalerOf(context).scale(16) * 1.4;
+        final double answers = 4 * math.max(54.0, line + 24) + 2;
+        final double photo = math.max(
+          200.0,
+          constraints.maxHeight -
+              2 * RememberemTheme.gutter -
+              (12 + line + 8 + answers),
+        );
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(RememberemTheme.gutter),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: photo,
+                child: _hidden
+                    ? const Center(
+                        child: Icon(Icons.visibility_off_rounded, size: 64),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          widget.repository.photoFile(person),
+                          fit: BoxFit.cover,
+                          semanticLabel:
+                              'The face to name. This game needs sight; '
+                              'Practice details works with a screen reader.',
+                          errorBuilder: (_, _, _) => const Center(
+                            child: Icon(Icons.person_rounded, size: 96),
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(height: 12),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  _phase == _Phase.choose
+                      ? (_said ?? 'Who is this?')
+                      : 'Who is this?',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // The names stay hidden until the countdown ends; their room
+              // is kept so nothing moves when they come.
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: answers),
+                child: _phase == _Phase.reveal
+                    ? Align(
+                        alignment: Alignment.topCenter,
+                        child: CountdownButton(
+                          key: ValueKey(_turn),
+                          label: 'Show names',
+                          duration: widget.reveal,
+                          running: !_hidden,
+                          onPressed: _showChoices,
+                        ),
+                      )
+                    : _answers(context),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          if (_phase == _Phase.reveal) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  'Who is this?',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleLarge,
-                ),
-              ),
-            ),
-            CountdownButton(
-              key: ValueKey(_turn),
-              label: 'Show names',
-              duration: widget.reveal,
-              running: !_hidden,
-              onPressed: _showChoices,
-            ),
-          ] else ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  _said ?? 'Who is this?',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ),
-            ),
-            for (final name in _choices)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: FilledButton.tonal(
-                  style: name == _correct ? _rightStyle : null,
-                  onPressed: _wrong.contains(name) || _writing || _advancing
-                      ? null
-                      : () => _choose(name),
-                  child: Text(name),
-                ),
-              ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
-  /// The right answer, green even while the buttons are disabled.
-  static final _rightStyle = FilledButton.styleFrom(
-    disabledBackgroundColor: Colors.green.shade600,
-    disabledForegroundColor: Colors.white,
-  );
+  /// The four names in one rounded list.
+  Widget _answers(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Column(
+          children: [
+            for (final (i, name) in _choices.indexed) ...[
+              if (i > 0)
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: RememberemTheme.rule(theme),
+                ),
+              AnswerRow(
+                name: name,
+                state: name == _correct
+                    ? AnswerState.right
+                    : _wrong.contains(name)
+                    ? AnswerState.wrong
+                    : AnswerState.open,
+                onTap: _wrong.contains(name) || _writing || _advancing
+                    ? null
+                    : () => _choose(name),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _message(BuildContext context, String text) => Center(
     child: Padding(

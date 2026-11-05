@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
+import 'package:rememberem/src/app/pill_button.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
+import 'package:rememberem/src/practice/answer_row.dart';
 import 'package:rememberem/src/practice/countdown_button.dart';
 import 'package:rememberem/src/practice/face_game_screen.dart';
 import 'package:rememberem/src/practice/filtered_practice_screen.dart';
@@ -42,6 +44,24 @@ void main() {
       expect(presses, 1);
       await tester.pump(const Duration(seconds: 5));
       expect(presses, 1);
+    });
+
+    testWidgets('the drain bar is drawn in the theme colour, not gold', (
+      tester,
+    ) async {
+      await show(tester);
+      final bar = tester.widget<ColoredBox>(
+        find.descendant(
+          of: find.byType(CountdownButton),
+          matching: find.byWidgetPredicate(
+            (w) => w is ColoredBox && w.color.a == 1 && w.child == null,
+          ),
+        ),
+      );
+      final scheme = Theme.of(tester.element(find.byType(CountdownButton)))
+          .colorScheme;
+      expect(bar.color, scheme.primary);
+      await tester.pump(const Duration(seconds: 4));
     });
 
     testWidgets('a tap presses it at once, and only once', (tester) async {
@@ -107,7 +127,7 @@ void main() {
       );
       await tester.pump();
       expect(find.byType(CountdownButton), findsNothing);
-      expect(find.byType(FilledButton), findsNWidgets(4));
+      expect(find.byType(AnswerRow), findsNWidgets(4));
     });
 
     testWidgets('mute flips the Sounds setting and its icon', (tester) async {
@@ -115,11 +135,11 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(home: Scaffold(body: MuteButton(settings))),
       );
-      expect(find.byIcon(Icons.volume_up), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
       await tester.tap(find.byTooltip('Mute sounds'));
       await tester.pump();
       expect(settings.value.sounds, isFalse);
-      expect(find.byIcon(Icons.volume_off), findsOneWidget);
+      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
       // It follows Settings too.
       settings.value = settings.value.copyWith(sounds: true);
       await tester.pump();
@@ -203,6 +223,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(FilteredPracticeScreen), findsOneWidget);
       expect(find.text('Place: Cafe'), findsOneWidget);
+      // The filter shows as a pill, in the strip under the bar.
+      expect(find.widgetWithText(PillButton, 'Place: Cafe'), findsOneWidget);
       expect(find.text('4 people, 4 faces to ask.'), findsOneWidget);
 
       await tester.tap(find.text('Play with the filtered list'));
@@ -287,8 +309,8 @@ void main() {
       await tester.pump();
       for (var turn = 0; turn < 4; turn++) {
         final shown = tester
-            .widgetList<FilledButton>(find.byType(FilledButton))
-            .map((b) => ((b.child! as Text).data!))
+            .widgetList<AnswerRow>(find.byType(AnswerRow))
+            .map((row) => row.name)
             .toSet();
         expect(shown, {'Ann', 'Bo', 'Cy', 'Di'});
         final image = tester.widget<Image>(find.byType(Image)).image;

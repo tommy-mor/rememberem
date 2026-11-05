@@ -82,7 +82,7 @@ void main() {
 
     await tester.tap(find.text('Sam'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Meeting'), 'Choir');
+    await tester.enterText(find.widgetWithText(TextField, 'MEETING'), 'Choir');
     await tester.tap(find.byTooltip('Move to trash'));
     await tester.pumpAndSettle();
 
@@ -100,6 +100,22 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Sam'), findsOneWidget);
+  });
+
+  testWidgets('the Moved-to-trash Undo stays for 10 seconds, then goes', (
+    tester,
+  ) async {
+    await person('Sam');
+    await showList(tester);
+    await trashFromPage(tester, 'Sam');
+
+    for (var i = 0; i < 9; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(find.text('Undo'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('Undo'), findsNothing);
   });
 
   testWidgets('opening the Trash hides a pending Undo', (tester) async {

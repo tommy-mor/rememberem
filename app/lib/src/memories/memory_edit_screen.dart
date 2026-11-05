@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/bottom_action_bar.dart';
 import '../app/home_button.dart';
+import '../app/portrait_thumb.dart';
+import '../app/rememberem_theme.dart';
 import '../contacts/contact_link_button.dart';
 import '../maps/location_choice.dart';
 import '../maps/location_picker_screen.dart';
@@ -375,50 +378,44 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       // Not a lazy ListView: fields scrolled out of view must keep their
       // text and any dictation in progress.
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(bottom: RememberemTheme.gutter),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _photo(memory),
-                const SizedBox(width: 12),
-                Expanded(child: _photoGroup(context, memory)),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                RememberemTheme.gutter,
+                12,
+                RememberemTheme.gutter,
+                0,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _photo(memory),
+                  const SizedBox(width: RememberemTheme.thumbGap),
+                  Expanded(child: _fields(memory, faintHint)),
+                ],
+              ),
             ),
-            if (widget.justMet) _askedRow(context),
+            if (widget.justMet)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: RememberemTheme.gutter,
+                ),
+                child: _askedRow(context),
+              ),
+            Padding(
+              // The icon buttons' own space puts their icons on the gutter.
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+              child: _whenWhere(memory),
+            ),
             if (memory.encounters.length > 1)
               PicturesSection(
                 encounters: memory.encounters.skip(1).toList(),
                 repository: widget.repository,
                 onOpen: _openPicture,
               ),
-            for (final field in MemoryField.values) ...[
-              const SizedBox(height: 16),
-              DictatedTextField(
-                key: ValueKey('${field.key}-$_fieldsGen'),
-                label: field.label,
-                initialValue: memory.field(field),
-                dictation: widget.services.dictation,
-                // Speaking is for the moment of meeting; later, typing.
-                showMic: widget.justMet,
-                hint: switch (field) {
-                  MemoryField.name => MemoryTile.unknownName,
-                  MemoryField.place || MemoryField.meeting => 'unknown',
-                },
-                // Fainter than other placeholders: plainly not filled in.
-                hintStyle: faintHint,
-                onListeningChanged: (listening) =>
-                    _setDictating(field.key, listening),
-                onChanged: (value) {
-                  _editor.update(field.key, value);
-                  // The title shows the name as it is typed.
-                  if (field == MemoryField.name) setState(() {});
-                },
-              ),
-            ],
-            const SizedBox(height: 16),
             _scaledForDetails(
               context,
               DetailListEditor(
@@ -441,7 +438,6 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                     _setDictating('details', listening),
               ),
             ),
-            const SizedBox(height: 16),
             RelationshipsSection(
               person: memory,
               people: _peopleNow,
@@ -454,12 +450,43 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
   }
 
+  /// Name, Place and Meeting, stacked beside the photo.
+  Widget _fields(Memory memory, TextStyle faintHint) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final field in MemoryField.values)
+        DictatedTextField(
+          key: ValueKey('${field.key}-$_fieldsGen'),
+          ledger: true,
+          label: field.label,
+          initialValue: memory.field(field),
+          dictation: widget.services.dictation,
+          // Speaking is for the moment of meeting; later, typing.
+          showMic: widget.justMet,
+          hint: switch (field) {
+            MemoryField.name => MemoryTile.unknownName,
+            MemoryField.place || MemoryField.meeting => 'unknown',
+          },
+          // Fainter than other placeholders: plainly not filled in.
+          hintStyle: faintHint,
+          onListeningChanged: (listening) =>
+              _setDictating(field.key, listening),
+          onChanged: (value) {
+            _editor.update(field.key, value);
+            // The title shows the name as it is typed.
+            if (field == MemoryField.name) setState(() {});
+          },
+        ),
+    ],
+  );
+
   /// The photo that represents this person; tap it to open its picture
-  /// page. The crop button sits on its lower right corner.
+  /// page. The crop button sits on its lower right corner: 28 dp to see,
+  /// 48 dp to tap.
   Widget _photo(Memory memory) {
-    return SizedBox(
-      width: 192,
-      height: 240,
+    const size = RememberemTheme.thumbCard;
+    return SizedBox.fromSize(
+      size: size,
       child: Stack(
         children: [
           Positioned.fill(
@@ -467,24 +494,27 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               onTap: () => _openPicture(memory.encounters.first),
               child: Tooltip(
                 message: 'Open this picture',
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    widget.repository.photoFile(memory),
-                    key: ValueKey('photo-$_photoGen'),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(Icons.person),
-                  ),
+                child: PortraitThumb(
+                  key: ValueKey('photo-$_photoGen'),
+                  photo: widget.repository.photoFile(memory),
+                  size: size,
                 ),
               ),
             ),
           ),
           Positioned(
-            right: 4,
-            bottom: 4,
+            right: 0,
+            bottom: 0,
             child: IconButton.filledTonal(
               tooltip: 'Crop',
-              icon: const Icon(Icons.crop),
+              iconSize: 18,
+              visualDensity: VisualDensity.standard,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(28, 28),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.padded,
+              ),
+              icon: const Icon(Icons.crop_rounded),
               onPressed: _cropping ? null : _crop,
             ),
           ),
@@ -493,35 +523,21 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
   }
 
-  /// Beside the photo: Merge, then when and where it was taken.
-  Widget _photoGroup(BuildContext context, Memory memory) {
-    final label = Theme.of(context).textTheme.labelLarge;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            textStyle: label?.copyWith(fontSize: (label.fontSize ?? 14) * 0.6),
-            visualDensity: VisualDensity.compact,
-          ),
-          onPressed: _merge,
-          icon: const Icon(Icons.merge, size: 16),
-          label: const Text(
-            'Merge with existing person record',
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 4),
-        WhenWhereRow(
-          stacked: true,
-          encounter: memory.encounters.first,
-          services: widget.services,
-          onTimeChanged: (at) => _changeNewest((e) => e.withCapturedAt(at)),
-          onLocationChosen: (choice) => _changeNewest(choice.applyTo),
-        ),
-      ],
-    );
-  }
+  /// When and where the newest picture was taken, and Merge at the end.
+  Widget _whenWhere(Memory memory) => WhenWhereRow(
+    encounter: memory.encounters.first,
+    services: widget.services,
+    onTimeChanged: (at) => _changeNewest((e) => e.withCapturedAt(at)),
+    onLocationChosen: (choice) => _changeNewest(choice.applyTo),
+    trailing: Tooltip(
+      message: 'Merge with existing person record',
+      child: TextButton.icon(
+        onPressed: _merge,
+        icon: const Icon(Icons.merge_rounded, size: 20),
+        label: const Text('Merge'),
+      ),
+    ),
+  );
 
   /// A happening's place, from the map: a known place's pin, or a spot
   /// Fred names. Null if he went back.
@@ -635,7 +651,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         content: Text('Moved ${memory.displayName} to trash'),
         // Undo snackbars would otherwise stay until dismissed.
         persist: false,
-        duration: const Duration(seconds: 6),
+        duration: const Duration(seconds: 10),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
@@ -683,7 +699,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             content: const Text('Picture deleted'),
             // Undo snackbars would otherwise stay until dismissed.
             persist: false,
-            duration: const Duration(seconds: 6),
+            duration: const Duration(seconds: 10),
             action: SnackBarAction(
               label: 'Undo',
               onPressed: () {
@@ -717,7 +733,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       MaterialPageRoute(
         builder: (_) => MergePickerScreen(
           repository: widget.repository,
-          excludeId: _editor.memory.id,
+          source: _editor.memory,
         ),
       ),
     );
@@ -814,38 +830,37 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     }
   }
 
-  /// A bar at the foot of the page: small Undo and Redo buttons either
-  /// side of "Saved automatically.".
+  /// A bar at the foot of the page: Undo and Redo either side of "Saved
+  /// automatically.".
   Widget _undoRow(BuildContext context) => ListenableBuilder(
     listenable: _editor,
     builder: (context, _) {
       final idle = _dictating.isEmpty && !_cropping;
-      return Material(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        child: SafeArea(top: false, child: _undoButtons(context, idle)),
+      final theme = Theme.of(context);
+      final disabled = IconButton.styleFrom(
+        disabledForegroundColor: theme.colorScheme.onSurface.withValues(
+          alpha: 0.35,
+        ),
       );
-    },
-  );
-
-  Widget _undoButtons(BuildContext context, bool idle) => Row(
-    children: [
-      IconButton(
-        tooltip: 'Undo',
-        icon: const Icon(Icons.undo),
-        onPressed: idle && _editor.canUndo ? () => _step(_editor.undo) : null,
-      ),
-      Expanded(
-        child: Text(
+      return BottomActionBar(
+        start: IconButton(
+          style: disabled,
+          tooltip: 'Undo',
+          icon: const Icon(Icons.undo_rounded),
+          onPressed: idle && _editor.canUndo ? () => _step(_editor.undo) : null,
+        ),
+        middle: Text(
           'Saved automatically.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: theme.textTheme.bodySmall,
         ),
-      ),
-      IconButton(
-        tooltip: 'Redo',
-        icon: const Icon(Icons.redo),
-        onPressed: idle && _editor.canRedo ? () => _step(_editor.redo) : null,
-      ),
-    ],
+        end: IconButton(
+          style: disabled,
+          tooltip: 'Redo',
+          icon: const Icon(Icons.redo_rounded),
+          onPressed: idle && _editor.canRedo ? () => _step(_editor.redo) : null,
+        ),
+      );
+    },
   );
 }

@@ -5,6 +5,9 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
 import '../app/home_button.dart';
+import '../app/ledger_picker_field.dart';
+import '../app/portrait_thumb.dart';
+import '../app/rememberem_theme.dart';
 import '../speech/dictated_text_field.dart';
 import 'memory_editor.dart';
 import 'when_where_row.dart';
@@ -55,6 +58,89 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
     if (removed != null) Navigator.of(context).pop(removed);
   }
 
+  /// Beside the photo: the date and the time, each to change, then the
+  /// location with its map pin.
+  Widget _whenAndWhere(BuildContext context, Encounter encounter) {
+    final localizations = MaterialLocalizations.of(context);
+    final local = encounter.capturedAt.toLocal();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LedgerPickerField(
+          label: 'Date',
+          value: localizations.formatMediumDate(local),
+          onTap: () => _pickDate(local),
+        ),
+        LedgerPickerField(
+          label: 'Time',
+          value: localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local)),
+          onTap: () => _pickClock(local),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                WhenWhereRow.whereOf(encounter),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Change location',
+              icon: const Icon(Icons.location_on_outlined, size: 20),
+              onPressed: () => WhenWhereRow.pickLocation(
+                context,
+                widget.services,
+                encounter,
+                (choice) => setState(() {
+                  _update(choice.applyTo, now: true);
+                  _placeGen++;
+                }),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickDate(DateTime local) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: local,
+      firstDate: DateTime(1970),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (date == null || !mounted) return;
+    setState(
+      () => _update(
+        (e) => e.withCapturedAt(
+          DateTime(date.year, date.month, date.day, local.hour, local.minute),
+        ),
+        now: true,
+      ),
+    );
+  }
+
+  Future<void> _pickClock(DateTime local) async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(local),
+    );
+    if (time == null || !mounted) return;
+    setState(
+      () => _update(
+        (e) => e.withCapturedAt(
+          DateTime(local.year, local.month, local.day, time.hour, time.minute),
+        ),
+        now: true,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final encounter = _encounterOrNull;
@@ -80,43 +166,34 @@ class _EncounterEditScreenState extends State<EncounterEditScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(RememberemTheme.gutter),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                widget.services.repository.encounterPhoto(encounter),
-                height: 320,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    const SizedBox(height: 320, child: Icon(Icons.person)),
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PortraitThumb(
+                  photo: widget.services.repository.encounterPhoto(encounter),
+                  size: RememberemTheme.thumbCard,
+                ),
+                const SizedBox(width: RememberemTheme.thumbGap),
+                Expanded(child: _whenAndWhere(context, encounter)),
+              ],
             ),
             const SizedBox(height: 8),
-            WhenWhereRow(
-              encounter: encounter,
-              services: widget.services,
-              onTimeChanged: (at) => setState(
-                () => _update((e) => e.withCapturedAt(at), now: true),
-              ),
-              onLocationChosen: (choice) => setState(() {
-                _update(choice.applyTo, now: true);
-                _placeGen++;
-              }),
-            ),
-            const SizedBox(height: 16),
             DictatedTextField(
               key: ValueKey('place-$_placeGen'),
+              ledger: true,
               label: MemoryField.place.label,
               initialValue: encounter.place,
               dictation: widget.services.dictation,
               showMic: false,
               onChanged: (v) => _update((e) => e.withPlace(v)),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             DictatedTextField(
+              ledger: true,
               label: MemoryField.meeting.label,
               initialValue: encounter.meeting,
               dictation: widget.services.dictation,

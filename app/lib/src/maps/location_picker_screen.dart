@@ -1,10 +1,13 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_services.dart';
+import '../app/bottom_action_bar.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import 'location_choice.dart';
 import 'place_circle.dart';
 import 'place_marker.dart';
@@ -12,9 +15,11 @@ import 'place_name_dialog.dart';
 import 'street_map.dart';
 
 /// Pick a spot by moving the map under the crosshair, or tap a known place's
-/// pin to choose that place. Above the map, the known places by name: one
-/// tapped is centred on the map. Pops with a [LocationChoice] naming the known
-/// place at the spot (if any), or nothing if Fred goes back.
+/// pin to choose that place. Above the map, the known places by name, each
+/// with a radio: one tapped is centred on the map. Under the map, a strip
+/// names the place the crosshair would choose. Pops with a [LocationChoice]
+/// naming the known place at the spot (if any), or nothing if Fred goes
+/// back.
 class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({
     super.key,
@@ -57,6 +62,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   String? _picked;
   int _pickTick = 0;
 
+  /// The known place at the crosshair (blank if none), for the strip.
+  String _near = '';
+
   /// The known places in alphabetical order.
   List<PlaceGroup> get _byName => [..._places]
     ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
@@ -66,6 +74,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     super.initState();
     _load();
   }
+
+  /// The known place nearest [at], by the settings' radius, or blank.
+  String _placeAt(GeoPoint at, List<Memory> people) =>
+      widget.services.settings.value.placeFinder.nearest(at, people)?.place ??
+      '';
 
   /// Known places to mark, and where to start: the picture's location,
   /// else here, else the newest known place, else the whole world.
@@ -105,64 +118,79 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _people = people;
       _start = start;
       _centre = start;
+      _near = start == null ? '' : _placeAt(start, people);
       _loading = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Where was this?'),
         actions: const [HomeButton()],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Align(
+              alignment: Alignment.topCenter,
+              child: LinearProgressIndicator(
+                minHeight: 3,
+                semanticsLabel: 'Loading',
+              ),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_places.isNotEmpty) _placeList(context),
                 Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      StreetMap(
-                        streetMaps: widget.services.settings.value.streetMaps,
-                        links: widget.services.links,
-                        centre: _start,
-                        centreTick: _pickTick,
-                        circles: [
-                          for (final g in _places)
-                            if (g.name case final name?)
-                              PlaceCircle(
+                  child: DecoratedBox(
+                    // A 2 dp rule of the theme colour along the map's
+                    // bottom edge, as on Places.
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: scheme.primary, width: 2),
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        StreetMap(
+                          streetMaps: widget.services.settings.value.streetMaps,
+                          links: widget.services.links,
+                          centre: _start,
+                          centreTick: _pickTick,
+                          circles: [
+                            for (final g in _places)
+                              if (g.name case final name?)
+                                PlaceCircle(
+                                  at: g.marker!,
+                                  meters: widget.services.settings.value
+                                      .radiusFor(name),
+                                  scheme: scheme,
+                                ),
+                          ],
+                          markers: [
+                            for (final g in _places)
+                              PlaceMarker(
                                 at: g.marker!,
-                                meters: widget.services.settings.value
-                                    .radiusFor(name),
-                                scheme: Theme.of(context).colorScheme,
+                                label: g.label,
+                                onTap: () => Navigator.of(context).pop(
+                                  LocationChoice.at(g.marker!, place: g.label),
+                                ),
                               ),
-                        ],
-                        markers: [
-                          for (final g in _places)
-                            PlaceMarker(
-                              at: g.marker!,
-                              label: g.label,
-                              onTap: () => Navigator.of(context).pop(
-                                LocationChoice.at(g.marker!, place: g.label),
-                              ),
-                            ),
-                        ],
-                        onCentreChanged: _moved,
-                      ),
-                      IgnorePointer(
-                        child: Icon(
-                          Icons.add,
-                          size: 48,
-                          color: Theme.of(context).colorScheme.error,
+                          ],
+                          onCentreChanged: _moved,
                         ),
-                      ),
-                    ],
+                        IgnorePointer(
+                          child: Icon(Icons.add, size: 48, color: scheme.error),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+                _chosenStrip(context),
                 _buttons(context),
               ],
             ),
@@ -170,16 +198,85 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   /// The map moved: once it leaves the place picked in the list, that
-  /// place is no longer marked as picked.
+  /// place is no longer marked as picked, and the strip names whatever
+  /// known place is under the crosshair now.
   void _moved(GeoPoint centre) {
     _centre = centre;
     final at = _start;
-    if (_picked == null || at == null) return;
     const near = 1e-6;
-    if ((centre.latitude - at.latitude).abs() > near ||
-        (centre.longitude - at.longitude).abs() > near) {
-      setState(() => _picked = null);
+    final left =
+        _picked != null &&
+        at != null &&
+        ((centre.latitude - at.latitude).abs() > near ||
+            (centre.longitude - at.longitude).abs() > near);
+    final place = _placeAt(centre, _people);
+    if (!left && place == _near) return;
+    void apply() {
+      if (!mounted) return;
+      setState(() {
+        if (left) _picked = null;
+        _near = place;
+      });
     }
+
+    // The map reports a move it was told to make while it is being built.
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => apply());
+    } else {
+      apply();
+    }
+  }
+
+  /// The place the crosshair would choose: the one picked in the list,
+  /// else the known place at the crosshair. Under the map, not over it,
+  /// because the map's attribution must stay in view. Absent when the spot
+  /// is no known place.
+  Widget _chosenStrip(BuildContext context) {
+    final place = _picked ?? _near;
+    if (place.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Material(
+      color: BottomActionBar.surfaceOf(theme),
+      child: Semantics(
+        liveRegion: true,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 58),
+          child: Padding(
+            padding:
+                EdgeInsets.symmetric(
+                  horizontal: RememberemTheme.gutter,
+                  vertical: 8,
+                ).add(
+                  EdgeInsets.only(
+                    left: MediaQuery.viewPaddingOf(context).left,
+                    right: MediaQuery.viewPaddingOf(context).right,
+                  ),
+                ),
+            child: Row(
+              children: [
+                ExcludeSemantics(
+                  child: Icon(
+                    Icons.place_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: RememberemTheme.thumbGap),
+                Expanded(
+                  child: Text(
+                    place,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// The known places, a few lines high; tapping one centres it.
@@ -190,20 +287,23 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       height: min(168, MediaQuery.sizeOf(context).height * 0.25),
       child: Scrollbar(
         child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 4),
           children: [
             for (final g in _byName)
               ListTile(
-                dense: true,
-                visualDensity: const VisualDensity(vertical: -4),
-                leading: const Icon(Icons.place, size: 20),
+                minTileHeight: RememberemTheme.tapTarget,
+                // A radio, as these are alternatives; the filled one is
+                // the pick (its label says so too).
+                leading: Icon(
+                  g.label == _picked
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 20,
+                  semanticLabel: g.label == _picked ? 'Chosen' : null,
+                ),
                 title: Text(g.label),
                 selected: g.label == _picked,
-                trailing: g.label == _picked
-                    ? const Icon(Icons.check, semanticLabel: 'Chosen')
-                    : null,
-                selectedTileColor: theme.colorScheme.primaryContainer.withAlpha(
-                  90,
+                selectedTileColor: theme.colorScheme.primary.withValues(
+                  alpha: 0.06,
                 ),
                 onTap: () => setState(() {
                   _picked = g.label;
@@ -222,8 +322,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   Future<void> _useCentre() async {
     final centre = _centre;
     if (centre == null) return;
-    final settings = widget.services.settings.value;
-    var place = settings.placeFinder.nearest(centre, _people)?.place ?? '';
+    var place = _placeAt(centre, _people);
     if (widget.askName) {
       final named = await showDialog<String>(
         context: context,
@@ -237,41 +336,37 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   Widget _buttons(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: scheme.secondary,
-                  foregroundColor: scheme.onSecondary,
-                  minimumSize: const Size.fromHeight(56),
-                  textStyle: Theme.of(context).textTheme.titleMedium,
+    return BottomActionBar(
+      // Two equal buttons, so large text wraps in them, not off the edge.
+      middle: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 46),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onPressed: () =>
-                    Navigator.of(context).pop(const LocationChoice.remote()),
-                icon: const Icon(Icons.wifi),
-                label: const Text('Remote'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
-                // With nowhere to start, wait for Fred to move the map.
-                onPressed: _useCentre,
-                icon: const Icon(Icons.check),
-                label: const Text('Use this spot'),
               ),
+              onPressed: () =>
+                  Navigator.of(context).pop(const LocationChoice.remote()),
+              child: const Text('Remote'),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton(
+              style: BottomActionBar.goldStyle,
+              // With nowhere to start, wait for Fred to move the map.
+              onPressed: _useCentre,
+              child: const Text('Use this spot'),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
-import '../memories/person_chip.dart';
+import '../app/pill_button.dart';
+import '../app/rememberem_theme.dart';
+import '../app/selected_row.dart';
+import '../memories/memory_tile.dart';
 
-/// One place in the list: its name in a box, edited in place; below it its
-/// radius in a box (tap to slide it) and, at the right, whether arriving
-/// there gives a notice; then how many people and when last, after an
-/// expander that shows the people met there, each with their photo
-/// (tapping one opens them). Tapping the row selects the place.
+/// One place in the list: its name as a ledger field, edited in place; below
+/// it its radius as a pill (tap to slide it) and, at the right, whether
+/// arriving there gives a notice; then how many people and when last, after
+/// an expander that shows the people met there, a line each with their
+/// photo (tapping one opens them). Tapping the row selects the place.
 class PlaceRow extends StatefulWidget {
   const PlaceRow({
     super.key,
@@ -26,9 +29,23 @@ class PlaceRow extends StatefulWidget {
     this.onNotify,
   });
 
-  /// Least height of a collapsed row; the list scrolls by about this much
-  /// a row (scaled with the text).
-  static const collapsedExtent = 152.0;
+  /// Measured height of a collapsed row at text scale 1.0 (a test keeps it
+  /// honest), and the part of it that is text and so grows with the text
+  /// scale; the rest (icons, buttons, padding) does not.
+  static const collapsedExtent = 162.0;
+  static const _collapsedText = 37.0;
+
+  /// The same for one expanded person (a `MemoryTile` and its rule).
+  static const personExtent = 59.0;
+  static const _personText = 35.0;
+
+  /// A collapsed row's height under [scaler], for the list to scroll by.
+  static double collapsedHeight(TextScaler scaler) =>
+      collapsedExtent + scaler.scale(_collapsedText) - _collapsedText;
+
+  /// One expanded person's height under [scaler].
+  static double personHeight(TextScaler scaler) =>
+      personExtent + scaler.scale(_personText) - _personText;
 
   final PlaceGroup group;
 
@@ -62,9 +79,12 @@ class PlaceRow extends StatefulWidget {
 }
 
 class _PlaceRowState extends State<PlaceRow> {
-  /// How far what sits under the name is set in: past the name box's
-  /// left edge (the pin and its gap are 36).
-  static const _indent = 52.0;
+  /// How far what sits under the name is set in: to the name's own left
+  /// edge, past the pin's slot and its gap (the text line of every list).
+  static const _indent = RememberemTheme.rowTextInset - RememberemTheme.gutter;
+
+  /// Kept clear at the end for the selected row's check.
+  static const _endReserve = RememberemTheme.gutter + 22 + 4;
 
   late final _name = TextEditingController(text: widget.group.name ?? '');
   final _focus = FocusNode();
@@ -125,116 +145,130 @@ class _PlaceRowState extends State<PlaceRow> {
     final count = people.length == 1 ? '1 person' : '${people.length} people';
     final radius = widget.radius;
     final notify = widget.notify;
-    return Material(
-      color: widget.selected
-          ? theme.colorScheme.primaryContainer.withAlpha(90)
-          : Colors.transparent,
-      child: InkWell(
-        // Tapping the row, not its name, ends any name being typed.
-        onTap: () {
-          FocusScope.of(context).unfocus();
-          widget.onTap();
-        },
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minHeight: PlaceRow.collapsedExtent,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      group.marker == null ? Icons.help_outline : Icons.place,
-                      color: widget.selected ? theme.colorScheme.primary : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: _nameField()),
-                  ],
+    return SelectedRow(
+      selected: widget.selected,
+      // A name box, a radius, a Notify box and an expander: each its own
+      // stop for a screen reader.
+      mergeSemantics: false,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          // Tapping the row, not its name, ends any name being typed.
+          onTap: () {
+            FocusScope.of(context).unfocus();
+            widget.onTap();
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  RememberemTheme.gutter,
+                  8,
+                  _endReserve,
+                  4,
                 ),
-                if (radius != null || notify != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: _indent, top: 4),
-                    child: Row(
-                      // The Notify box keeps to the right.
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        if (widget.slider case final slider?)
-                          Flexible(child: slider)
-                        else if (radius != null)
-                          // Flexible, so large text wraps, not overflows.
-                          Flexible(
-                            child: OutlinedButton(
-                              // Half the usual padding.
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(48, 32),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: widget.onRadius,
-                              child: Text(
-                                '$radius radius',
-                                semanticsLabel:
-                                    '$radius radius, adjust for ${group.label}',
-                              ),
-                            ),
-                          )
-                        else
-                          const SizedBox.shrink(),
-                        const SizedBox(width: 8),
-                        if (notify != null) _notifyBox(group, notify),
+                        SizedBox(
+                          width: RememberemTheme.thumbRow.width,
+                          child: Icon(
+                            group.marker == null
+                                ? Icons.help_outline_rounded
+                                : Icons.place_rounded,
+                            color: widget.selected
+                                ? theme.colorScheme.primary
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: RememberemTheme.thumbGap),
+                        Expanded(child: _nameField(theme)),
                       ],
                     ),
-                  ),
+                    if (radius != null || notify != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: _indent),
+                        child: Wrap(
+                          // The Notify box keeps to the right; a narrow
+                          // screen or large text wraps it below.
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (widget.slider case final slider?)
+                              slider
+                            else if (radius != null)
+                              PillButton(
+                                label: '$radius radius',
+                                tooltip:
+                                    '$radius radius, adjust for ${group.label}',
+                                onPressed: widget.onRadius,
+                              ),
+                            if (notify != null) _notifyBox(group, notify),
+                          ],
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: _indent - 12),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            tooltip: widget.expanded
+                                ? 'Hide the people met at ${group.label}'
+                                : 'Show the people met at ${group.label}',
+                            icon: Icon(
+                              widget.expanded
+                                  ? Icons.expand_less_rounded
+                                  : Icons.expand_more_rounded,
+                            ),
+                            onPressed: widget.onExpand,
+                          ),
+                          Expanded(
+                            child: Text(
+                              '$count · $date',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 13,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.expanded)
+                // One person a line, their photos starting where the
+                // place's name does.
                 Padding(
-                  padding: const EdgeInsets.only(left: _indent - 8),
-                  child: Row(
+                  padding: const EdgeInsets.only(left: _indent),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        tooltip: widget.expanded
-                            ? 'Hide the people met at ${group.label}'
-                            : 'Show the people met at ${group.label}',
-                        icon: Icon(
-                          widget.expanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
+                      for (final person in people)
+                        MemoryTile(
+                          memory: person,
+                          photo: widget.repository.photoFile(person),
+                          onTap: () => widget.onOpenPerson(person),
                         ),
-                        onPressed: widget.onExpand,
-                      ),
-                      Expanded(
-                        child: Text(
-                          '$count · $date',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
                     ],
                   ),
                 ),
-                if (widget.expanded)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(_indent, 0, 8, 8),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final person in people)
-                          PersonChip(
-                            memory: person,
-                            repository: widget.repository,
-                            onTap: () => widget.onOpenPerson(person),
-                          ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: RememberemTheme.rowTextInset,
+                color: RememberemTheme.rule(theme),
+              ),
+            ],
           ),
         ),
       ),
@@ -248,10 +282,13 @@ class _PlaceRowState extends State<PlaceRow> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ExcludeSemantics(
-            child: GestureDetector(
-              onTap: onNotify == null ? null : () => onNotify(!notify),
-              child: const Text('Notify'),
+          // Flexible, so very large text wraps, not overflows.
+          Flexible(
+            child: ExcludeSemantics(
+              child: GestureDetector(
+                onTap: onNotify == null ? null : () => onNotify(!notify),
+                child: const Text('Notify'),
+              ),
             ),
           ),
           Checkbox(
@@ -264,8 +301,9 @@ class _PlaceRowState extends State<PlaceRow> {
     );
   }
 
-  /// The name in an outlined box, so it plainly can be edited.
-  Widget _nameField() {
+  /// The name as a ledger field labelled PLACE, so it plainly can be
+  /// edited.
+  Widget _nameField(ThemeData theme) {
     final group = widget.group;
     return TextField(
       controller: _name,
@@ -273,17 +311,15 @@ class _PlaceRowState extends State<PlaceRow> {
       maxLines: 1,
       textInputAction: TextInputAction.done,
       textCapitalization: TextCapitalization.words,
-      decoration: InputDecoration(
-        isDense: true,
-        // Half the usual padding.
-        contentPadding: const EdgeInsets.fromLTRB(4, 7, 4, 4),
-        border: const OutlineInputBorder(),
+      decoration: RememberemTheme.ledgerDecoration(
+        theme,
+        label: 'Place',
         // Only an unknown place shows a hint (it has no name yet).
-        hintText: group.name == null ? group.label : null,
-        suffixIcon: _changed
+        hint: group.name == null ? group.label : null,
+        suffix: _changed
             ? IconButton(
                 tooltip: 'Save the name',
-                icon: const Icon(Icons.check),
+                icon: const Icon(Icons.check_rounded),
                 onPressed: _commit,
               )
             : null,

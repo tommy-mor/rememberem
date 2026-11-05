@@ -138,7 +138,7 @@ void main() {
       'saved', (tester) async {
     await boot(tester);
     await open(tester, find.byTooltip('Timeline'));
-    await open(tester, find.text('Thursday, October 1, 2026'));
+    await open(tester, find.text('THURSDAY, OCTOBER 1, 2026'));
     await open(tester, find.text('Ann'));
     await tester.enterText(find.widgetWithText(TextField, 'Ann'), 'Annie');
 
@@ -152,7 +152,7 @@ void main() {
   testWidgets('timeline, a day, then a card: Back three times', (tester) async {
     await boot(tester);
     await open(tester, find.byTooltip('Timeline'));
-    await open(tester, find.text('Thursday, October 1, 2026'));
+    await open(tester, find.text('THURSDAY, OCTOBER 1, 2026'));
     await open(tester, find.text('Ann'));
     expect(find.byType(MemoryEditScreen), findsOneWidget);
 
@@ -185,7 +185,7 @@ void main() {
   testWidgets('the merge picker goes back to the card', (tester) async {
     await boot(tester);
     await open(tester, find.text('Ann'));
-    await open(tester, find.text('Merge with existing person record'));
+    await open(tester, find.byTooltip('Merge with existing person record'));
     expect(find.byType(MergePickerScreen), findsOneWidget);
 
     await back(tester);
@@ -196,7 +196,7 @@ void main() {
     tester,
   ) async {
     await boot(tester);
-    await tester.tap(find.text('Meet someone'));
+    await tester.tap(find.byTooltip('Meet someone'));
     await settleCamera(tester);
     expect(find.byType(CaptureScreen), findsOneWidget);
     // What the shutter does: the notes page replaces the camera.
@@ -270,7 +270,7 @@ void main() {
     await back(tester);
     expectList(tester);
 
-    await tester.tap(find.text('Meet someone'));
+    await tester.tap(find.byTooltip('Meet someone'));
     await settleCamera(tester);
     final added = await repository.add(
       photoJpeg: [],

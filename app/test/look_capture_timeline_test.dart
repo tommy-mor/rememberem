@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/app/rememberem_app.dart';
 import 'package:rememberem/src/app/rememberem_theme.dart';
+import 'package:rememberem/src/app/section_header.dart';
 import 'package:rememberem/src/capture/photo_check.dart';
 import 'package:rememberem/src/settings/settings_screen.dart';
-import 'package:rememberem/src/settings/settings_section.dart';
 import 'package:rememberem/src/timeline/timeline_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -22,8 +22,8 @@ void main() {
   }
 
   group('settings sections', () {
-    testWidgets('each section is a box with its title on the border, 30% '
-        'larger', (tester) async {
+    testWidgets('each section is a tinted, capitalised header over its '
+        'rows', (tester) async {
       phone(tester);
       final services = testServices(FakeMemoryRepository());
       await tester.pumpWidget(
@@ -37,32 +37,27 @@ void main() {
       await tester.pumpAndSettle();
 
       final titles = tester
-          .widgetList<SettingsSection>(find.byType(SettingsSection))
+          .widgetList<SectionHeader>(find.byType(SectionHeader))
           .map((s) => s.title)
           .toList();
       expect(titles, ['Display', 'Matching', 'Practice', 'Maps']);
+      expect(find.text('DISPLAY'), findsOneWidget);
+      // No boxed sections, and so no local field theme.
+      expect(find.byType(InputDecorator), findsNothing);
 
-      final context = tester.element(find.byType(SettingsSection).first);
-      final base = Theme.of(context).textTheme.titleMedium!.fontSize!;
-      final decorator = tester.widget<InputDecorator>(
+      final context = tester.element(find.byType(SectionHeader).first);
+      final strip = tester.widget<Container>(
         find
             .descendant(
-              of: find.byType(SettingsSection).first,
-              matching: find.byType(InputDecorator),
+              of: find.byType(SectionHeader).first,
+              matching: find.byType(Container),
             )
             .first,
       );
-      // Drawn at 3/4 of its style, as every floating label is.
-      expect(
-        decorator.decoration.floatingLabelStyle!.fontSize! * 0.75,
-        closeTo(base * 1.3, 0.01),
-      );
-      expect(decorator.decoration.filled, isTrue);
-      expect(decorator.decoration.enabledBorder, isA<OutlineInputBorder>());
-      // Darker than the light page it sits on.
       final surface = Theme.of(context).colorScheme.surface;
+      // Darker than the light page it sits on.
       expect(
-        decorator.decoration.fillColor!.computeLuminance(),
+        (strip.color!).computeLuminance(),
         lessThan(surface.computeLuminance()),
       );
     });
@@ -147,19 +142,25 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final decorator = tester.widget<InputDecorator>(
+      final strip = tester.widget<Container>(
         find
             .descendant(
-              of: find.byType(SettingsSection).first,
-              matching: find.byType(InputDecorator),
+              of: find.byType(SectionHeader).first,
+              matching: find.byType(Container),
             )
             .first,
       );
       final page = Color(AppPalette.darkBackgrounds.first);
-      final fill = decorator.decoration.fillColor!;
+      final fill = strip.color!;
       expect(fill.computeLuminance(), greaterThan(page.computeLuminance()));
+      // The overline reads on the strip.
       expect(
-        RememberemTheme.contrast(Colors.white, fill),
+        RememberemTheme.contrast(
+          Theme.of(tester.element(find.byType(SectionHeader).first))
+              .colorScheme
+              .onSurfaceVariant,
+          fill,
+        ),
         greaterThanOrEqualTo(4.5),
       );
     });
@@ -263,9 +264,8 @@ void main() {
       0xD9,
     ]);
 
-    testWidgets('Use photo is the big button; each button does its job', (
-      tester,
-    ) async {
+    testWidgets('Use photo is the gold button on the right; each button does '
+        'its job', (tester) async {
       var used = 0;
       var retaken = 0;
       await tester.pumpWidget(
@@ -279,14 +279,15 @@ void main() {
           ),
         ),
       );
-      final use = tester.getSize(
-        find.widgetWithText(FilledButton, 'Use photo'),
+      final use = find.widgetWithText(FilledButton, 'Use photo');
+      final retake = find.widgetWithText(TextButton, 'Retake');
+      expect(tester.getCenter(retake).dx, lessThan(tester.getCenter(use).dx));
+      expect(tester.getSize(use).height, greaterThanOrEqualTo(46));
+      expect(tester.getSize(retake).height, greaterThanOrEqualTo(48));
+      expect(
+        tester.widget<FilledButton>(use).style?.backgroundColor?.resolve({}),
+        RememberemTheme.gold,
       );
-      final retake = tester.getSize(
-        find.widgetWithText(OutlinedButton, 'Retake'),
-      );
-      expect(use.width, greaterThan(retake.width));
-      expect(use.height, greaterThanOrEqualTo(56));
 
       await tester.tap(find.text('Retake'));
       await tester.tap(find.text('Use photo'));
@@ -321,9 +322,7 @@ void main() {
       );
     });
 
-    testWidgets('Show details adds dated details with their own words', (
-      tester,
-    ) async {
+    Future<void> showTimeline(WidgetTester tester) async {
       phone(tester);
       await tester.pumpWidget(
         MaterialApp(
@@ -334,16 +333,28 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('the Details switch adds dated details with their own words, '
+        'and takes them away again', (tester) async {
+      await showTimeline(tester);
       expect(find.text('Library'), findsNothing);
       expect(find.textContaining('Book club'), findsNothing);
-      // The box sits just before its label, with no explainer.
-      final toggle = tester.widget<CheckboxListTile>(
-        find.byType(CheckboxListTile),
+      // An icon and the visible word, in the bar; no checkbox row.
+      expect(find.byType(CheckboxListTile), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Details'),
+        ),
+        findsOneWidget,
       );
-      expect(toggle.controlAffinity, ListTileControlAffinity.leading);
-      expect(toggle.subtitle, isNull);
+      expect(
+        find.byIcon(Icons.check_box_outline_blank_rounded),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.text('Show details'));
+      await tester.tap(find.text('Details'));
       await tester.pumpAndSettle();
 
       expect(services.timelineDetails.value, isTrue);
@@ -352,10 +363,44 @@ void main() {
         find.text('Ann Lee – Tag · Book club: Hosts in June'),
         findsOneWidget,
       );
+      expect(find.byIcon(Icons.check_box_rounded), findsOneWidget);
+
+      await tester.tap(find.text('Details'));
+      await tester.pumpAndSettle();
+
+      expect(services.timelineDetails.value, isFalse);
+      expect(find.text('Library'), findsNothing);
+      expect(find.textContaining('Book club'), findsNothing);
+    });
+
+    testWidgets('the switch says Details, and whether it is on', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await showTimeline(tester);
+
       expect(
-        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
-        isTrue,
+        tester.getSemantics(find.text('Details')),
+        matchesSemantics(
+          label: 'Details',
+          hasToggledState: true,
+          isToggled: false,
+          hasTapAction: true,
+          hasEnabledState: false,
+        ),
       );
+      await tester.tap(find.text('Details'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(find.text('Details')),
+        matchesSemantics(
+          label: 'Details',
+          hasToggledState: true,
+          isToggled: true,
+          hasTapAction: true,
+        ),
+      );
+      handle.dispose();
     });
   });
 }

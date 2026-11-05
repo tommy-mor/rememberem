@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/rememberem_app.dart';
 import 'package:rememberem/src/settings/app_settings_controller.dart';
 import 'package:rememberem/src/settings/file_settings_store.dart';
+import 'package:rememberem/src/settings/setting_stepper.dart';
 import 'package:rememberem/src/settings/settings_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -56,7 +57,7 @@ void main() {
 
     final turns = find.ancestor(
       of: find.text('Questions per game'),
-      matching: find.byType(ListTile),
+      matching: find.byType(SettingStepper),
     );
     final more = find.descendant(of: turns, matching: find.byTooltip('More'));
     await tester.tap(more);
@@ -107,7 +108,7 @@ void main() {
 
     final size = find.ancestor(
       of: find.text('Detail text size'),
-      matching: find.byType(ListTile),
+      matching: find.byType(SettingStepper),
     );
     expect(
       find.descendant(of: size, matching: find.text('80 %')),

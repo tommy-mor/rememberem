@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
 import 'package:rememberem/src/memories/memory_edit_screen.dart';
+import 'package:rememberem/src/timeline/timeline_miniature.dart';
 import 'package:rememberem/src/timeline/timeline_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -107,18 +108,59 @@ void main() {
 
     await showTimeline(tester);
 
-    expect(find.text('Sunday, November 1, 2026'), findsOneWidget);
-    expect(find.text('Friday, October 30, 2026'), findsOneWidget);
-    expect(find.text('Stake Center - Sunday'), findsOneWidget);
+    expect(find.text('SUNDAY, NOVEMBER 1, 2026'), findsOneWidget);
+    expect(find.text('FRIDAY, OCTOBER 30, 2026'), findsOneWidget);
+    expect(find.text('Stake Center · Sunday'), findsOneWidget);
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('Sam'), findsOneWidget);
-    expect(find.text('Thursday, November 5, 2026'), findsNothing);
+    expect(find.text('THURSDAY, NOVEMBER 5, 2026'), findsNothing);
     expect(find.text('Gone'), findsNothing);
     expect(repository.saves, isEmpty);
     expect(repository.purges, isEmpty);
     expect(repository.merges, isEmpty);
     expect(repository.deletedPhotos, isEmpty);
     expect(repository.stored[quiet.id]!.details, isEmpty);
+  });
+
+  testWidgets('each person is a 44 x 55 photo with the first name under it, '
+      'and a button named in full', (tester) async {
+    await person('Alex Davis', DateTime(2026, 11, 1, 10), place: 'Cafe');
+    final handle = tester.ensureSemantics();
+    await showTimeline(tester);
+
+    expect(tester.getSize(find.byType(Image)), const Size(44, 55));
+    expect(find.text('Alex'), findsOneWidget);
+    expect(find.text('Alex Davis'), findsNothing);
+    expect(
+      tester.getSemantics(find.byType(TimelineMiniature)),
+      isSemantics(label: 'Alex Davis', isButton: true, hasTapAction: true),
+    );
+    expect(tester.getSize(find.byType(TimelineMiniature)).width, 52);
+    handle.dispose();
+  });
+
+  testWidgets('a day page shows the date with the people count', (
+    tester,
+  ) async {
+    await person('Alex', DateTime(2026, 11, 1, 10));
+    await person('Sam', DateTime(2026, 11, 1, 11));
+    await showTimeline(tester);
+
+    await tester.tap(find.text('SUNDAY, NOVEMBER 1, 2026'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Sunday, November 1, 2026'), findsOneWidget);
+    expect(find.textContaining('2 people'), findsOneWidget);
+    // The page of one day has no chevron and no Details switch.
+    expect(find.text('Details'), findsNothing);
+  });
+
+  testWidgets('nothing yet says so, with Meet someone when it can', (
+    tester,
+  ) async {
+    await showTimeline(tester);
+    expect(find.text('No one yet.'), findsOneWidget);
+    expect(find.text('Meet someone'), findsNothing);
   });
 
   testWidgets('tapping a date shows just that day', (tester) async {
@@ -134,7 +176,7 @@ void main() {
     );
     await showTimeline(tester);
 
-    await tester.tap(find.text('Sunday, November 1, 2026'));
+    await tester.tap(find.text('SUNDAY, NOVEMBER 1, 2026'));
     await tester.pumpAndSettle();
 
     expect(find.text('Alex'), findsOneWidget);

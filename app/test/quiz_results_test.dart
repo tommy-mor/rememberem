@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rememberem/src/memories/memory_list_screen.dart';
 import 'package:rememberem/src/memories/progress_badge.dart';
 import 'package:rememberem/src/practice/face_game_screen.dart';
 import 'package:rememberem/src/practice/quiz_result.dart';
@@ -130,11 +129,84 @@ void main() {
 
       expect(find.text('You remember Ann now!'), findsOneWidget);
       expect(find.text('1 of 2 right first try'), findsOneWidget);
-      expect(find.byIcon(Icons.star), findsNWidgets(2)); // banner and row
+      expect(
+        find.byIcon(Icons.star_rounded),
+        findsNWidgets(2),
+      ); // banner and row
       expect(feedback.given, ['right']);
       // A miss shows the person kindly, not an emptied pie.
       expect(find.text(QuizResultsView.missText), findsOneWidget);
       expect(find.byType(ProgressBadge), findsOneWidget);
+    });
+
+    testWidgets('the results bar is the theme colour on its tint, not gold', (
+      tester,
+    ) async {
+      await show(tester, [
+        QuizResult(
+          person: named('Ann'),
+          rightFirstTry: true,
+          pointsBefore: 1,
+          pointsAfter: 2,
+        ),
+      ]);
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      final scheme = Theme.of(tester.element(find.byType(QuizResultsView)))
+          .colorScheme;
+      expect(bar.color, scheme.primary);
+    });
+
+    testWidgets('the missed come first under "See again soon", then '
+        '"Got it", each with a count', (tester) async {
+      await show(tester, [
+        QuizResult(
+          person: named('Ann'),
+          rightFirstTry: true,
+          pointsBefore: 1,
+          pointsAfter: 2,
+        ),
+        QuizResult(
+          person: named('Bo'),
+          rightFirstTry: false,
+          pointsBefore: 1,
+          pointsAfter: 0,
+        ),
+        QuizResult(
+          person: named('Cy'),
+          rightFirstTry: true,
+          pointsBefore: 0,
+          pointsAfter: 1,
+        ),
+      ]);
+
+      final soon = tester.getTopLeft(find.text('SEE AGAIN SOON  1'));
+      final got = tester.getTopLeft(find.text('GOT IT  2'));
+      expect(soon.dy, lessThan(got.dy));
+      double top(String name) => tester.getTopLeft(find.text(name)).dy;
+      expect(top('Bo'), allOf(greaterThan(soon.dy), lessThan(got.dy)));
+      expect(top('Ann'), greaterThan(got.dy));
+      expect(top('Cy'), greaterThan(top('Ann')));
+      expect(find.text('2 of 3 right first try'), findsOneWidget);
+      // No replay: practice that is spaced is not repeated at once.
+      expect(find.textContaining('Play again'), findsNothing);
+      expect(find.text('Back to list'), findsOneWidget);
+    });
+
+    testWidgets('a quiz with no misses has no "See again soon"', (
+      tester,
+    ) async {
+      await show(tester, [
+        QuizResult(
+          person: named('Ann'),
+          rightFirstTry: true,
+          pointsBefore: 1,
+          pointsAfter: 2,
+        ),
+      ]);
+      expect(find.textContaining('SEE AGAIN SOON'), findsNothing);
+      expect(find.text('GOT IT  1'), findsOneWidget);
     });
 
     testWidgets('nothing crossed: no banner, no star, no chime', (
@@ -150,7 +222,7 @@ void main() {
       ]);
 
       expect(find.textContaining('You remember'), findsNothing);
-      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.byIcon(Icons.star_rounded), findsNothing);
       expect(feedback.given, isEmpty);
     });
 
@@ -208,10 +280,6 @@ void main() {
 
     expect(find.text('1 of 1 right first try'), findsOneWidget);
     expect(find.text('You remember $name now!'), findsOneWidget);
-  });
-
-  testWidgets('the list labels its quiz buttons', (tester) async {
-    expect(MemoryListScreen.quizzesLabel, 'Quizzes to help you remember...');
   });
 
   test('the default threshold is 10, and a stored one is kept', () {

@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rememberem/src/app/app_services.dart';
 import 'package:rememberem/src/location/device_location.dart';
+import 'package:rememberem/src/memories/home_bottom_bar.dart';
 import 'package:rememberem/src/memories/memory_list_screen.dart';
+import 'package:rememberem/src/practice/answer_row.dart';
 import 'package:rememberem/src/practice/face_game_screen.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
@@ -113,10 +115,10 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 2900));
     expect(find.text(nameOf(person)), findsNothing);
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byType(AnswerRow), findsNothing);
 
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.byType(FilledButton), findsNWidgets(4));
+    expect(find.byType(AnswerRow), findsNWidgets(4));
     expect(find.text(nameOf(person)), findsOneWidget);
   });
 
@@ -301,7 +303,7 @@ void main() {
     // remembered.
     expect(find.text('2 of 2 right first try'), findsOneWidget);
     expect(find.textContaining('You remember'), findsNothing);
-    expect(find.byIcon(Icons.star), findsNothing);
+    expect(find.byIcon(Icons.star_rounded), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -344,15 +346,15 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump(const Duration(seconds: 5));
     expect(find.byType(Image), findsNothing);
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byType(AnswerRow), findsNothing);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
     expect(find.byType(Image), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 2900));
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byType(AnswerRow), findsNothing);
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.byType(FilledButton), findsNWidgets(4));
+    expect(find.byType(AnswerRow), findsNWidgets(4));
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
@@ -407,10 +409,7 @@ void main() {
       await people(['Ann', 'Bo', 'Cy', 'Di']);
       await showList(tester);
 
-      expect(
-        find.bySemanticsLabel(MemoryListScreen.facesLabel),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel(HomeBottomBar.facesLabel), findsOneWidget);
       semantics.dispose();
     });
 
@@ -422,6 +421,170 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(FaceGameScreen), findsOneWidget);
+    });
+  });
+
+  group('layout', () {
+    Future<void> showAt(
+      WidgetTester tester,
+      Size size, {
+      double scale = 1,
+    }) async {
+      tester.view
+        ..physicalSize = size
+        ..devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FaceGameScreen(
+            repository: repository,
+            planner: FaceQuizPlanner(Random(1), () => now),
+            clock: () => now,
+            pauseAfterRight: Duration.zero,
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    Size photo(WidgetTester tester) => tester.getSize(find.byType(Image));
+
+    testWidgets('the photo does not change size when the names appear', (
+      tester,
+    ) async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      for (final (size, scale) in const [
+        (Size(360, 640), 1.0),
+        (Size(360, 640), 2.0),
+        (Size(320, 568), 1.0),
+      ]) {
+        await showAt(tester, size, scale: scale);
+        final before = photo(tester);
+        final top = tester.getTopLeft(find.byType(Image));
+        expect(find.byType(AnswerRow), findsNothing);
+
+        await reveal(tester);
+
+        expect(find.byType(AnswerRow), findsNWidgets(4));
+        expect(photo(tester), before, reason: '$size at $scale');
+        expect(tester.getTopLeft(find.byType(Image)), top);
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+
+    testWidgets('the photo takes the room the page has, and is never under '
+        '200 dp', (tester) async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      await showAt(tester, const Size(360, 800));
+      final tall = photo(tester);
+      expect(tall.width, 360 - 32);
+      expect(tall.height, greaterThan(200));
+
+      await tester.pumpWidget(const SizedBox());
+      await showAt(tester, const Size(360, 640), scale: 2);
+      expect(photo(tester).height, greaterThanOrEqualTo(200));
+    });
+
+    for (final (name, size, scale) in const [
+      ('on its side at 568 x 320', Size(568, 320), 1.0),
+      ('at text scale 2.0 on 320 x 568', Size(320, 568), 2.0),
+    ]) {
+      testWidgets('every answer can be reached $name', (tester) async {
+        await people(['Ann', 'Bo', 'Cy', 'Di']);
+        await showAt(tester, size, scale: scale);
+        expect(photo(tester).height, greaterThanOrEqualTo(200));
+        await reveal(tester);
+
+        final list = find.byType(Scrollable);
+        for (final row in tester.widgetList<AnswerRow>(
+          find.byType(AnswerRow),
+        )) {
+          final finder = find.widgetWithText(AnswerRow, row.name);
+          await tester.dragUntilVisible(
+            finder,
+            list.first,
+            const Offset(0, -80),
+          );
+          // On screen, and not under the app bar.
+          final rect = tester.getRect(finder);
+          expect(rect.bottom, lessThanOrEqualTo(size.height));
+          expect(rect.top, greaterThanOrEqualTo(0));
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('a wrong answer is dimmed, disabled and "not this one", '
+        'never red; the right one is green, checked and selected', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      await showAt(tester, const Size(360, 800));
+      final person = showing(tester);
+      final wrong = [
+        'Ann',
+        'Bo',
+        'Cy',
+        'Di',
+      ].firstWhere((n) => n != nameOf(person));
+      await reveal(tester);
+
+      await tester.tap(find.text(wrong));
+      await tester.pump();
+
+      final row = tester.widget<AnswerRow>(
+        find.widgetWithText(AnswerRow, wrong),
+      );
+      expect(row.state, AnswerState.wrong);
+      expect(row.onTap, isNull);
+      expect(
+        tester
+            .widget<Opacity>(
+              find.descendant(
+                of: find.byWidget(row),
+                matching: find.byType(Opacity),
+              ),
+            )
+            .opacity,
+        0.35,
+      );
+      expect(find.bySemanticsLabel('$wrong, not this one'), findsOneWidget);
+      expect(find.text('Not $wrong.'), findsOneWidget);
+
+      await tester.tap(find.text(nameOf(person)));
+      await tester.pump();
+      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+      expect(
+        tester.getSemantics(find.widgetWithText(AnswerRow, nameOf(person))),
+        matchesSemantics(
+          label: '${nameOf(person)}, right',
+          isButton: true,
+          isEnabled: true,
+          isSelected: true,
+          hasSelectedState: true,
+          hasTapAction: false,
+          hasEnabledState: true,
+        ),
+      );
+      semantics.dispose();
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('while the countdown runs the names are not in the tree'
+        ' until it ends', (tester) async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      await showAt(tester, const Size(360, 640));
+      await tester.pump(const Duration(milliseconds: 1500));
+      for (final name in ['Ann', 'Bo', 'Cy', 'Di']) {
+        expect(find.widgetWithText(AnswerRow, name), findsNothing);
+      }
+      expect(find.text('Show names'), findsOneWidget);
+      await reveal(tester);
+      expect(find.text('Show names'), findsNothing);
+      expect(find.byType(AnswerRow), findsNWidgets(4));
     });
   });
 }

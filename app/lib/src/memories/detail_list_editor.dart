@@ -3,18 +3,20 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/portrait_thumb.dart';
 import '../app/rememberem_theme.dart';
+import '../app/section_header.dart';
 import '../speech/dictated_text_field.dart';
 import '../speech/dictation.dart';
 import 'detail_extras_editor.dart';
 import 'detail_help_dialog.dart';
 
-/// The details, one section per kind under a bold heading with a "+" to
-/// add one. Each detail is a tinted card: closed, one line ([DetailSummary])
-/// and any problem in red; open (its card tapped), a close toggle at the
-/// top, the kind's extras, the description with its mic, and help and
-/// delete at the bottom. Tapping outside an open card, or focus leaving
-/// it, closes it. A new detail opens, with nothing focused. Details can be
+/// The details, one section per kind under a tinted header with its count
+/// and a "+" to add one. Each detail is a row: closed, one line
+/// ([DetailSummary]) and any problem in red; open (its row tapped), a raised
+/// card with the kind's extras, the description with its mic, and help,
+/// close and delete along the bottom. Tapping outside an open card, or
+/// focus leaving it, closes it. A new detail opens, with nothing focused. Details can be
 /// deleted, with Undo.
 class DetailListEditor extends StatefulWidget {
   const DetailListEditor({
@@ -88,11 +90,6 @@ class DetailListEditor extends StatefulWidget {
     DetailKind.anniversary when detail.eventDate == null => noDate,
     _ => null,
   };
-
-  /// A card's colour: the page's, a shade darker on a light page or
-  /// lighter on a dark one.
-  static Color tintOf(ThemeData theme) =>
-      RememberemTheme.shade(theme, theme.scaffoldBackgroundColor);
 
   @override
   State<DetailListEditor> createState() => _DetailListEditorState();
@@ -186,7 +183,7 @@ class _DetailListEditorState extends State<DetailListEditor> {
           content: const Text('Detail deleted'),
           // Undo snackbars would otherwise stay until dismissed.
           persist: false,
-          duration: const Duration(seconds: 6),
+          duration: const Duration(seconds: 10),
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () {
@@ -210,45 +207,26 @@ class _DetailListEditorState extends State<DetailListEditor> {
         for (final kind in DetailKind.values) ...[
           _heading(context, kind),
           for (final detail in widget.details)
-            if (detail.kind == kind) ...[
-              _row(context, detail),
-              const SizedBox(height: 3),
-            ],
-          const SizedBox(height: 2),
+            if (detail.kind == kind) _row(context, detail),
         ],
       ],
     );
   }
 
-  /// Icon buttons without the extra space around their 40 dp.
-  static final _small = IconButton.styleFrom(
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-  );
-
-  Widget _heading(BuildContext context, DetailKind kind) => Row(
-    children: [
-      Semantics(
-        header: true,
-        child: Text(
-          kind.plural,
-          style: Theme.of(context).textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      ),
-      IconButton(
-        style: _small,
-        tooltip: DetailListEditor.addLabel(kind),
-        icon: const Icon(Icons.add),
-        onPressed: () => widget.onAdd(kind),
-      ),
-    ],
+  Widget _heading(BuildContext context, DetailKind kind) => SectionHeader(
+    title: kind.plural,
+    count: widget.details.where((d) => d.kind == kind).length,
+    trailing: IconButton(
+      tooltip: DetailListEditor.addLabel(kind),
+      icon: const Icon(Icons.add_rounded),
+      onPressed: () => widget.onAdd(kind),
+    ),
   );
 
   Widget _row(BuildContext context, Detail detail) {
     final id = detail.id;
     final name = DetailSummary.spokenName(detail, widget.nameOf);
     final open = _open.contains(id);
-    final theme = Theme.of(context);
     // In the text fields' group, so the paste toolbar and selection
     // handles (overlays) count as inside; tapping another field still
     // closes the row, through focus leaving it.
@@ -264,143 +242,152 @@ class _DetailListEditorState extends State<DetailListEditor> {
         onFocusChange: (focused) {
           if (!focused) _collapse(id);
         },
-        child: Material(
-          color: DetailListEditor.tintOf(theme),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: open
-                ? BorderSide(color: theme.colorScheme.primary, width: 1.5)
-                : BorderSide.none,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: open
-              ? _opened(context, detail, name)
-              : _closed(context, detail, name),
-        ),
+        child: open
+            ? _opened(context, detail, name)
+            : _closed(context, detail, name),
       ),
     );
   }
 
-  /// One line, never wrapped, and any problem in red below it.
+  /// One line, never wrapped, and any problem in red below it; a rule
+  /// under it, from the text.
   Widget _closed(BuildContext context, Detail detail, String name) {
     final theme = Theme.of(context);
     final line = DetailSummary.lineFor(detail, widget.nameOf);
     final problem = DetailListEditor.problemOf(detail);
-    return InkWell(
-      onTap: () => _expand(detail.id),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      line.isEmpty ? DetailListEditor.nothingYet : line,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      style: line.isEmpty
-                          ? theme.inputDecorationTheme.hintStyle
-                          : null,
-                    ),
-                    if (problem != null)
-                      Text(
-                        problem,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                  ],
-                ),
+    final target = detail.kind == DetailKind.relationship
+        ? widget.people.where((m) => m.id == detail.targetId).firstOrNull
+        : null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: () => _expand(detail.id),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: RememberemTheme.tapTarget,
+            ),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                RememberemTheme.gutter,
+                8,
+                4,
+                8,
               ),
-              Icon(Icons.expand_more, semanticLabel: 'Open $name'),
-            ],
+              child: Row(
+                children: [
+                  if (target != null) ...[
+                    PortraitThumb(
+                      photo: widget.photoOf(target),
+                      size: RememberemTheme.thumbSmall,
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          line.isEmpty ? DetailListEditor.nothingYet : line,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: line.isEmpty
+                              ? theme.inputDecorationTheme.hintStyle
+                              : null,
+                        ),
+                        if (problem != null)
+                          Text(
+                            problem,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.expand_more_rounded, semanticLabel: 'Open $name'),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+        Divider(
+          height: 1,
+          thickness: 1,
+          indent: RememberemTheme.gutter,
+          color: RememberemTheme.rule(theme),
+        ),
+      ],
     );
   }
 
-  /// The close toggle on top, the kind's extras, the description last,
-  /// then help and delete.
+  /// A raised card, inset from the page: the kind's extras, the
+  /// description last, then help, close and delete.
   Widget _opened(BuildContext context, Detail detail, String name) {
     final id = detail.id;
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Material(
+        color: RememberemTheme.raised(theme),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Text(
-                  detail.kind.label,
-                  style: Theme.of(context).textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+              if (detail.kind != DetailKind.fact)
+                DetailExtrasEditor(
+                  key: ValueKey('extras-$id'),
+                  detail: detail,
+                  ownerId: widget.ownerId,
+                  people: widget.people,
+                  photoOf: widget.photoOf,
+                  choosePlace: widget.choosePlace,
+                  onChanged: widget.onReplace,
                 ),
+              DictatedTextField(
+                key: ValueKey('$id-${widget.generation}'),
+                ledger: true,
+                label: 'Description',
+                hint: DetailListEditor.describeHint,
+                initialValue: detail.text,
+                dictation: widget.dictation,
+                multiline: true,
+                onListeningChanged: (listening) => _setListening(id, listening),
+                onChanged: (text) => widget.onChanged(id, text),
               ),
-              IconButton(
-                style: _small,
-                tooltip: 'Close $name',
-                icon: const Icon(Icons.expand_less),
-                onPressed: () => _collapse(id),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (detail.kind != DetailKind.fact)
-                  DetailExtrasEditor(
-                    key: ValueKey('extras-$id'),
-                    detail: detail,
-                    ownerId: widget.ownerId,
-                    people: widget.people,
-                    photoOf: widget.photoOf,
-                    choosePlace: widget.choosePlace,
-                    onChanged: widget.onReplace,
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'About ${detail.kind.label.toLowerCase()} details',
+                    icon: const Icon(Icons.help_outline_rounded),
+                    onPressed: () =>
+                        DetailHelpDialog.show(context, detail.kind),
                   ),
-                const SizedBox(height: 4),
-                DictatedTextField(
-                  key: ValueKey('$id-${widget.generation}'),
-                  label: 'Description',
-                  hint: DetailListEditor.describeHint,
-                  initialValue: detail.text,
-                  dictation: widget.dictation,
-                  multiline: true,
-                  dense: true,
-                  onListeningChanged: (listening) =>
-                      _setListening(id, listening),
-                  onChanged: (text) => widget.onChanged(id, text),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                style: _small,
-                tooltip: 'About ${detail.kind.label.toLowerCase()} details',
-                icon: const Icon(Icons.help_outline),
-                onPressed: () => DetailHelpDialog.show(context, detail.kind),
-              ),
-              const Spacer(),
-              IconButton(
-                // Full size: it deletes, so it is never a near miss.
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Delete $name',
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _delete(detail),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Close $name',
+                    icon: const Icon(Icons.expand_less_rounded),
+                    onPressed: () => _collapse(id),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Delete $name',
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    onPressed: () => _delete(detail),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

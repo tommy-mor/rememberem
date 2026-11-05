@@ -8,18 +8,22 @@ import '../about/about_screen.dart';
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
 import '../app/brand_logo.dart';
+import '../app/empty_state.dart';
+import '../app/rememberem_theme.dart';
+import '../app/section_header.dart';
 import '../places/places_screen.dart';
 import '../practice/filtered_practice_screen.dart';
 import '../practice/practice_screens.dart';
 import '../settings/settings_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../trash/trash_screen.dart';
+import 'date_groups.dart';
 import 'filter_bar.dart';
 import 'filter_match_lines.dart';
+import 'home_bottom_bar.dart';
 import 'memory_tile.dart';
 import 'person_card_route.dart';
 import 'progress_badge.dart';
-import 'remembered_label.dart';
 
 /// Home screen: everyone you have met, newest first, narrowed and sorted
 /// by the filters above them ([AppServices.listFilters]).
@@ -39,14 +43,6 @@ class MemoryListScreen extends StatefulWidget {
   final VoidCallback onMeetSomeone;
   final DateTime Function() clock;
 
-  /// Above the practice buttons.
-  static const quizzesLabel = 'Quizzes to help you remember...';
-
-  /// What a screen reader says for the Faces practice button.
-  static const facesLabel =
-      'Practice faces. Needs sight; Practice details works with a screen '
-      'reader.';
-
   /// Said above the list when some records could not be read.
   static String unreadableText(int count) => count == 1
       ? "1 record couldn't be read. It is kept on this phone, untouched."
@@ -57,7 +53,8 @@ class MemoryListScreen extends StatefulWidget {
   State<MemoryListScreen> createState() => _MemoryListScreenState();
 }
 
-class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
+class _MemoryListScreenState extends State<MemoryListScreen>
+    with RouteAware, WidgetsBindingObserver {
   MemoryRepository get _repository => widget.services.repository;
   List<Memory>? _memories;
 
@@ -81,7 +78,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _reload();
+  }
+
+  /// The date groups follow the clock, so a list left open past midnight
+  /// (or past Monday) is regrouped when the app comes back.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) setState(() {});
   }
 
   @override
@@ -93,6 +98,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.routeObserver.unsubscribe(this);
     super.dispose();
   }
@@ -157,6 +163,7 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
         builder: (_) => TimelineScreen(
           services: widget.services,
           routeObserver: widget.routeObserver,
+          onMeetSomeone: widget.onMeetSomeone,
         ),
       ),
     );
@@ -217,108 +224,61 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       appBar: AppBar(
         title: Tooltip(
           message: 'About',
-          child: InkWell(onTap: _openAbout, child: const BrandLogo()),
+          child: InkWell(
+            onTap: _openAbout,
+            // A full 48 dp to tap, whatever the logo's height.
+            child: const SizedBox(
+              height: RememberemTheme.tapTarget,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: BrandLogo(),
+              ),
+            ),
+          ),
         ),
         actions: [
           IconButton(
             tooltip: 'Timeline',
-            icon: const Icon(Icons.schedule),
+            icon: const Icon(Icons.schedule_rounded, size: 22),
             onPressed: _openTimeline,
           ),
           IconButton(
             tooltip: 'Places',
-            icon: const Icon(Icons.place),
+            icon: const Icon(Icons.place_rounded, size: 22),
             onPressed: _openPlaces,
           ),
           IconButton(
             tooltip: 'Trash',
-            icon: const Icon(Icons.delete),
+            icon: const Icon(Icons.delete_rounded, size: 22),
             onPressed: _openTrash,
           ),
           IconButton(
             tooltip: 'Settings',
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_rounded, size: 22),
             onPressed: _openSettings,
           ),
         ],
       ),
       body: _body(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: widget.onMeetSomeone,
-        icon: const Icon(Icons.camera_alt),
-        label: const Text('Meet someone'),
-      ),
-      bottomNavigationBar: _practiceBar(),
+      bottomNavigationBar: _bottomBar(),
     );
   }
 
-  /// Practice controls along the bottom, below the "Meet someone" button.
-  Widget? _practiceBar() {
-    final memories = _memories;
-    if (memories == null || memories.isEmpty) return null;
-    final canPlayFaces = _facePlanner.canPlay(memories);
-    final canPlayDetails = _detailPlanner.canPlay(memories);
-    final small = Theme.of(context).textTheme.bodySmall;
-    final remembered = RememberedCount.of(
-      memories,
-      threshold: widget.services.settings.value.rememberedThreshold,
-    );
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // From the list as shown, so a trash or undo updates it at once.
-            if (remembered.isNothing)
-              const SizedBox.shrink()
-            else ...[
-              RememberedLabel(remembered),
-              const SizedBox(height: 4),
-            ],
-            if (!canPlayFaces)
-              Text(
-                'Name at least 4 different people to practice faces.',
-                textAlign: TextAlign.center,
-                style: small,
-              ),
-            if (!canPlayDetails)
-              Text(
-                'Add a detail and have 4 people to practice details.',
-                textAlign: TextAlign.center,
-                style: small,
-              ),
-            const SizedBox(height: 4),
-            Text(
-              MemoryListScreen.quizzesLabel,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: canPlayFaces ? _practiceFaces : null,
-                    icon: const Icon(Icons.face),
-                    label: const Text(
-                      'Faces',
-                      semanticsLabel: MemoryListScreen.facesLabel,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: canPlayDetails ? _practiceDetails : null,
-                    icon: const Icon(Icons.notes),
-                    label: const Text('Details'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+  /// Practice, what is remembered, and Meet, along the bottom.
+  Widget _bottomBar() {
+    final memories = _memories ?? const <Memory>[];
+    return HomeBottomBar(
+      // From the list as shown, so a trash or undo updates it at once.
+      remembered: RememberedCount.of(
+        memories,
+        threshold: widget.services.settings.value.rememberedThreshold,
       ),
+      showPractice: memories.isNotEmpty,
+      canPlayFaces: _facePlanner.canPlay(memories),
+      canPlayDetails: _detailPlanner.canPlay(memories),
+      onFaces: _practiceFaces,
+      onDetails: _practiceDetails,
+      onMeet: widget.onMeetSomeone,
     );
   }
 
@@ -361,7 +321,10 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
   Widget _body() {
     final memories = _memories;
     if (memories == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const Align(
+        alignment: Alignment.topCenter,
+        child: LinearProgressIndicator(minHeight: 3, semanticsLabel: 'Loading'),
+      );
     }
     if (_unreadable == 0) return _people(memories);
     return Column(
@@ -381,19 +344,15 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
 
   Widget _people(List<Memory> memories) {
     if (memories.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text(
-            'No one yet.\n\nTap "Meet someone" to take a photo. '
+      return const EmptyState(
+        title: 'No one yet.',
+        help:
+            'Tap "Meet" to take a photo. '
             'Tip: long-press the Rememberem icon and drag '
             '"Meet someone" to your home screen for a one-tap shortcut.'
             '\n\nRememberem will ask to use the camera, the microphone and '
             'your location. Photos and notes are kept on this phone, and in '
             'its Google backup if that is on (see About).',
-            textAlign: TextAlign.center,
-          ),
-        ),
       );
     }
     final filters = widget.services.listFilters;
@@ -402,27 +361,39 @@ class _MemoryListScreenState extends State<MemoryListScreen> with RouteAware {
       builder: (context, _) {
         final shown = filters.apply(memories);
         final active = filters.active;
-        return CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: FilterBar(
+        // Groups by date met only when sorted by it; otherwise no headers.
+        final dated = filters.order.sort == PersonSort.date;
+        final rows = <Object>[
+          if (dated)
+            for (final group in DateGroups(widget.clock).group(
+              shown,
+              (m) => m.capturedAt,
+            )) ...[group.label, ...group.items]
+          else
+            ...shown,
+        ];
+        // The filter bar is the first item, so it scrolls with the list.
+        return ListView.builder(
+          itemCount: rows.length + (shown.isEmpty ? 2 : 1),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return FilterBar(
                 filters: filters,
                 people: memories,
                 shown: shown.length,
-              ),
-            ),
-            if (shown.isEmpty)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: Text('No one matches.')),
-              )
-            else
-              SliverList.builder(
-                itemCount: shown.length,
-                itemBuilder: (context, index) =>
-                    _tile(context, shown[index], active),
-              ),
-          ],
+              );
+            }
+            if (shown.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(RememberemTheme.gutter),
+                child: Text('No one matches.'),
+              );
+            }
+            final row = rows[index - 1];
+            return row is Memory
+                ? _tile(context, row, active)
+                : SectionHeader(title: row as String, tinted: false);
+          },
         );
       },
     );

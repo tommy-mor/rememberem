@@ -119,6 +119,8 @@ void main() {
     expect(find.byType(FacePickerScreen), findsOneWidget);
     expect(routeName(tester, FacePickerScreen), AppRoutes.capture);
     expect(find.textContaining('happy to be remembered'), findsOneWidget);
+    expect(find.text('Tap each face to keep'), findsOneWidget);
+    expect(find.textContaining('Tap each face to remember'), findsNothing);
     expect(addButton(tester).onPressed, isNull);
 
     await tester.tap(find.byTooltip('Face 2'));
@@ -192,11 +194,11 @@ void main() {
     expect(find.widgetWithText(TextField, 'Choir'), findsOneWidget);
     expect(find.text('Details true of everyone here'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextField, 'Hall'), 'Town hall');
-    await tester.enterText(find.widgetWithText(TextField, 'Detail'), 'Sings');
+    await tester.enterText(find.widgetWithText(TextField, 'DETAIL'), 'Sings');
     await tester.tap(find.text('Add detail'));
     await tester.pump();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Detail').last,
+      find.widgetWithText(TextField, 'DETAIL').last,
       'Tall',
     );
     await tester.tap(find.text('Add detail'));
@@ -390,7 +392,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Add 2 people'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Detail'), 'Kind');
+    await tester.enterText(find.widgetWithText(TextField, 'DETAIL'), 'Kind');
     await tester.tap(find.text('Add detail'));
     await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, 'Add 2 people'));

@@ -35,9 +35,9 @@ void main() {
     await repository.save(memory);
   }
 
-  /// A short pump: an anniversary's "+ date" pulses, so never settle.
-  Future<void> beat(WidgetTester tester) =>
-      tester.pump(const Duration(milliseconds: 500));
+  /// Lets the card finish moving. A dateless anniversary's "+ date" pulses
+  /// three times and stops, so this settles.
+  Future<void> beat(WidgetTester tester) => tester.pumpAndSettle();
 
   Detail tag({String? label, String text = 'x'}) => Detail(
     id: 't',
@@ -69,7 +69,7 @@ void main() {
 
     final tops = [
       for (final kind in DetailKind.values)
-        tester.getTopLeft(find.text(kind.plural)).dy,
+        tester.getTopLeft(detailHeading(kind)).dy,
     ];
     expect(DetailKind.values.map((k) => k.plural), [
       'Facts',
@@ -162,7 +162,7 @@ void main() {
     await tester.tap(openToggle('Fact'));
     await beat(tester);
 
-    await tester.tap(find.text('Tags'));
+    await tester.tap(detailHeading(DetailKind.tag));
     await beat(tester);
 
     expect(descriptionField(), findsNothing);
@@ -248,10 +248,10 @@ void main() {
     final chip = tester.widget<ActionChip>(find.byType(ActionChip));
     expect((chip.label as Text).style?.fontStyle, FontStyle.italic);
     final theme = Theme.of(tester.element(find.byType(ActionChip)));
-    expect(chip.backgroundColor, isNot(DetailListEditor.tintOf(theme)));
+    expect(chip.backgroundColor, isNot(RememberemTheme.raised(theme)));
     expect(
       chip.backgroundColor!.computeLuminance(),
-      lessThan(DetailListEditor.tintOf(theme).computeLuminance()),
+      lessThan(RememberemTheme.raised(theme).computeLuminance()),
     );
   });
 
@@ -305,22 +305,19 @@ void main() {
     await tester.tap(openToggle('Happening 3 May 2026'));
     await beat(tester);
 
-    expect(find.widgetWithText(OutlinedButton, '+ place'), findsOneWidget);
+    expect(find.text('+ place'), findsOneWidget);
   });
 
-  test('a card is a shade darker than a light page and lighter than a dark '
-      'one', () {
+  test('an open card is lighter than the page, light or dark', () {
     final light = RememberemTheme.light(AppSettings());
     final dark = RememberemTheme.dark(AppSettings(darkMode: true));
 
-    expect(
-      DetailListEditor.tintOf(light).computeLuminance(),
-      lessThan(light.scaffoldBackgroundColor.computeLuminance()),
-    );
-    expect(
-      DetailListEditor.tintOf(dark).computeLuminance(),
-      greaterThan(dark.scaffoldBackgroundColor.computeLuminance()),
-    );
+    for (final theme in [light, dark]) {
+      expect(
+        RememberemTheme.raised(theme).computeLuminance(),
+        greaterThan(theme.scaffoldBackgroundColor.computeLuminance()),
+      );
+    }
   });
 
   test('placeholders are italic', () {

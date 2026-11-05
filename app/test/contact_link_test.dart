@@ -147,7 +147,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'Name'),
+      find.widgetWithText(TextField, 'NAME'),
       'Ann B. Lee',
     );
     await tester.pump(const Duration(seconds: 1));

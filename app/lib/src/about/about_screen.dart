@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../app/brand_logo.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
+import '../app/section_header.dart';
 import '../places/place_notice_keeper.dart';
 import '../reminders/reminder_coordinator.dart';
 import 'debug_section.dart';
@@ -61,61 +63,87 @@ class AboutScreen extends StatelessWidget {
     }
   }
 
+  Widget _link(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required VoidCallback onTap,
+    IconData trailing = Icons.open_in_new_rounded,
+  }) => ListTile(
+    leading: Icon(icon),
+    title: Text(title),
+    subtitle: subtitle == null ? null : Text(subtitle),
+    trailing: Icon(trailing, size: 20),
+    onTap: onTap,
+  );
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    const gutter = RememberemTheme.gutter;
     return Scaffold(
       appBar: AppBar(title: const Text('About'), actions: const [HomeButton()]),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const Center(child: BrandLogo()),
-          const SizedBox(height: 24),
-          Text(
-            'Rememberem was created by Eric Jorgensen.',
-            style: text.titleMedium,
-            textAlign: TextAlign.center,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(gutter, 16, gutter, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const BrandLogo(height: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Rememberem was created by Eric Jorgensen.',
+                  style: text.titleMedium?.copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('Suggestions are welcome!', style: text.bodyLarge),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Suggestions are welcome!',
-            style: text.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ListTile(
-            leading: const Icon(Icons.public),
-            title: const Text('ericjorgensen.com'),
+          _link(
+            context,
+            icon: Icons.public_rounded,
+            title: 'ericjorgensen.com',
             onTap: () => _open(context, website),
           ),
-          ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Suggest an idea or report a problem'),
-            subtitle: const Text('github.com/nebosite/rememberem/issues'),
+          _link(
+            context,
+            icon: Icons.bug_report_rounded,
+            title: 'Suggest an idea or report a problem',
+            subtitle: 'github.com/nebosite/rememberem/issues',
             onTap: () => _open(context, issues),
           ),
-          ListTile(
-            leading: const Icon(Icons.mail_outline),
-            title: const Text('Privacy questions'),
-            subtitle: const Text(email),
+          _link(
+            context,
+            icon: Icons.mail_rounded,
+            title: 'Privacy questions',
+            subtitle: email,
             onTap: () => _open(context, mail),
           ),
-          const SizedBox(height: 16),
-          Text('Where your people are kept', style: text.titleMedium),
+          const SectionHeader(title: 'Your data'),
           for (final paragraph in dataText)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.fromLTRB(gutter, 8, gutter, 0),
               child: Text(paragraph, style: text.bodyMedium),
             ),
           const SizedBox(height: 8),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy policy'),
+          _link(
+            context,
+            icon: Icons.privacy_tip_rounded,
+            title: 'Privacy policy',
             onTap: () => _open(context, privacy),
           ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Licences'),
+          _link(
+            context,
+            icon: Icons.description_rounded,
+            title: 'Licences',
+            trailing: Icons.chevron_right_rounded,
             onTap: () => showLicensePage(
               context: context,
               applicationName: 'Rememberem',

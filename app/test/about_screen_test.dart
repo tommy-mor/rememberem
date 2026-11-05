@@ -10,7 +10,7 @@ void main() {
     final links = FakeLinkOpener();
     await tester.pumpWidget(MaterialApp(home: AboutScreen(links: links)));
 
-    expect(find.text('Where your people are kept'), findsOneWidget);
+    expect(find.text('YOUR DATA'), findsOneWidget);
     expect(find.textContaining('backs up to Google'), findsOneWidget);
 
     await tester.tap(find.text('Privacy questions'));

@@ -81,73 +81,90 @@ class _RadiusSliderState extends State<RadiusSlider>
     final value = widget.format(RadiusScale.metersAt(_position));
     return TapRegion(
       onTapOutside: (_) => widget.onDone(),
-      child: Semantics(
-        slider: true,
-        label: 'Radius of ${widget.place}',
-        value: value,
-        increasedValue: widget.format(
-          RadiusScale.metersAt((_position + RadiusSlider.step).clamp(0, 1)),
-        ),
-        decreasedValue: widget.format(
-          RadiusScale.metersAt((_position - RadiusSlider.step).clamp(0, 1)),
-        ),
-        onIncrease: () => _moveBy(RadiusSlider.step, settle: true),
-        onDecrease: () => _moveBy(-RadiusSlider.step, settle: true),
-        child: GestureDetector(
-          onHorizontalDragUpdate: (d) =>
-              _moveBy(d.primaryDelta! / RadiusSlider.span, settle: false),
-          onHorizontalDragEnd: (_) =>
-              widget.onSettled(RadiusScale.metersAt(_position)),
-          child: AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, child) => DecoratedBox(
-              decoration: BoxDecoration(
-                color: Color.lerp(
-                  scheme.primaryContainer,
-                  scheme.primary.withAlpha(110),
-                  _pulse.value,
-                ),
-                border: Border.all(color: scheme.primary, width: 1.5),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: child,
+      // The check wraps below the pill when the line is too short for both.
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Semantics(
+            slider: true,
+            label: 'Radius of ${widget.place}',
+            value: value,
+            increasedValue: widget.format(
+              RadiusScale.metersAt((_position + RadiusSlider.step).clamp(0, 1)),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Smaller',
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: _position <= 0
-                      ? null
-                      : () {
-                          HapticFeedback.selectionClick();
-                          _moveBy(-RadiusSlider.step, settle: true);
-                        },
-                ),
-                ExcludeSemantics(
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      color: scheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
+            decreasedValue: widget.format(
+              RadiusScale.metersAt((_position - RadiusSlider.step).clamp(0, 1)),
+            ),
+            onIncrease: () => _moveBy(RadiusSlider.step, settle: true),
+            onDecrease: () => _moveBy(-RadiusSlider.step, settle: true),
+            child: GestureDetector(
+              onHorizontalDragUpdate: (d) =>
+                  _moveBy(d.primaryDelta! / RadiusSlider.span, settle: false),
+              onHorizontalDragEnd: (_) =>
+                  widget.onSettled(RadiusScale.metersAt(_position)),
+              child: AnimatedBuilder(
+                animation: _pulse,
+                builder: (context, child) => DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color.lerp(
+                      scheme.primaryContainer,
+                      scheme.primary.withAlpha(110),
+                      _pulse.value,
                     ),
+                    border: Border.all(color: scheme.primary, width: 1.5),
+                    borderRadius: BorderRadius.circular(24),
                   ),
+                  child: child,
                 ),
-                IconButton(
-                  tooltip: 'Larger',
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: _position >= 1
-                      ? null
-                      : () {
-                          HapticFeedback.selectionClick();
-                          _moveBy(RadiusSlider.step, settle: true);
-                        },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Smaller',
+                      icon: const Icon(Icons.chevron_left_rounded),
+                      onPressed: _position <= 0
+                          ? null
+                          : () {
+                              HapticFeedback.selectionClick();
+                              _moveBy(-RadiusSlider.step, settle: true);
+                            },
+                    ),
+                    // Shrinks a little, not off the edge, at the largest text.
+                    Flexible(
+                      child: ExcludeSemantics(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            value,
+                            style: TextStyle(
+                              color: scheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Larger',
+                      icon: const Icon(Icons.chevron_right_rounded),
+                      onPressed: _position >= 1
+                          ? null
+                          : () {
+                              HapticFeedback.selectionClick();
+                              _moveBy(RadiusSlider.step, settle: true);
+                            },
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          IconButton(
+            tooltip: 'Done',
+            icon: const Icon(Icons.check_rounded),
+            onPressed: widget.onDone,
+          ),
+        ],
       ),
     );
   }

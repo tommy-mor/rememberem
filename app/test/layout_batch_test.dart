@@ -87,7 +87,7 @@ void main() {
       await tester.tap(descriptionField());
       await tester.pumpAndSettle();
       await tester.tapAt(
-        tester.getCenter(find.widgetWithText(TextField, 'Meeting')),
+        tester.getCenter(find.widgetWithText(TextField, 'MEETING')),
       );
       await tester.pumpAndSettle();
       expect(find.byTooltip('Delete Fact'), findsNothing);
@@ -102,7 +102,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byTooltip('Delete Fact'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextField, 'Meeting'));
+      await tester.tap(find.widgetWithText(TextField, 'MEETING'));
       await tester.pumpAndSettle();
 
       expect(find.byTooltip('Delete Fact'), findsNothing);
@@ -132,7 +132,7 @@ void main() {
       await tester.pump();
 
       await tester.tapAt(
-        tester.getCenter(find.widgetWithText(TextField, 'Meeting')),
+        tester.getCenter(find.widgetWithText(TextField, 'MEETING')),
       );
       await tester.pump();
       expect(find.byTooltip('Stop listening'), findsOneWidget);
@@ -161,7 +161,7 @@ void main() {
       await tester.tap(openToggle('Happening 3 May 2026'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.schedule).last); // the happening's
+      await tester.tap(find.text('DATE')); // the happening's
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -261,7 +261,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.stored[memory.id]!.details.single.place, 'Cafe');
-      await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Icons.expand_less_rounded),
+      );
       await tester.pumpAndSettle();
       expect(find.text('3 May 2026 · Cafe - Picnic'), findsOneWidget);
     });
@@ -282,18 +284,17 @@ void main() {
     });
   });
 
-  testWidgets('the crop page explains itself and crops only on Crop', (
+  testWidgets('the crop page explains itself and crops only on Done', (
     tester,
   ) async {
     await tester.pumpWidget(MaterialApp(home: CropScreen(jpeg: Uint8List(0))));
     await tester.pump();
 
     expect(
-      find.text('Use pinch to zoom in or out, then press Crop'),
+      find.text('Use pinch to zoom in or out, then press Done'),
       findsOneWidget,
     );
-    expect(find.widgetWithText(FilledButton, 'Crop'), findsOneWidget);
-    expect(find.text('Done'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Done'), findsOneWidget);
   });
 
   group('about', () {

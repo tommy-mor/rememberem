@@ -274,7 +274,9 @@ void main() {
     expect(order(), ['Ann Zed', 'Cy Adams', 'Unknown']); // newest first
 
     Future<void> sortBy(String label) async {
-      await tester.tap(find.byIcon(Icons.sort));
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is PopupMenuButton<PersonSort>),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining(label).last);
       await tester.pumpAndSettle();

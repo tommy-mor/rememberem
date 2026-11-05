@@ -142,7 +142,7 @@ void main() {
     expect(find.byType(Image), findsNWidgets(4));
     // The detail stays above the choices, with its kind.
     expect(find.textContaining('about #'), findsOneWidget);
-    expect(find.text('Fact'), findsOneWidget);
+    expect(find.text('FACT'), findsOneWidget);
   });
 
   testWidgets('first try right scores the detail', (tester) async {
@@ -381,10 +381,166 @@ void main() {
     await showGame(tester);
 
     expect(find.text('My boss is Bo: Since 2020'), findsOneWidget);
-    expect(find.text('Relationship'), findsOneWidget);
+    expect(find.text('RELATIONSHIP'), findsOneWidget);
     await reveal(tester);
     await pick(tester, repository.stored[ids[0]]!);
 
     expect(repository.detailAnswers, [(ids[0], 'r', true)]);
+  });
+
+  group('layout', () {
+    Future<void> showAt(
+      WidgetTester tester,
+      Size size, {
+      double scale = 1,
+    }) async {
+      tester.view
+        ..physicalSize = size
+        ..devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DetailGameScreen(
+            repository: repository,
+            planner: DetailQuizPlanner(Random(1), () => now),
+            clock: () => now,
+            pauseAfterRight: Duration.zero,
+          ),
+        ),
+      );
+      await tester.pump();
+      await reveal(tester);
+    }
+
+    for (final (name, size, scale) in const [
+      ('on 360 x 640', Size(360, 640), 1.0),
+      ('on its side at 568 x 320', Size(568, 320), 1.0),
+      ('at text scale 2.0 on 320 x 568', Size(320, 568), 2.0),
+    ]) {
+      testWidgets('four photos at least 120 dp tall, all reachable $name', (
+        tester,
+      ) async {
+        await people(['Ann', 'Bo', 'Cy', 'Di']);
+        await showAt(tester, size, scale: scale);
+
+        final images = find.byType(Image);
+        expect(images, findsNWidgets(4));
+        for (final image in images.evaluate()) {
+          final box = image.renderObject! as RenderBox;
+          expect(box.size.height, inInclusiveRange(120, 188));
+        }
+        for (final name in ['Ann', 'Bo', 'Cy', 'Di']) {
+          final finder = find.text(name);
+          await tester.dragUntilVisible(
+            finder,
+            find.byType(Scrollable).first,
+            const Offset(0, -80),
+          );
+          final rect = tester.getRect(finder);
+          expect(rect.bottom, lessThanOrEqualTo(size.height));
+          expect(rect.top, greaterThanOrEqualTo(0));
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('a wrong card is dimmed, disabled and "not this one"; the '
+        'right one has a corner check and is selected', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      await showAt(tester, const Size(360, 800));
+      final answer = subject(tester);
+      final wrong = repository.stored.values.firstWhere(
+        (m) => m.id != answer.id,
+      );
+
+      await tester.tap(card(wrong));
+      await tester.pump();
+
+      final name = wrong.field(MemoryField.name);
+      expect(find.bySemanticsLabel('$name, not this one'), findsOneWidget);
+      expect(
+        tester
+            .widget<Opacity>(
+              find
+                  .ancestor(of: card(wrong), matching: find.byType(Opacity))
+                  .first,
+            )
+            .opacity,
+        0.35,
+      );
+      expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+
+      await tester.tap(card(answer));
+      await tester.pump();
+      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+      expect(
+        tester.getSemantics(find.text(answer.field(MemoryField.name))),
+        matchesSemantics(
+          label: '${answer.field(MemoryField.name)}, right',
+          isButton: true,
+          isEnabled: true,
+          isSelected: true,
+          hasSelectedState: true,
+          hasEnabledState: true,
+        ),
+      );
+      semantics.dispose();
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('during the countdown the four people stay hidden', (
+      tester,
+    ) async {
+      await people(['Ann', 'Bo', 'Cy', 'Di']);
+      tester.view
+        ..physicalSize = const Size(360, 640)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DetailGameScreen(
+            repository: repository,
+            planner: DetailQuizPlanner(Random(1), () => now),
+            clock: () => now,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(find.byType(Image), findsNothing);
+      for (final name in ['Ann', 'Bo', 'Cy', 'Di']) {
+        expect(find.text(name), findsNothing);
+      }
+      expect(find.text('Show people'), findsOneWidget);
+      expect(find.text('Who is this about?'), findsOneWidget);
+    });
+
+    testWidgets('a long detail shrinks to 19 sp, then is cut at three lines', (
+      tester,
+    ) async {
+      final m = await repository.add(
+        photoJpeg: [],
+        capturedAt: DateTime(2026, 1, 1),
+      );
+      await repository.save(
+        m.withField('name', 'Ann').withDetails([
+          Detail(id: 'long', text: 'word ' * 80, at: DateTime.utc(2026)),
+        ]),
+      );
+      for (final name in ['Bo', 'Cy', 'Di']) {
+        final other = await repository.add(
+          photoJpeg: [],
+          capturedAt: DateTime(2026, 1, 2),
+        );
+        await repository.save(other.withField('name', name));
+      }
+      await showAt(tester, const Size(360, 640));
+      final text = tester.widget<Text>(find.textContaining('word word'));
+      expect(text.style?.fontSize, 19);
+      expect(text.maxLines, 3);
+      expect(text.overflow, TextOverflow.ellipsis);
+    });
   });
 }

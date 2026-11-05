@@ -11,6 +11,7 @@ import 'fakes/fake_memory_repository.dart';
 import 'fakes/test_services.dart';
 
 void main() {
+  const mergeTooltip = 'Merge with existing person record';
   late FakeMemoryRepository repository;
   late FakeDictation dictation;
   late Memory memory;
@@ -46,8 +47,7 @@ void main() {
   Future<void> addRow(WidgetTester tester, String kind) async {
     await tester.ensureVisible(addDetailButtonNamed(kind));
     await tester.tap(addDetailButtonNamed(kind));
-    // Not pumpAndSettle: a dateless anniversary's "+ date" pulses for ever.
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
   }
 
   /// Opens the detail card named [label] with its expander.
@@ -94,7 +94,10 @@ void main() {
     await showScreen(tester);
 
     for (final label in ['Name', 'Place', 'Meeting']) {
-      expect(find.widgetWithText(TextField, label), findsOneWidget);
+      expect(
+        find.widgetWithText(TextField, label.toUpperCase()),
+        findsOneWidget,
+      );
       // Mics are for the moment of meeting, not a later visit.
       expect(find.byTooltip('Speak $label'), findsNothing);
     }
@@ -144,7 +147,7 @@ void main() {
   testWidgets('dictation adds to text already typed', (tester) async {
     await showScreen(tester, justMet: true);
 
-    await tester.enterText(find.widgetWithText(TextField, 'Meeting'), 'Choir');
+    await tester.enterText(find.widgetWithText(TextField, 'MEETING'), 'Choir');
     await speakInto(tester, 'Meeting', 'practice');
 
     expect(find.text('Choir practice'), findsOneWidget);
@@ -154,7 +157,7 @@ void main() {
     tester,
   ) async {
     await showScreen(tester);
-    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Alex');
+    await tester.enterText(find.widgetWithText(TextField, 'NAME'), 'Alex');
 
     await tester.pumpWidget(const SizedBox());
 
@@ -278,7 +281,9 @@ void main() {
       [DetailKind.happening, 'Park', 'Picnic'],
     );
     expect(find.text('Park'), findsOneWidget);
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+    await tester.tap(
+      find.widgetWithIcon(IconButton, Icons.expand_less_rounded),
+    );
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.textContaining('· Park - Picnic'), findsOneWidget);
   });
@@ -450,7 +455,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().details.single.targetId, bo.id);
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+    await tester.tap(
+      find.widgetWithIcon(IconButton, Icons.expand_less_rounded),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Boss: Bo - Kind'), findsOneWidget);
   });
@@ -471,13 +478,10 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Add'));
     await tester.pump(const Duration(milliseconds: 500));
-    // "+ date" pulses for ever: pump, never settle.
     await tester.tap(find.text('+ date'));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('OK'));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
     final a = saved().details.single;
     expect([a.kind, a.label], [DetailKind.anniversary, 'Baptism']);
     expect(a.eventDate, isNotNull);
@@ -512,7 +516,7 @@ void main() {
     await showScreen(tester);
     expect(find.widgetWithText(AppBar, 'Unknown'), findsOneWidget);
 
-    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Ann Lee');
+    await tester.enterText(find.widgetWithText(TextField, 'NAME'), 'Ann Lee');
     await tester.pump();
 
     expect(find.widgetWithText(AppBar, 'Ann Lee'), findsOneWidget);
@@ -520,35 +524,43 @@ void main() {
   });
 
   testWidgets(
-    'crop sits on the lower right of the photo; Merge, then the time, '
-    'then the coordinates sit to its right',
+    'the photo is 136 x 170 with crop on its lower right (28 dp to see, '
+    '48 dp to tap); the fields sit to its right and the time, the '
+    'coordinates and Merge on one line below it',
     (tester) async {
       await showScreen(tester);
 
-      final photo = tester.getRect(find.byType(Image).first);
+      final photo = tester.getRect(find.byKey(const ValueKey('photo-0')));
+      expect(photo.size, const Size(136, 170));
       final crop = tester.getRect(find.byTooltip('Crop'));
       expect(photo.contains(crop.center), isTrue);
       expect(crop.center.dx, greaterThan(photo.center.dx));
       expect(crop.center.dy, greaterThan(photo.center.dy));
+      expect(crop.size, const Size(28, 28));
+      // The tap area is 48 dp, whatever is drawn.
+      final handle = tester.ensureSemantics();
+      final area = tester.getSemantics(find.byTooltip('Crop')).rect;
+      expect(area.width, greaterThanOrEqualTo(48));
+      expect(area.height, greaterThanOrEqualTo(48));
+      handle.dispose();
       expect(find.text('Crop'), findsNothing); // an icon only
 
-      final merge = tester.getRect(
-        find.text('Merge with existing person record'),
-      );
+      for (final label in ['NAME', 'PLACE', 'MEETING']) {
+        final field = tester.getRect(find.widgetWithText(TextField, label));
+        expect(field.left, greaterThan(photo.right));
+        expect(field.top, lessThan(photo.bottom));
+      }
+
+      final merge = tester.getRect(find.byTooltip(mergeTooltip));
       final clock = tester.getRect(find.byTooltip('Change date and time'));
       final pin = tester.getRect(find.byTooltip('Change location'));
       for (final r in [merge, clock, pin]) {
-        expect(r.left, greaterThan(photo.right));
-        expect(r.top, lessThan(photo.bottom));
+        expect(r.top, greaterThanOrEqualTo(photo.bottom));
+        expect(r.center.dy, closeTo(clock.center.dy, 1));
       }
-      expect(merge.top, lessThan(clock.top));
-      expect(clock.top, lessThan(pin.top));
-      expect(
-        tester
-            .widget<Text>(find.text('Merge with existing person record'))
-            .style,
-        isNull, // sized by the button's own text style (60 %)
-      );
+      expect(clock.right, lessThan(pin.left));
+      expect(pin.right, lessThanOrEqualTo(merge.left));
+      expect(find.text('Merge'), findsOneWidget);
     },
   );
 
@@ -642,7 +654,7 @@ void main() {
       await showRelated(tester);
 
       // Once for the details' heading, once for this list of people.
-      expect(find.text('Relationships'), findsNWidgets(2));
+      expect(find.textContaining('RELATIONSHIPS'), findsNWidgets(2));
       expect(find.widgetWithText(ListTile, 'Boss'), findsOneWidget);
       expect(
         find.widgetWithText(ListTile, 'Bo is their brother'),
@@ -679,7 +691,7 @@ void main() {
       tester,
     ) async {
       await showRelated(tester);
-      await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Bob');
+      await tester.enterText(find.widgetWithText(TextField, 'NAME'), 'Bob');
 
       await tester.ensureVisible(find.widgetWithText(ListTile, 'Cy'));
       await tester.tap(find.widgetWithText(ListTile, 'Cy'));
@@ -740,7 +752,9 @@ void main() {
       await tester.tap(find.text('friend'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less).last);
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Icons.expand_less_rounded).last,
+      );
       await tester.pumpAndSettle();
       expect(find.text('Friend: Jill - Sings'), findsOneWidget);
       final b = repository.saves.last.details.last;
@@ -863,7 +877,7 @@ void main() {
 
     expect(
       tester
-          .widget<TextField>(find.widgetWithText(TextField, 'Place'))
+          .widget<TextField>(find.widgetWithText(TextField, 'PLACE'))
           .controller!
           .text,
       isEmpty,

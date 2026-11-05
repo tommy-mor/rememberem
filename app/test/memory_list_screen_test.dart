@@ -92,7 +92,7 @@ void main() {
     var started = false;
     await showScreen(tester, onMeetSomeone: () => started = true);
 
-    await tester.tap(find.text('Meet someone'));
+    await tester.tap(find.byTooltip('Meet someone'));
 
     expect(started, isTrue);
   });
@@ -118,7 +118,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(
-        find.widgetWithText(TextField, 'Name'),
+        find.widgetWithText(TextField, 'NAME'),
         'Alex Davis',
       );
       await tester.pageBack();

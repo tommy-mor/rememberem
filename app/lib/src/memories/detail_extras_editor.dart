@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
+import '../app/ledger_picker_field.dart';
+import '../app/portrait_thumb.dart';
 import '../app/rememberem_theme.dart';
 import 'new_type_dialog.dart';
 import 'pulsing_button.dart';
@@ -75,9 +77,6 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
 
   Detail get _detail => widget.detail;
 
-  /// Lines and chips at about half the usual height.
-  static const _tight = VisualDensity(horizontal: -2, vertical: -4);
-
   /// Asks for a new type's name and chooses it; a name already listed
   /// chooses that one.
   Future<void> _newType(String title) async {
@@ -146,7 +145,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
           DetailKind.happening => _happening(context),
           DetailKind.relationship => [
             _who(context),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             ..._types(context, 'New relationship type'),
           ],
           DetailKind.anniversary => [
@@ -182,109 +181,77 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     );
   }
 
+  /// Date and place side by side, each to change.
   List<Widget> _happening(BuildContext context) {
     final l = MaterialLocalizations.of(context);
     final at = _detail.at.toLocal();
     return [
-      ListTile(
-        dense: true,
-        visualDensity: _tight,
-        minVerticalPadding: 0,
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.schedule, semanticLabel: 'When'),
-        title: Text(
-          '${l.formatMediumDate(at)}, '
-          '${l.formatTimeOfDay(TimeOfDay.fromDateTime(at))}',
-        ),
-        onTap: _pickHappeningTime,
-      ),
-      if ((_detail.place?.trim() ?? '').isEmpty)
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              visualDensity: VisualDensity.compact,
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: LedgerPickerField(
+              label: 'Date',
+              value:
+                  '${l.formatMediumDate(at)}, '
+                  '${l.formatTimeOfDay(TimeOfDay.fromDateTime(at))}',
+              onTap: _pickHappeningTime,
             ),
-            onPressed: _pickPlace,
-            child: const Text('+ place'),
           ),
-        )
-      else
-        _placeTile(),
+          const SizedBox(width: _gap),
+          Expanded(child: _placeField()),
+        ],
+      ),
     ];
   }
 
-  /// The place, to change on the map or clear.
-  Widget _placeTile() => ListTile(
-    dense: true,
-    visualDensity: _tight,
-    minVerticalPadding: 0,
-    contentPadding: EdgeInsets.zero,
-    leading: const Icon(Icons.place_outlined, semanticLabel: 'Where'),
-    title: Text(
-      (_detail.place?.trim() ?? '').isEmpty
-          ? 'Choose place'
-          : _detail.place!.trim(),
-    ),
-    trailing: (_detail.place?.trim() ?? '').isNotEmpty
-        ? IconButton(
-            tooltip: 'Clear the place',
-            icon: const Icon(Icons.clear),
-            onPressed: () =>
-                widget.onChanged(_detail.copyWith(place: () => null)),
-          )
-        : null,
-    onTap: _pickPlace,
-  );
+  /// Between two fields in a row.
+  static const _gap = 12.0;
 
-  /// A tag's place and date: a "+ place" and a "+ date" button side by
-  /// side for what is not set, and a clearable line for what is.
-  List<Widget> _tagPlaceAndDate(BuildContext context) {
+  /// The place, to change on the map or clear; "+ place" while there is
+  /// none.
+  Widget _placeField() {
     final place = _detail.place?.trim() ?? '';
+    return LedgerPickerField(
+      label: 'Place',
+      value: place,
+      hint: '+ place',
+      onTap: _pickPlace,
+      onClear: place.isEmpty
+          ? null
+          : () => widget.onChanged(_detail.copyWith(place: () => null)),
+      clearTooltip: 'Clear the place',
+    );
+  }
+
+  /// A tag's place and date side by side, "+ place" and "+ date" for what
+  /// is not set, and a clear button for what is.
+  List<Widget> _tagPlaceAndDate(BuildContext context) {
     final when = _detail.eventDate;
     return [
-      if (place.isNotEmpty) _placeTile(),
-      if (when != null)
-        ListTile(
-          dense: true,
-          visualDensity: _tight,
-          minVerticalPadding: 0,
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.event, semanticLabel: 'When'),
-          title: Text(MaterialLocalizations.of(context).formatMediumDate(when)),
-          trailing: IconButton(
-            tooltip: 'Clear the date',
-            icon: const Icon(Icons.clear),
-            onPressed: () =>
-                widget.onChanged(_detail.copyWith(eventDate: () => null)),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: _placeField()),
+          const SizedBox(width: _gap),
+          Expanded(
+            child: LedgerPickerField(
+              label: 'Date',
+              value: when == null
+                  ? ''
+                  : MaterialLocalizations.of(context).formatMediumDate(when),
+              hint: '+ date',
+              onTap: _pickEventDate,
+              onClear: when == null
+                  ? null
+                  : () => widget.onChanged(
+                      _detail.copyWith(eventDate: () => null),
+                    ),
+              clearTooltip: 'Clear the date',
+            ),
           ),
-          onTap: _pickEventDate,
-        ),
-      if (place.isEmpty || when == null)
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Wrap(
-            spacing: 8,
-            children: [
-              if (place.isEmpty)
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onPressed: _pickPlace,
-                  child: const Text('+ place'),
-                ),
-              if (when == null)
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onPressed: _pickEventDate,
-                  child: const Text('+ date'),
-                ),
-            ],
-          ),
-        ),
+        ],
+      ),
     ];
   }
 
@@ -294,11 +261,9 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
     return DropdownButtonFormField<String>(
       initialValue: others.any((m) => m.id == target) ? target : null,
       isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Who',
-        isDense: true,
-        contentPadding: RememberemTheme.denseFieldPadding,
-        border: OutlineInputBorder(),
+      decoration: RememberemTheme.ledgerDecoration(
+        Theme.of(context),
+        label: 'Who',
       ),
       items: [
         for (final m in others)
@@ -306,17 +271,9 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
             value: m.id,
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.file(
-                    widget.photoOf(m),
-                    width: 24,
-                    height: 30,
-                    fit: BoxFit.cover,
-                    cacheWidth: 80,
-                    errorBuilder: (_, _, _) =>
-                        const SizedBox(width: 24, child: Icon(Icons.person)),
-                  ),
+                PortraitThumb(
+                  photo: widget.photoOf(m),
+                  size: RememberemTheme.thumbSmall,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -353,7 +310,7 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
             // A shade off the card, like the card off the page.
             backgroundColor: RememberemTheme.shade(
               theme,
-              RememberemTheme.shade(theme, theme.scaffoldBackgroundColor),
+              RememberemTheme.raised(theme),
             ),
             avatar: const Icon(Icons.add, size: 18),
             label: const Text(
@@ -377,14 +334,10 @@ class _DetailExtrasEditorState extends State<DetailExtrasEditor> {
         child: PulsingButton(label: '+ date', onPressed: _pickEventDate),
       );
     }
-    return ListTile(
-      dense: true,
-      visualDensity: _tight,
-      minVerticalPadding: 0,
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.event),
-      title: Text(MaterialLocalizations.of(context).formatMediumDate(when)),
-      subtitle: const Text('When it first happened'),
+    return LedgerPickerField(
+      label: 'Date',
+      value: MaterialLocalizations.of(context).formatMediumDate(when),
+      helper: 'When it first happened',
       onTap: _pickEventDate,
     );
   }

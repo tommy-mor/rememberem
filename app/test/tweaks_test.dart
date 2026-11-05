@@ -231,7 +231,7 @@ void main() {
             ?.findAncestorWidgetOfExactType<EditableText>() !=
         null;
 
-    await tester.tap(find.widgetWithText(TextField, 'Name'));
+    await tester.tap(find.widgetWithText(TextField, 'NAME'));
     await tester.pump();
     expect(typing(), isTrue);
 

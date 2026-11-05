@@ -70,7 +70,9 @@ void main() {
 
   /// Closes the one open card and returns its one-line summary.
   Future<String> closedLine(WidgetTester tester) async {
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.expand_less));
+    await tester.tap(
+      find.widgetWithIcon(IconButton, Icons.expand_less_rounded),
+    );
     await tester.pumpAndSettle();
     final text = tester.widget<Text>(
       find.descendant(

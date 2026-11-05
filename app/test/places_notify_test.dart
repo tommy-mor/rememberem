@@ -165,6 +165,23 @@ void main() {
     expect(watched(), [PlaceNotice.fenceId(cafe)]);
   });
 
+  testWidgets('the radius pill and the Notify box keep a gap when they wrap', (
+    tester,
+  ) async {
+    await showPlaces(tester);
+
+    final wrap = tester.widget<Wrap>(
+      find
+          .ancestor(
+            of: find.byType(Checkbox).first,
+            matching: find.byType(Wrap),
+          )
+          .first,
+    );
+    expect(wrap.spacing, 8);
+    expect(wrap.runSpacing, 8);
+  });
+
   testWidgets('ticking and unticking saves the choice in settings', (
     tester,
   ) async {

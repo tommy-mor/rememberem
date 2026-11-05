@@ -5,7 +5,8 @@ import '../settings/app_settings_controller.dart';
 
 /// Turns the app's sounds off or on from a game: the same switch as
 /// "Sounds" in Settings, so it is remembered and also quiets the dictation
-/// dings. Vibration has its own switch and is not changed.
+/// dings. Vibration has its own switch and is not changed. It sits in a
+/// game's app bar.
 class MuteButton extends StatelessWidget {
   const MuteButton(this.settings, {super.key});
 
@@ -17,7 +18,10 @@ class MuteButton extends StatelessWidget {
       valueListenable: settings,
       builder: (context, s, _) => IconButton(
         tooltip: s.sounds ? 'Mute sounds' : 'Unmute sounds',
-        icon: Icon(s.sounds ? Icons.volume_up : Icons.volume_off),
+        icon: Icon(
+          s.sounds ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+          size: 22,
+        ),
         onPressed: () => settings.update(s.copyWith(sounds: !s.sounds)),
       ),
     );

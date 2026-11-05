@@ -1,12 +1,17 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import '../memories/memory_tile.dart';
 import '../settings/app_settings_controller.dart';
 import 'countdown_button.dart';
+import 'detail_prompt_block.dart';
 import 'game_feedback.dart';
 import 'mute_button.dart';
+import 'quiz_progress_bar.dart';
 import 'quiz_result.dart';
 import 'quiz_results_view.dart';
 
@@ -252,6 +257,13 @@ class _DetailGameScreenState extends State<DetailGameScreen>
     }
   }
 
+  /// How far through the turns: moving while loading, full at the end.
+  double? get _progress => switch (_phase) {
+    _Phase.loading => null,
+    _Phase.finished => 1,
+    _ => _turns == 0 ? 0 : _turn / _turns,
+  };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -259,23 +271,23 @@ class _DetailGameScreenState extends State<DetailGameScreen>
         title: Text(_turn == 0 ? 'Practice details' : 'Turn $_turn of $_turns'),
         leading: IconButton(
           tooltip: 'Stop practice',
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close_rounded, size: 22),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         actions: [
           if (widget.settings case final settings?) MuteButton(settings),
           const HomeButton(),
         ],
+        bottom: QuizProgressBar(value: _progress),
       ),
       body: SafeArea(child: _body(context)),
     );
   }
 
   Widget _body(BuildContext context) {
-    final theme = Theme.of(context);
     switch (_phase) {
       case _Phase.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const SizedBox.shrink();
       case _Phase.finished:
         return QuizResultsView(
           results: _results,
@@ -289,128 +301,197 @@ class _DetailGameScreenState extends State<DetailGameScreen>
       case _Phase.stopped:
         return _message(context, _stopReason);
       case _Phase.reveal:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: _hidden
-                ? const Icon(Icons.visibility_off, size: 64)
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Semantics(
-                        liveRegion: true,
-                        child: _promptView(
-                          theme,
-                          theme.textTheme.headlineSmall,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      CountdownButton(
-                        key: ValueKey(_turn),
-                        label: 'Show people',
-                        duration: widget.reveal,
-                        running: !_hidden,
-                        onPressed: _showChoices,
-                      ),
-                    ],
-                  ),
+        if (_hidden) {
+          return const Center(
+            child: Icon(Icons.visibility_off_rounded, size: 64),
+          );
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            RememberemTheme.gutter,
+            24,
+            RememberemTheme.gutter,
+            RememberemTheme.gutter,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DetailPromptBlock(
+                prompt: _prompt!,
+                question: 'Who is this about?',
+                announce: true,
+              ),
+              const SizedBox(height: 24),
+              CountdownButton(
+                key: ValueKey(_turn),
+                label: 'Show people',
+                duration: widget.reveal,
+                running: !_hidden,
+                onPressed: _showChoices,
+              ),
+            ],
           ),
         );
       case _Phase.choose:
         break;
     }
     if (_hidden) {
-      return const Center(child: Icon(Icons.visibility_off, size: 64));
+      return const Center(child: Icon(Icons.visibility_off_rounded, size: 64));
     }
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          _promptView(theme, theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              _said ?? 'Who is this about?',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.8,
-              children: [for (final m in _choices) _card(context, m)],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// The detail as it reads: its kind small above, then the words.
-  Widget _promptView(ThemeData theme, TextStyle? style) {
-    final prompt = _prompt!;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(prompt.caption, style: theme.textTheme.labelMedium),
-        const SizedBox(height: 4),
-        Text(prompt.full, textAlign: TextAlign.center, style: style),
-      ],
-    );
-  }
-
-  Widget _card(BuildContext context, Memory person) {
-    final disabled = _wrong.contains(person.id) || _writing || _advancing;
-    final name = MemoryTile.nameOf(person);
-    return Semantics(
-      button: true,
-      enabled: !disabled,
-      label: person.id == _correctId
-          ? '$name, right'
-          : _wrong.contains(person.id)
-          ? '$name, not this one'
-          : name,
-      onTap: disabled ? null : () => _choose(person),
-      excludeSemantics: true,
-      child: Opacity(
-        opacity: _wrong.contains(person.id) ? 0.35 : 1,
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          shape: person.id == _correctId
-              ? RoundedRectangleBorder(
-                  side: BorderSide(color: Colors.green.shade600, width: 4),
-                  borderRadius: BorderRadius.circular(12),
-                )
-              : null,
-          child: InkWell(
-            onTap: disabled ? null : () => _choose(person),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Image.file(
-                    widget.repository.photoFile(person),
-                    fit: BoxFit.cover,
-                    cacheWidth: 500,
-                    excludeFromSemantics: true,
-                    errorBuilder: (_, _, _) =>
-                        const Center(child: Icon(Icons.person, size: 48)),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Each photo takes what is left once the prompt and the two name
+        // strips have their room: 120 to 188 dp. When even 120 does not
+        // fit (large text, a phone on its side) the whole page scrolls.
+        final scaler = MediaQuery.textScalerOf(context);
+        final prompt = scaler.scale(14) * 1.4 + 8 + scaler.scale(21) * 1.25 * 3;
+        final strip = _stripHeight(context);
+        const gap = 10.0;
+        final space =
+            (constraints.maxHeight -
+                    2 * RememberemTheme.gutter -
+                    prompt -
+                    16 -
+                    gap) /
+                2 -
+            strip;
+        final photo = space.clamp(120.0, 188.0);
+        final width =
+            (constraints.maxWidth - 2 * RememberemTheme.gutter - gap) / 2;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(RememberemTheme.gutter),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DetailPromptBlock(
+                prompt: _prompt!,
+                question: _said ?? 'Who is this about?',
+              ),
+              const SizedBox(height: 16),
+              for (var i = 0; i < _choices.length; i += 2) ...[
+                if (i > 0) const SizedBox(height: gap),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _card(context, _choices[i], width, photo, strip),
+                    const SizedBox(width: gap),
+                    if (i + 1 < _choices.length)
+                      _card(context, _choices[i + 1], width, photo, strip)
+                    else
+                      SizedBox(width: width),
+                  ],
                 ),
               ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// The strip under a photo: two lines of name, 48 dp at the least.
+  double _stripHeight(BuildContext context) =>
+      math.max(48.0, MediaQuery.textScalerOf(context).scale(14) * 1.3 * 2 + 16);
+
+  Widget _card(
+    BuildContext context,
+    Memory person,
+    double width,
+    double photoHeight,
+    double stripHeight,
+  ) {
+    final disabled = _wrong.contains(person.id) || _writing || _advancing;
+    final right = person.id == _correctId;
+    final wrong = _wrong.contains(person.id);
+    final name = MemoryTile.nameOf(person);
+    return SizedBox(
+      width: width,
+      child: Semantics(
+        container: true,
+        button: true,
+        enabled: !disabled || right,
+        selected: right,
+        label: right
+            ? '$name, right'
+            : wrong
+            ? '$name, not this one'
+            : name,
+        onTap: disabled ? null : () => _choose(person),
+        excludeSemantics: true,
+        child: Opacity(
+          opacity: wrong ? 0.35 : 1,
+          child: Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              side: right
+                  ? const BorderSide(
+                      color: RememberemTheme.rememberedGreen,
+                      width: 3,
+                    )
+                  : BorderSide(
+                      color: Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.2),
+                    ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: InkWell(
+              onTap: disabled ? null : () => _choose(person),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: photoHeight,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.file(
+                          widget.repository.photoFile(person),
+                          fit: BoxFit.cover,
+                          cacheWidth: 500,
+                          excludeFromSemantics: true,
+                          errorBuilder: (_, _, _) => const Center(
+                            child: Icon(Icons.person_rounded, size: 48),
+                          ),
+                        ),
+                        if (right)
+                          const Positioned(
+                            top: 6,
+                            right: 6,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                color: RememberemTheme.rememberedGreen,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    height: stripHeight,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -5,7 +5,9 @@ import 'package:rememberem_core/rememberem_core.dart';
 
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
+import '../app/bottom_action_bar.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import '../memories/memory_edit_screen.dart';
 import 'discard_photo_dialog.dart';
 import 'face_box.dart';
@@ -126,31 +128,87 @@ class _FacePickerScreenState extends State<FacePickerScreen> {
             ),
           ],
         ),
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text(
-                  'Tap each face to remember. Choose only people who are '
-                  'happy to be remembered.',
-                ),
-              ),
-              Expanded(child: Center(child: _photo())),
-            ],
+        body: SafeArea(child: _body(context)),
+        // Here, not in the body, so a message never covers it.
+        bottomNavigationBar: BottomActionBar(
+          end: FilledButton(
+            style: BottomActionBar.goldStyle,
+            onPressed: count == 0 || _saving ? null : _next,
+            child: Text(count <= 1 ? 'Add 1 person' : 'Add $count people'),
           ),
         ),
-        // Here, not in the body, so a message never covers it.
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: FilledButton(
-              onPressed: count == 0 || _saving ? null : _next,
-              child: Text(count <= 1 ? 'Add 1 person' : 'Add $count people'),
+      ),
+    );
+  }
+
+  /// The words, then the photo. The photo takes what the words leave; with
+  /// large text or on its side that is too little to tap a face, so the
+  /// page scrolls instead, with the photo at a size of its own.
+  Widget _body(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final largeText = MediaQuery.textScalerOf(context).scale(10) > 13;
+    final header = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _strip(context),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            RememberemTheme.gutter,
+            8,
+            RememberemTheme.gutter,
+            8,
+          ),
+          child: Text('Choose only people who are happy to be remembered.'),
+        ),
+      ],
+    );
+    if (largeText || size.width > size.height) {
+      return SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            SizedBox(
+              height: max(280, size.height * 0.7),
+              child: Center(child: _photo()),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        Expanded(child: Center(child: _photo())),
+      ],
+    );
+  }
+
+  /// What to do here, on the pale gold of the bars.
+  Widget _strip(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 40),
+      color: BottomActionBar.surfaceOf(theme),
+      padding: const EdgeInsets.symmetric(horizontal: RememberemTheme.gutter),
+      child: Row(
+        children: [
+          Icon(
+            Icons.touch_app_rounded,
+            size: 20,
+            color: theme.colorScheme.onSurface,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Tap each face to keep',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

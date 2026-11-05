@@ -10,12 +10,15 @@ import '../app/allow_in_settings.dart';
 import '../app/app_routes.dart';
 import '../app/app_services.dart';
 import '../app/home_button.dart';
+import '../app/rememberem_theme.dart';
 import '../app/system_settings.dart';
 import '../memories/memory_edit_screen.dart';
 import 'face_picker_screen.dart';
+import 'gallery_button.dart';
 import 'photo_check.dart';
 import 'photo_picker.dart';
 import 'photo_problems.dart';
+import 'shutter_button.dart';
 
 /// A photo to keep, held until it is saved so a failure can try again.
 typedef _Photo = ({List<int> bytes, DateTime capturedAt, GeoPoint? location});
@@ -362,9 +365,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
-  /// The consent cue: one quiet line, no extra step.
+  /// The consent cue: one quiet line at the gutter, no extra step.
   Widget _askFirst() => const Padding(
-    padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+    padding: EdgeInsets.fromLTRB(
+      RememberemTheme.gutter,
+      0,
+      RememberemTheme.gutter,
+      12,
+    ),
     child: DecoratedBox(
       // Dark behind the words, so they read over any scene.
       decoration: BoxDecoration(
@@ -375,10 +383,40 @@ class _CaptureScreenState extends State<CaptureScreen> {
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Text(
           'Ask first: "Mind if I take a photo so I remember your name?"',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Color(0xD9FFFFFF), fontSize: 13),
         ),
       ),
+    ),
+  );
+
+  /// Shutter in the middle, the gallery on the right, and an empty slot of
+  /// the same width on the left so the shutter stays centred.
+  Widget _shutterRow(CameraController? camera, PhotoPicker? picker) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      RememberemTheme.gutter,
+      0,
+      RememberemTheme.gutter,
+      16,
+    ),
+    child: Row(
+      children: [
+        const SizedBox(width: RememberemTheme.tapTarget),
+        Expanded(
+          child: Center(
+            child: ShutterButton(
+              onPressed: camera == null || _saving ? null : _takePhoto,
+            ),
+          ),
+        ),
+        SizedBox(
+          width: RememberemTheme.tapTarget,
+          child: picker == null
+              ? null
+              : GalleryButton(
+                  onPressed: _saving ? null : () => _pickPhoto(picker),
+                ),
+        ),
+      ],
     ),
   );
 
@@ -426,47 +464,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
             ),
           Align(
             alignment: Alignment.bottomCenter,
+            // Clear of the navigation bar and a notch on its side.
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (camera != null) _askFirst(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Balances the gallery button so the shutter stays
-                        // centred.
-                        const SizedBox(width: 72),
-                        FloatingActionButton.large(
-                          heroTag: 'shutter',
-                          tooltip: 'Take photo',
-                          onPressed: camera == null || _saving
-                              ? null
-                              : _takePhoto,
-                          child: const Icon(Icons.camera_alt),
-                        ),
-                        SizedBox(
-                          width: 72,
-                          child: Center(
-                            child: picker == null
-                                ? null
-                                : FloatingActionButton.small(
-                                    heroTag: 'gallery',
-                                    tooltip: 'Choose a photo from the phone',
-                                    onPressed: _saving
-                                        ? null
-                                        : () => _pickPhoto(picker),
-                                    child: const Icon(Icons.photo_library),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (camera != null) _askFirst(),
+                  _shutterRow(camera, picker),
+                ],
               ),
             ),
           ),
@@ -485,10 +490,25 @@ class _CaptureScreenState extends State<CaptureScreen> {
           if (_saving)
             const ColoredBox(
               color: Colors.black54,
-              child: Center(
-                child: Text(
-                  'Framing the photo…',
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      minHeight: 3,
+                      color: RememberemTheme.gold,
+                      backgroundColor: Colors.transparent,
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(RememberemTheme.gutter),
+                      child: Text(
+                        'Framing the photo…',
+                        style: TextStyle(color: Colors.white, fontSize: 18),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

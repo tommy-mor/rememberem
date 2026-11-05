@@ -135,7 +135,7 @@ void main() {
 
     expect(stored(memory).place, isEmpty);
     final place = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Place'),
+      find.widgetWithText(TextField, 'PLACE'),
     );
     expect(place.decoration!.hintText, 'unknown');
   });
@@ -201,7 +201,7 @@ void main() {
     await tester.tap(find.text('Unknown'));
     await tester.pumpAndSettle();
     final name = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Name'),
+      find.widgetWithText(TextField, 'NAME'),
     );
     expect(name.decoration!.hintText, 'Unknown');
     expect(name.controller!.text, isEmpty);

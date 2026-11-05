@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// A button whose background fills from left to right over [duration],
-/// like a progress bar, and presses itself when full. A tap presses it at
-/// once. While [running] is false (the app is hidden) it stands empty and
-/// waits; when it runs again it starts from empty. It presses once only.
+/// A button with a thin gold bar along its foot that drains from full to
+/// empty over [duration], and presses itself when it is gone. A tap
+/// presses it at once. While [running] is false (the app is hidden) it stands full and
+/// waits; when it runs again it starts from full. It presses once only.
 class CountdownButton extends StatefulWidget {
   const CountdownButton({
     super.key,
@@ -26,7 +26,7 @@ class CountdownButton extends StatefulWidget {
 
 class _CountdownButtonState extends State<CountdownButton>
     with SingleTickerProviderStateMixin {
-  /// Only draws the fill; [_timer] presses, so the press comes exactly
+  /// Only draws the bar draining; [_timer] presses, so the press comes exactly
   /// [CountdownButton.duration] after the countdown starts.
   late final AnimationController _fill = AnimationController(
     vsync: this,
@@ -110,21 +110,19 @@ class _CountdownButtonState extends State<CountdownButton>
           onTap: _press,
           child: Stack(
             children: [
-              Positioned.fill(
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: AnimatedBuilder(
                   animation: _fill,
-                  // A solid fill, and a bar along the bottom edge that stays
-                  // visible whatever colour Fred chose.
                   builder: (context, _) => FractionallySizedBox(
                     alignment: AlignmentDirectional.centerStart,
-                    widthFactor: _fill.value,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.primaryContainer,
-                        border: Border(
-                          bottom: BorderSide(color: scheme.primary, width: 4),
-                        ),
-                      ),
+                    widthFactor: 1 - _fill.value,
+                    // Primary, not gold: gold is 1.6:1 on the pale button.
+                    child: SizedBox(
+                      height: 4,
+                      child: ColoredBox(color: scheme.primary),
                     ),
                   ),
                 ),

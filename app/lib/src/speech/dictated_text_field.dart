@@ -19,6 +19,7 @@ class DictatedTextField extends StatefulWidget {
     this.dense = false,
     this.autofocus = false,
     this.showMic = true,
+    this.ledger = false,
     this.onListeningChanged,
   });
 
@@ -39,6 +40,12 @@ class DictatedTextField extends StatefulWidget {
   final bool autofocus;
 
   final bool showMic;
+
+  /// The ledger look (an overline label over an underline, at least 48 dp
+  /// tall) instead of a box. [dense] does not apply to it. With [showMic]
+  /// false there is no microphone and the field simply ends. A [hint] shows
+  /// at once, since the label is always up.
+  final bool ledger;
 
   /// Told when listening starts and stops (and that it stopped, if the
   /// field goes while listening).
@@ -136,6 +143,49 @@ class _DictatedTextFieldState extends State<DictatedTextField>
     }
   }
 
+  Widget? get _mic => !widget.showMic && !_listening
+      ? null
+      : IconButton(
+          tooltip: _listening ? 'Stop listening' : 'Speak ${widget.label}',
+          icon: _listening
+              ? FadeTransition(
+                  opacity: _pulse,
+                  child: ScaleTransition(
+                    scale: _pulse.drive(Tween(begin: 0.85, end: 1.15)),
+                    child: const Icon(Icons.stop_circle),
+                  ),
+                )
+              : const Icon(Icons.mic),
+          color: _listening ? Theme.of(context).colorScheme.error : null,
+          // Never smaller than 48 dp, whatever density is inherited.
+          visualDensity: VisualDensity.standard,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: _toggleListening,
+        );
+
+  InputDecoration _decoration(BuildContext context) {
+    if (widget.ledger) {
+      return RememberemTheme.ledgerDecoration(
+        Theme.of(context),
+        label: widget.label,
+        hint: widget.hint,
+        suffix: _mic,
+      ).copyWith(hintStyle: widget.hintStyle);
+    }
+    return InputDecoration(
+      labelText: widget.label,
+      hintText: widget.hint,
+      hintStyle: widget.hintStyle,
+      isDense: widget.dense,
+      contentPadding: widget.dense ? RememberemTheme.denseFieldPadding : null,
+      // Keep the label up so the hint shows while the field is empty.
+      floatingLabelBehavior: widget.hint != null
+          ? FloatingLabelBehavior.always
+          : null,
+      suffixIcon: _mic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -147,36 +197,7 @@ class _DictatedTextFieldState extends State<DictatedTextField>
           : TextCapitalization.words,
       minLines: 1,
       maxLines: widget.multiline ? 5 : 1,
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hint,
-        hintStyle: widget.hintStyle,
-        isDense: widget.dense,
-        contentPadding: widget.dense ? RememberemTheme.denseFieldPadding : null,
-        // Keep the label up so the hint shows while the field is empty.
-        floatingLabelBehavior: widget.hint != null
-            ? FloatingLabelBehavior.always
-            : null,
-        border: const OutlineInputBorder(),
-        suffixIcon: !widget.showMic && !_listening
-            ? null
-            : IconButton(
-                tooltip: _listening
-                    ? 'Stop listening'
-                    : 'Speak ${widget.label}',
-                icon: _listening
-                    ? FadeTransition(
-                        opacity: _pulse,
-                        child: ScaleTransition(
-                          scale: _pulse.drive(Tween(begin: 0.85, end: 1.15)),
-                          child: const Icon(Icons.stop_circle),
-                        ),
-                      )
-                    : const Icon(Icons.mic),
-                color: _listening ? Theme.of(context).colorScheme.error : null,
-                onPressed: _toggleListening,
-              ),
-      ),
+      decoration: _decoration(context),
     );
   }
 }
