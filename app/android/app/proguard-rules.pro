@@ -18,3 +18,10 @@
 # Place notices: the geofence plugin's worker, receivers and callback
 # lookup run with the app closed; shrinking could silently stop them.
 -keep class com.chunkytofustudios.native_geofence.** { *; }
+
+# WorkManager (pulled in by plugins): the app crashes at startup in release
+# when R8 strips the generated WorkDatabase_Impl constructor, which Room and
+# WorkManager look up by reflection.
+-keep class androidx.work.impl.WorkDatabase_Impl { <init>(); }
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.work.** { *; }
